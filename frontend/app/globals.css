@@ -8,8 +8,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-sans);
+  --font-handwriting: var(--font-handwriting);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -22,5 +22,167 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), "Plus Jakarta Sans", system-ui, -apple-system,
+    "Segoe UI", Roboto, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+/* Offset cho anchor khi navbar fixed (giống DUDI: scroll-mt-16/20/24) */
+section[id] {
+  scroll-margin-top: 84px;
+}
+
+@media (max-width: 640px) {
+  section[id] {
+    scroll-margin-top: 72px;
+  }
+}
+
+/* Custom scrollbar — tone xanh EduHub (tham khảo DUDI, đổi sang blue-600) */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #e4edfb;
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #60a5fa 0%, #2563eb 100%);
+  border-radius: 8px;
+  border: 2px solid #e4edfb;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
+}
+
+/* Firefox */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: #2563eb #e4edfb;
+}
+
+.font-handwriting {
+  font-family: var(--font-handwriting), "Dancing Script", cursive !important;
+}
+
+/* Vòng dashed xoay chậm quanh radar Features (class đã dùng sẵn trong code) */
+@keyframes spin-slower {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slower {
+  animation: spin-slower 40s linear infinite;
+}
+
+/* Role Transition Animations (Smooth crossfade & slide for roles switcher) */
+@keyframes roleCardIn {
+  from {
+    opacity: 0;
+    transform: translateY(18px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes roleImageIn {
+  from {
+    opacity: 0;
+    transform: scale(0.93) translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateX(0);
+  }
+}
+
+.animate-role-card {
+  animation: roleCardIn 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.animate-role-image {
+  animation: roleImageIn 0.72s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* ========================================================
+   SCROLL REVEAL / LAZY LOADING ANIMATIONS (port từ DUDI)
+   GPU-accelerated, cinematic smooth transitions
+   Slow, deliberate & elegant easing — thấy rõ chuyển động
+   Lướt lên + lướt xuống đều trigger (once=false mặc định)
+   ======================================================== */
+.reveal-init {
+  opacity: 0 !important;
+  will-change: transform, opacity;
+  transition-property: transform, opacity !important;
+  transition-timing-function: cubic-bezier(0.25, 1, 0.4, 1) !important;
+  transition-duration: 350ms !important;
+  transition-delay: 0ms !important;
+}
+
+.reveal-init.is-revealed {
+  opacity: 1 !important;
+  transition-duration: var(--reveal-duration, 1000ms) !important;
+  transition-delay: var(--reveal-delay, 0ms) !important;
+}
+
+/* Variant 1: Fade Up (đi từ dưới lướt lên) */
+.reveal-fade-up {
+  transform: translate3d(0, 36px, 0);
+}
+.reveal-fade-up.is-revealed {
+  transform: translate3d(0, 0, 0);
+}
+
+/* Variant 2: Fade Down (đi từ trên lướt xuống) */
+.reveal-fade-down {
+  transform: translate3d(0, -32px, 0);
+}
+.reveal-fade-down.is-revealed {
+  transform: translate3d(0, 0, 0);
+}
+
+/* Variant 3: Slide In from Left */
+.reveal-slide-left {
+  transform: translate3d(-40px, 0, 0);
+}
+.reveal-slide-left.is-revealed {
+  transform: translate3d(0, 0, 0);
+}
+
+/* Variant 4: Slide In from Right */
+.reveal-slide-right {
+  transform: translate3d(40px, 0, 0);
+}
+.reveal-slide-right.is-revealed {
+  transform: translate3d(0, 0, 0);
+}
+
+/* Variant 5: Zoom In (nhỏ + hơi nâng lên, nở ra full size) */
+.reveal-zoom-in {
+  transform: scale(0.9) translate3d(0, 22px, 0);
+}
+.reveal-zoom-in.is-revealed {
+  transform: scale(1) translate3d(0, 0, 0);
+}
+
+/* Variant 6: 3D Perspective Card (nghiêng về trước vào vị trí) */
+.reveal-card-3d {
+  transform: perspective(1000px) rotateX(10deg) translate3d(0, 36px, 0);
+}
+.reveal-card-3d.is-revealed {
+  transform: perspective(1000px) rotateX(0deg) translate3d(0, 0, 0);
+}
+
+/* Variant 7: Flip In (xoay ngang phối cảnh) */
+.reveal-flip-in {
+  transform: perspective(1000px) rotateY(-10deg) translate3d(-24px, 0, 0);
+}
+.reveal-flip-in.is-revealed {
+  transform: perspective(1000px) rotateY(0deg) translate3d(0, 0, 0);
 }
