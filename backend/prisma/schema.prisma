@@ -1,0 +1,600 @@
+// ==============================================================================
+// CLASSROOM-HUB - PRISMA DATABASE SCHEMA
+// Chuẩn hóa theo ERD (erd.mmd / erd.puml) và Class Diagram UML 2.5 (26 bảng)
+// ==============================================================================
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ==============================================================================
+// 1. ENUMS (CÁC KIỂU LIỆT KÊ TRONG HỆ THỐNG)
+// ==============================================================================
+
+enum UserRole {
+  ADMIN
+  TEACHER
+  STUDENT
+}
+
+enum UserStatus {
+  ACTIVE
+  LOCKED
+}
+
+enum MembershipStatus {
+  ACTIVE
+  REMOVED
+}
+
+enum ClassStatus {
+  ACTIVE
+  CLOSED
+  ARCHIVED
+}
+
+enum LessonStatus {
+  DRAFT
+  PUBLISHED
+  ARCHIVED
+}
+
+enum ResourceParent {
+  LESSON
+  SUBMISSION
+}
+
+enum ActivityStatus {
+  DRAFT
+  PUBLISHED
+  CLOSED
+}
+
+enum SubmissionStatus {
+  SUBMITTED
+  GRADED
+}
+
+enum GradeCategory {
+  ASSIGNMENT
+  QUIZ
+}
+
+enum GradingMethod {
+  MANUAL
+  AUTO
+}
+
+enum ActorType {
+  USER
+  SYSTEM
+}
+
+enum QuestionType {
+  SINGLE
+  MULTIPLE
+}
+
+enum QuestionStatus {
+  ACTIVE
+  RETIRED
+}
+
+enum AttemptStatus {
+  DRAFT
+  IN_PROGRESS
+  SUBMITTED
+  GRADED
+}
+
+enum AnnouncementStatus {
+  ACTIVE
+  CANCELLED
+}
+
+enum NotificationType {
+  ASSIGNMENT_NEW
+  QUIZ_NEW
+  GRADE_POSTED
+  ANNOUNCEMENT_NEW
+  SYSTEM_ALERT
+}
+
+enum EventSource {
+  MANUAL
+  ASSIGNMENT_DEADLINE
+  QUIZ_DEADLINE
+}
+
+// ==============================================================================
+// 2. CORE IDENTITY & CLASSROOM DOMAIN (NGƯỜI DÙNG & LỚP HỌC)
+// ==============================================================================
+
+model User {
+  id           BigInt     @id @default(autoincrement())
+  email        String     @unique @db.VarChar(255)
+  fullName     String     @map("full_name") @db.VarChar(255)
+  passwordHash String     @map("password_hash") @db.VarChar(255)
+  role         UserRole   @default(STUDENT)
+  status       UserStatus @default(ACTIVE)
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Quan hệ 1-nhiều
+  ownedClasses          Classroom[]       @relation("ClassOwner")
+  classMemberships      ClassMembership[]
+  lessonProgresses      LessonProgress[]
+  uploadedResources     Resource[]        @relation("ResourceUploader")
+  createdAssignments    Assignment[]      @relation("AssignmentCreator")
+  submissions           Submission[]
+  receivedGrades        Grade[]           @relation("StudentGrade")
+  givenGrades           Grade[]           @relation("TeacherGraded")
+  gradeHistories        GradeHistory[]    @relation("GradeHistoryActor")
+  questionBanks         QuestionBank[]    @relation("QuestionBankOwner")
+  createdQuizzes        Quiz[]            @relation("QuizCreator")
+  quizAttempts          QuizAttempt[]
+  authoredAnnouncements Announcement[]    @relation("AnnouncementAuthor")
+  notifications         Notification[]
+  calendarEvents        CalendarEvent[]   @relation("CalendarEventCreator")
+  auditLogs             AuditLog[]        @relation("AuditLogActor")
+
+  @@map("users")
+}
+
+model Classroom {
+  id          BigInt      @id @default(autoincrement())
+  ownerId     BigInt      @map("owner_id")
+  classCode   String      @unique @map("class_code") @db.VarChar(50)
+  name        String      @db.VarChar(255)
+  description String?     @db.Text
+  status      ClassStatus @default(ACTIVE)
+  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  // Quan hệ
+  owner          User              @relation("ClassOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  memberships    ClassMembership[]
+  courses        Course[]
+  assignments    Assignment[]
+  gradeItems     GradeItem[]
+  gradeConfig    GradeConfig?
+  quizzes        Quiz[]
+  announcements  Announcement[]
+  calendarEvents CalendarEvent[]
+
+  @@map("classes")
+}
+
+model ClassMembership {
+  id        BigInt           @id @default(autoincrement())
+  classId   BigInt           @map("class_id")
+  studentId BigInt           @map("student_id")
+  status    MembershipStatus @default(ACTIVE)
+  joinedAt  DateTime         @default(now()) @map("joined_at") @db.Timestamptz(6)
+  removedAt DateTime?        @map("removed_at") @db.Timestamptz(6)
+
+  classroom Classroom @relation(fields: [classId], references: [id], onDelete: Cascade)
+  student   User      @relation(fields: [studentId], references: [id], onDelete: Restrict)
+
+  @@unique([classId, studentId], name: "uk_class_memberships_class_student")
+  @@map("class_memberships")
+}
+
+// ==============================================================================
+// 3. LEARNING CONTENT DOMAIN (NỘI DUNG HỌC TẬP: COURSE - MODULE - LESSON)
+// ==============================================================================
+
+model Course {
+  id         BigInt   @id @default(autoincrement())
+  classId    BigInt   @map("class_id")
+  title      String   @db.VarChar(255)
+  orderIndex Int      @map("order_index")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  classroom Classroom @relation(fields: [classId], references: [id], onDelete: Cascade)
+  modules   Module[]
+
+  @@unique([classId, orderIndex], name: "uk_courses_class_order")
+  @@map("courses")
+}
+
+model Module {
+  id         BigInt   @id @default(autoincrement())
+  courseId   BigInt   @map("course_id")
+  title      String   @db.VarChar(255)
+  orderIndex Int      @map("order_index")
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons Lesson[]
+
+  @@unique([courseId, orderIndex], name: "uk_modules_course_order")
+  @@map("modules")
+}
+
+model Lesson {
+  id          BigInt       @id @default(autoincrement())
+  moduleId    BigInt       @map("module_id")
+  title       String       @db.VarChar(255)
+  content     String       @db.Text
+  orderIndex  Int          @map("order_index")
+  status      LessonStatus @default(DRAFT)
+  publishedAt DateTime?    @map("published_at") @db.Timestamptz(6)
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  module     Module           @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  progresses LessonProgress[]
+  resources  Resource[]
+
+  @@unique([moduleId, orderIndex], name: "uk_lessons_module_order")
+  @@map("lessons")
+}
+
+model LessonProgress {
+  id          BigInt    @id @default(autoincrement())
+  lessonId    BigInt    @map("lesson_id")
+  studentId   BigInt    @map("student_id")
+  isCompleted Boolean   @default(false) @map("is_completed")
+  completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
+
+  lesson  Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  student User   @relation(fields: [studentId], references: [id], onDelete: Restrict)
+
+  @@unique([lessonId, studentId], name: "uk_lesson_progress_lesson_student")
+  @@map("lesson_progress")
+}
+
+model Resource {
+  id            BigInt         @id @default(autoincrement())
+  parentType    ResourceParent @map("parent_type")
+  lessonId      BigInt?        @map("lesson_id")
+  submissionId  BigInt?        @unique @map("submission_id")
+  uploadedBy    BigInt         @map("uploaded_by")
+  fileName      String         @map("file_name") @db.VarChar(255)
+  storageKey    String         @map("storage_key") @db.VarChar(500)
+  fileSizeBytes BigInt         @map("file_size_bytes")
+  mimeType      String         @map("mime_type") @db.VarChar(100)
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  lesson     Lesson?     @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  submission Submission? @relation(fields: [submissionId], references: [id], onDelete: Cascade)
+  uploader   User        @relation("ResourceUploader", fields: [uploadedBy], references: [id], onDelete: Restrict)
+
+  @@map("resources")
+}
+
+// ==============================================================================
+// 4. ASSESSMENT & GRADEBOOK DOMAIN (BÀI TẬP, ĐIỂM SỐ & SỔ ĐIỂM)
+// ==============================================================================
+
+model Assignment {
+  id          BigInt         @id @default(autoincrement())
+  classId     BigInt         @map("class_id")
+  createdBy   BigInt         @map("created_by")
+  title       String         @db.VarChar(255)
+  description String?        @db.Text
+  maxScore    Decimal        @map("max_score") @db.Decimal(10, 2)
+  openAt      DateTime       @map("open_at") @db.Timestamptz(6)
+  dueAt       DateTime       @map("due_at") @db.Timestamptz(6)
+  status      ActivityStatus @default(DRAFT)
+  publishedAt DateTime?      @map("published_at") @db.Timestamptz(6)
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  classroom   Classroom    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  creator     User         @relation("AssignmentCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  submissions Submission[]
+  gradeItem   GradeItem?
+
+  @@map("assignments")
+}
+
+model Submission {
+  id           BigInt           @id @default(autoincrement())
+  assignmentId BigInt           @map("assignment_id")
+  studentId    BigInt           @map("student_id")
+  status       SubmissionStatus @default(SUBMITTED)
+  submittedAt  DateTime         @default(now()) @map("submitted_at") @db.Timestamptz(6)
+  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  student    User       @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  resource   Resource?
+
+  @@unique([assignmentId, studentId], name: "uk_submissions_assignment_student")
+  @@map("submissions")
+}
+
+model GradeItem {
+  id           BigInt        @id @default(autoincrement())
+  classId      BigInt        @map("class_id")
+  category     GradeCategory
+  assignmentId BigInt?       @unique @map("assignment_id")
+  quizId       BigInt?       @unique @map("quiz_id")
+  maxScore     Decimal       @map("max_score") @db.Decimal(10, 2)
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  classroom  Classroom   @relation(fields: [classId], references: [id], onDelete: Cascade)
+  assignment Assignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  quiz       Quiz?       @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  grades     Grade[]
+
+  @@map("grade_items")
+}
+
+model Grade {
+  id            BigInt        @id @default(autoincrement())
+  gradeItemId   BigInt        @map("grade_item_id")
+  studentId     BigInt        @map("student_id")
+  score         Decimal       @db.Decimal(10, 2)
+  feedback      String?       @db.Text
+  gradingMethod GradingMethod @map("grading_method")
+  gradedBy      BigInt?       @map("graded_by")
+  gradedAt      DateTime      @default(now()) @map("graded_at") @db.Timestamptz(6)
+  updatedAt     DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  gradeItem GradeItem      @relation(fields: [gradeItemId], references: [id], onDelete: Cascade)
+  student   User           @relation("StudentGrade", fields: [studentId], references: [id], onDelete: Restrict)
+  grader    User?          @relation("TeacherGraded", fields: [gradedBy], references: [id], onDelete: SetNull)
+  histories GradeHistory[]
+
+  @@unique([gradeItemId, studentId], name: "uk_grades_grade_item_student")
+  @@map("grades")
+}
+
+model GradeHistory {
+  id          BigInt    @id @default(autoincrement())
+  gradeId     BigInt    @map("grade_id")
+  oldScore    Decimal?  @map("old_score") @db.Decimal(10, 2)
+  newScore    Decimal   @map("new_score") @db.Decimal(10, 2)
+  oldFeedback String?   @map("old_feedback") @db.Text
+  newFeedback String?   @map("new_feedback") @db.Text
+  actorType   ActorType @map("actor_type")
+  actorId     BigInt?   @map("actor_id")
+  changedAt   DateTime  @default(now()) @map("changed_at") @db.Timestamptz(6)
+  reason      String?   @db.VarChar(255)
+
+  grade Grade @relation(fields: [gradeId], references: [id], onDelete: Cascade)
+  actor User? @relation("GradeHistoryActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@map("grade_histories")
+}
+
+model GradeConfig {
+  id               BigInt   @id @default(autoincrement())
+  classId          BigInt   @unique @map("class_id")
+  assignmentWeight Decimal  @default(50.00) @map("assignment_weight") @db.Decimal(5, 2)
+  quizWeight       Decimal  @default(50.00) @map("quiz_weight") @db.Decimal(5, 2)
+  updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  classroom Classroom @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  @@map("grade_configs")
+}
+
+// ==============================================================================
+// 5. QUESTION BANK & QUIZ DOMAIN (NGÂN HÀNG CÂU HỎI & TRẮC NGHIỆM)
+// ==============================================================================
+
+model QuestionBank {
+  id           BigInt         @id @default(autoincrement())
+  ownerId      BigInt         @map("owner_id")
+  questionKey  String         @default(uuid()) @map("question_key") @db.Uuid
+  content      String         @db.Text
+  questionType QuestionType   @map("question_type")
+  defaultScore Decimal        @default(1.00) @map("default_score") @db.Decimal(10, 2)
+  version      Int            @default(1)
+  status       QuestionStatus @default(ACTIVE)
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  owner         User             @relation("QuestionBankOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  choices       QuestionChoice[]
+  quizQuestions QuizQuestion[]
+
+  @@unique([questionKey, version], name: "uk_question_bank_key_version")
+  @@map("question_bank")
+}
+
+model QuestionChoice {
+  id         BigInt  @id @default(autoincrement())
+  questionId BigInt  @map("question_id")
+  content    String  @db.Text
+  isCorrect  Boolean @map("is_correct")
+  orderIndex Int     @map("order_index")
+
+  question             QuestionBank          @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  attemptAnswerChoices AttemptAnswerChoice[]
+
+  @@unique([questionId, orderIndex], name: "uk_question_choices_question_order")
+  @@map("question_choices")
+}
+
+model Quiz {
+  id                     BigInt         @id @default(autoincrement())
+  classId                BigInt         @map("class_id")
+  createdBy              BigInt         @map("created_by")
+  title                  String         @db.VarChar(255)
+  instructions           String?        @db.Text
+  openAt                 DateTime       @map("open_at") @db.Timestamptz(6)
+  dueAt                  DateTime       @map("due_at") @db.Timestamptz(6)
+  durationMinutes        Int?           @map("duration_minutes")
+  maxAttempts            Int            @default(1) @map("max_attempts") @db.SmallInt
+  scoringEnabled         Boolean        @default(true) @map("scoring_enabled")
+  showAnswersAfterSubmit Boolean        @default(false) @map("show_answers_after_submit")
+  status                 ActivityStatus @default(DRAFT)
+  publishedAt            DateTime?      @map("published_at") @db.Timestamptz(6)
+  createdAt              DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  classroom     Classroom      @relation(fields: [classId], references: [id], onDelete: Cascade)
+  creator       User           @relation("QuizCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+  quizQuestions QuizQuestion[]
+  attempts      QuizAttempt[]
+  gradeItem     GradeItem?
+
+  @@map("quizzes")
+}
+
+model QuizQuestion {
+  id               BigInt   @id @default(autoincrement())
+  quizId           BigInt   @map("quiz_id")
+  questionId       BigInt   @map("question_id")
+  orderIndex       Int      @map("order_index")
+  maxScore         Decimal  @map("max_score") @db.Decimal(10, 2)
+  questionSnapshot Json     @map("question_snapshot") @db.JsonB
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  quiz             Quiz              @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  question         QuestionBank      @relation(fields: [questionId], references: [id], onDelete: Restrict)
+  attemptQuestions AttemptQuestion[]
+
+  @@unique([quizId, questionId], name: "uk_quiz_questions_quiz_question")
+  @@unique([quizId, orderIndex], name: "uk_quiz_questions_quiz_order")
+  @@map("quiz_questions")
+}
+
+model QuizAttempt {
+  id            BigInt        @id @default(autoincrement())
+  quizId        BigInt        @map("quiz_id")
+  studentId     BigInt        @map("student_id")
+  attemptNumber Int           @default(1) @map("attempt_number") @db.SmallInt
+  status        AttemptStatus @default(DRAFT)
+  startedAt     DateTime?     @map("started_at") @db.Timestamptz(6)
+  submittedAt   DateTime?     @map("submitted_at") @db.Timestamptz(6)
+  gradedAt      DateTime?     @map("graded_at") @db.Timestamptz(6)
+  totalScore    Decimal?      @map("total_score") @db.Decimal(10, 2)
+  createdAt     DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  quiz             Quiz              @relation(fields: [quizId], references: [id], onDelete: Cascade)
+  student          User              @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  attemptQuestions AttemptQuestion[]
+
+  @@unique([quizId, studentId, attemptNumber], name: "uk_quiz_attempts_quiz_student_attempt")
+  @@map("quiz_attempts")
+}
+
+model AttemptQuestion {
+  id               BigInt  @id @default(autoincrement())
+  attemptId        BigInt  @map("attempt_id")
+  quizQuestionId   BigInt  @map("quiz_question_id")
+  orderIndex       Int     @map("order_index")
+  maxScore         Decimal @map("max_score") @db.Decimal(10, 2)
+  questionSnapshot Json    @map("question_snapshot") @db.JsonB
+
+  attempt       QuizAttempt    @relation(fields: [attemptId], references: [id], onDelete: Cascade)
+  quizQuestion  QuizQuestion   @relation(fields: [quizQuestionId], references: [id], onDelete: Restrict)
+  attemptAnswer AttemptAnswer?
+
+  @@unique([attemptId, quizQuestionId], name: "uk_attempt_questions_attempt_quiz_question")
+  @@unique([attemptId, orderIndex], name: "uk_attempt_questions_attempt_order")
+  @@map("attempt_questions")
+}
+
+model AttemptAnswer {
+  id                BigInt   @id @default(autoincrement())
+  attemptQuestionId BigInt   @unique @map("attempt_question_id")
+  isCorrect         Boolean? @map("is_correct")
+  awardedScore      Decimal? @map("awarded_score") @db.Decimal(10, 2)
+  answeredAt        DateTime @default(now()) @map("answered_at") @db.Timestamptz(6)
+
+  attemptQuestion AttemptQuestion       @relation(fields: [attemptQuestionId], references: [id], onDelete: Cascade)
+  selectedChoices AttemptAnswerChoice[]
+
+  @@map("attempt_answers")
+}
+
+model AttemptAnswerChoice {
+  id              BigInt @id @default(autoincrement())
+  attemptAnswerId BigInt @map("attempt_answer_id")
+  choiceId        BigInt @map("choice_id")
+
+  attemptAnswer AttemptAnswer  @relation(fields: [attemptAnswerId], references: [id], onDelete: Cascade)
+  choice        QuestionChoice @relation(fields: [choiceId], references: [id], onDelete: Restrict)
+
+  @@unique([attemptAnswerId, choiceId], name: "uk_attempt_answer_choices_answer_choice")
+  @@map("attempt_answer_choices")
+}
+
+// ==============================================================================
+// 6. COMMUNICATION, CALENDAR & AUDIT DOMAIN (THÔNG BÁO, LỊCH & NHẬT KÝ HỆ THỐNG)
+// ==============================================================================
+
+model Announcement {
+  id        BigInt             @id @default(autoincrement())
+  classId   BigInt             @map("class_id")
+  authorId  BigInt             @map("author_id")
+  title     String             @db.VarChar(255)
+  content   String             @db.Text
+  status    AnnouncementStatus @default(ACTIVE)
+  createdAt DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  classroom Classroom @relation(fields: [classId], references: [id], onDelete: Cascade)
+  author    User      @relation("AnnouncementAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@map("announcements")
+}
+
+model Notification {
+  id          BigInt           @id @default(autoincrement())
+  recipientId BigInt           @map("recipient_id")
+  eventKey    String           @default(uuid()) @map("event_key") @db.Uuid
+  type        NotificationType
+  title       String           @db.VarChar(255)
+  message     String           @db.Text
+  targetType  String?          @map("target_type") @db.VarChar(50)
+  targetId    BigInt?          @map("target_id")
+  readAt      DateTime?        @map("read_at") @db.Timestamptz(6)
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  recipient User @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@unique([recipientId, eventKey], name: "uk_notifications_recipient_event")
+  @@map("notifications")
+}
+
+model CalendarEvent {
+  id         BigInt      @id @default(autoincrement())
+  classId    BigInt      @map("class_id")
+  createdBy  BigInt?     @map("created_by")
+  title      String      @db.VarChar(255)
+  startAt    DateTime    @map("start_at") @db.Timestamptz(6)
+  endAt      DateTime    @map("end_at") @db.Timestamptz(6)
+  sourceType EventSource @default(MANUAL) @map("source_type")
+  sourceId   BigInt?     @map("source_id")
+  createdAt  DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  classroom Classroom @relation(fields: [classId], references: [id], onDelete: Cascade)
+  creator   User?     @relation("CalendarEventCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([sourceType, sourceId], name: "idx_calendar_events_source")
+  @@map("calendar_events")
+}
+
+model AuditLog {
+  id         BigInt    @id @default(autoincrement())
+  actorId    BigInt?   @map("actor_id")
+  actorType  ActorType @default(USER) @map("actor_type")
+  action     String    @db.VarChar(100)
+  entityType String    @map("entity_type") @db.VarChar(100)
+  entityId   BigInt    @map("entity_id")
+  beforeData Json?     @map("before_data") @db.JsonB
+  afterData  Json?     @map("after_data") @db.JsonB
+  requestId  String?   @map("request_id") @db.Uuid
+  occurredAt DateTime  @default(now()) @map("occurred_at") @db.Timestamptz(6)
+
+  actor User? @relation("AuditLogActor", fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@map("audit_logs")
+}
