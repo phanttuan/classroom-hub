@@ -22,7 +22,9 @@ export interface LogoutResponse {
 }
 
 /**
- * Lưu thông tin session và token vào Cookie / Storage để Next.js proxy và giao diện nhận diện ngay lập tức
+ * Lưu thông tin người dùng vào Storage / Cookie hiển thị giao diện.
+ * Lưu ý bảo mật: Cặp Access Token và Refresh Token đã được Backend tự động thiết lập
+ * trong HttpOnly Cookie (chống XSS), do đó client tuyệt đối không lưu token thô vào localStorage.
  */
 export function saveAuthSession(
   tokens?: { accessToken?: string; refreshToken?: string },
@@ -30,15 +32,9 @@ export function saveAuthSession(
 ) {
   if (typeof window === 'undefined') return;
 
-  const accessToken = tokens?.accessToken;
-  if (accessToken) {
-    document.cookie = `${AUTH_COOKIE_NAME}=${accessToken}; path=/; max-age=86400; SameSite=Lax`;
-    localStorage.setItem(AUTH_COOKIE_NAME, accessToken);
-  }
-
   if (user) {
     if (user.role) {
-      document.cookie = `${ROLE_COOKIE_NAME}=${user.role}; path=/; max-age=86400; SameSite=Lax`;
+      document.cookie = `${ROLE_COOKIE_NAME}=${user.role}; path=/; max-age=604800; SameSite=Lax`;
     }
     localStorage.setItem('user', JSON.stringify(user));
   }

@@ -740,20 +740,20 @@ export class AuthService {
       },
     });
 
-    // Thiết lập Cookie an toàn (Chuẩn hóa auth_token duy nhất cho Backend & Next.js Proxy)
+    // Thiết lập Cookie bảo mật chuẩn HttpOnly chống tấn công XSS
     res.cookie('auth_token', accessToken, {
-      httpOnly: false, // Để Next.js proxy và client-side nhận diện tức thì
+      httpOnly: true, // Bảo mật tuyệt đối: ngăn chặn hoàn toàn XSS đánh cắp access token
       secure: this.isProduction,
       sameSite: this.isProduction ? 'none' : 'lax',
-      maxAge: 15 * 60 * 1000, // 15 phút
+      maxAge: 15 * 60 * 1000, // 15 phút (Access token ngắn hạn theo chuẩn OWASP)
       path: '/',
     });
 
     res.cookie('refresh_token', refreshToken, {
-      httpOnly: true,
+      httpOnly: true, // Bảo mật tuyệt đối: Refresh token lưu an toàn trong cookie
       secure: this.isProduction,
       sameSite: this.isProduction ? 'none' : 'lax',
-      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 ngày
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 ngày (Refresh token dài hạn)
       path: '/',
     });
 
@@ -774,7 +774,7 @@ export class AuthService {
       expires: new Date(0),
     };
 
-    res.clearCookie('auth_token', { ...cookieOptions, httpOnly: false });
+    res.clearCookie('auth_token', cookieOptions);
     res.clearCookie('access_token', cookieOptions); // Xóa sạch nếu còn sót từ phiên cũ
     res.clearCookie('refresh_token', cookieOptions);
   }

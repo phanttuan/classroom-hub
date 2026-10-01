@@ -44,14 +44,21 @@ export class JwtAuthGuard implements CanActivate {
       }
     }
 
-    const req = context.switchToHttp().getRequest<RequestWithUser>();
+    const req = context.switchToHttp().getRequest<
+      RequestWithUser & { cookies?: Record<string, string> }
+    >();
     const authHeader = req.headers?.authorization;
+    let token: string | undefined;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedException('Vui lòng đăng nhập để tiếp tục');
+    if (authHeader) {
+      if (!authHeader.startsWith('Bearer ')) {
+        throw new UnauthorizedException('Vui lòng đăng nhập để tiếp tục');
+      }
+      token = authHeader.substring(7).trim();
+    } else if (req.cookies) {
+      token = (req.cookies['auth_token'] || req.cookies['access_token'])?.trim();
     }
 
-    const token = authHeader.substring(7).trim();
     if (!token) {
       throw new UnauthorizedException('Vui lòng đăng nhập để tiếp tục');
     }

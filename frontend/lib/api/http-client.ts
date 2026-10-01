@@ -37,13 +37,41 @@ export async function apiFetch<T = unknown>(
     headers.set('Authorization', `Bearer ${token}`);
   }
 
-  // 4. Thực hiện gọi API với URL và Headers đã được bổ sung
-  const response = await fetch(url, {
+  // 4. Thực hiện gọi API với credentials: 'include' để tự động gửi nhận HttpOnly Cookies bảo mật
+  let response = await fetch(url, {
     ...init,
+    credentials: init?.credentials || 'include',
     headers,
   });
 
-  // 5. Bắt lỗi 401/403 của auth-guard
+  // 5. Tự động làm mới phiên (Silent Refresh) nếu Access Token hết hạn (401)
+  if (response.status === 401 && typeof window !== 'undefined') {
+    const isRefreshOrAuthUrl =
+      typeof input === 'string' &&
+      (input.includes('/auth/refresh') || input.includes('/auth/login') || input.includes('/auth/register'));
+
+    if (!isRefreshOrAuthUrl) {
+      try {
+        const refreshRes = await fetch(`${API_BASE_URL}/auth/refresh`, {
+          method: 'POST',
+          credentials: 'include',
+        });
+
+        if (refreshRes.ok) {
+          // Làm mới token thành công -> Backend đã cấp Set-Cookie mới -> Gọi lại API ban đầu
+          response = await fetch(url, {
+            ...init,
+            credentials: init?.credentials || 'include',
+            headers,
+          });
+        }
+      } catch {
+        // Lỗi kết nối mạng khi refresh, tiếp tục xử lý bên dưới
+      }
+    }
+  }
+
+  // 6. Bắt lỗi 401/403 của auth-guard khi không thể khôi phục phiên
   if (response.status === 401 || response.status === 403) {
     handleAuthError(response.status);
     throw new Error(`HTTP Error ${response.status}: ${response.statusText}`);
