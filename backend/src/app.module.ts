@@ -5,6 +5,7 @@ import { validateEnvironment } from './config/env.validation.js';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { DatabaseModule } from './database/database.module.js';
+import { UserModule } from './user/user.module.js';
 
 @Module({
   imports: [
@@ -13,8 +14,10 @@ import { DatabaseModule } from './database/database.module.js';
       envFilePath: '.env',
       load: [appConfig],
       validate: validateEnvironment,
-    }), DatabaseModule
-    ],
+    }),
+    DatabaseModule,
+    UserModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })
