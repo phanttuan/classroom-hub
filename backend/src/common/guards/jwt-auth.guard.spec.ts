@@ -137,5 +137,47 @@ describe('JwtAuthGuard', () => {
       new UnauthorizedException('Dữ liệu xác thực trong token không hợp lệ')
     );
   });
+
+  it('should throw UnauthorizedException when sub/id is an object, boolean, negative or non-numeric', async () => {
+    const invalidSubCases = [
+      { userId: 10 },
+      true,
+      false,
+      'abc',
+      '-5',
+      '0',
+      0,
+      -10,
+      10.5,
+    ];
+
+    for (const invalidSub of invalidSubCases) {
+      jwtService.verifyAsync.mockResolvedValue({
+        sub: invalidSub,
+        email: 'user@eduhub.vn',
+        role: UserRole.STUDENT,
+      });
+      const req: any = { headers: { authorization: 'Bearer some-token' } };
+      const context = createMockContext(req);
+
+      await expect(guard.canActivate(context)).rejects.toThrow(
+        new UnauthorizedException('Dữ liệu xác thực trong token không hợp lệ')
+      );
+    }
+  });
+
+  it('should accept valid numeric number sub and attach as id', async () => {
+    jwtService.verifyAsync.mockResolvedValue({
+      sub: 25,
+      email: 'student@eduhub.vn',
+      role: UserRole.STUDENT,
+    });
+    const req: any = { headers: { authorization: 'Bearer valid-token' } };
+    const context = createMockContext(req);
+
+    const result = await guard.canActivate(context);
+    expect(result).toBe(true);
+    expect(req.user.id).toBe(25);
+  });
 });
 

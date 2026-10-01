@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { AUTH_COOKIE_NAME, ROLE_COOKIE_NAME } from './lib/auth/auth-constants';
+import { AUTH_COOKIE_NAME } from './lib/auth/auth-constants';
 
-function extractRoleFromToken(token?: string): string | null {
+const VALID_ROLES = ['ADMIN', 'TEACHER', 'STUDENT'] as const;
+type ValidRole = (typeof VALID_ROLES)[number];
+
+function extractRoleFromToken(token?: string): ValidRole | null {
   if (!token) return null;
   try {
     const parts = token.split('.');
@@ -19,7 +22,12 @@ function extractRoleFromToken(token?: string): string | null {
       return null;
     }
 
-    return typeof payload.role === 'string' ? payload.role.toUpperCase() : null;
+    if (typeof payload.role !== 'string') {
+      return null;
+    }
+
+    const role = payload.role.toUpperCase();
+    return VALID_ROLES.includes(role as ValidRole) ? (role as ValidRole) : null;
   } catch {
     return null;
   }
@@ -43,8 +51,8 @@ export function proxy(request: NextRequest) {
   }
 
   const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
-  const tokenRole = extractRoleFromToken(token);
-  const role = tokenRole || request.cookies.get(ROLE_COOKIE_NAME)?.value?.toUpperCase();
+  // Chỉ xác thực và phân quyền dựa trên JWT token đã được ký bởi server; tuyệt đối không fallback sang cookie client có thể chỉnh sửa
+  const role = extractRoleFromToken(token);
 
   // Kiểm tra route theo role
   const isAdminRoute = pathname.startsWith('/admin');

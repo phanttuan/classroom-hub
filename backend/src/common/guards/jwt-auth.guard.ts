@@ -9,6 +9,19 @@ import { ConfigService } from '@nestjs/config';
 import { UserRole } from '../../generated/prisma/enums.js';
 import type { RequestWithUser, AuthenticatedUser } from '../interfaces/request-with-user.interface.js';
 
+function isValidUserId(id: unknown): boolean {
+  if (typeof id === 'number') {
+    return Number.isInteger(id) && id > 0;
+  }
+  if (typeof id === 'string') {
+    return /^[1-9]\d*$/.test(id.trim());
+  }
+  if (typeof id === 'bigint') {
+    return id > 0n;
+  }
+  return false;
+}
+
 @Injectable()
 export class JwtAuthGuard implements CanActivate {
   constructor(
@@ -42,7 +55,7 @@ export class JwtAuthGuard implements CanActivate {
       const role = payload?.role;
 
       if (
-        (userId === undefined || userId === null || userId === '') ||
+        !isValidUserId(userId) ||
         typeof email !== 'string' ||
         !email.trim() ||
         !Object.values(UserRole).includes(role)
@@ -51,7 +64,7 @@ export class JwtAuthGuard implements CanActivate {
       }
 
       const user: AuthenticatedUser = {
-        id: userId,
+        id: typeof userId === 'string' ? userId.trim() : (userId as number | bigint),
         email: email.trim(),
         role: role as UserRole,
         fullName: typeof payload.fullName === 'string' ? payload.fullName : undefined,

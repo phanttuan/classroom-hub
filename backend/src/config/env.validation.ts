@@ -4,6 +4,7 @@ import {
   IsBoolean,
   IsEnum,
   IsInt,
+  IsNotEmpty,
   IsOptional,
   IsString,
   Max,
@@ -38,8 +39,8 @@ export class EnvironmentVariables {
   CORS_ORIGINS: string = 'http://localhost:3000';
 
   @IsString()
-  @IsOptional()
-  JWT_SECRET?: string;
+  @IsNotEmpty({ message: 'JWT_SECRET là bắt buộc để xác thực người dùng' })
+  JWT_SECRET: string;
 
   // --- Cấu hình Database PostgreSQL ---
 
