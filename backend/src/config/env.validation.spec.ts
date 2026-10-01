@@ -6,6 +6,7 @@ describe('Environment Validation', () => {
     const config = {
       NODE_ENV: 'development',
       PORT: '5000',
+      JWT_SECRET: 'classroom_hub_test_jwt_secret_key_minimum_32_chars',
       DB_HOST: 'localhost',
       DB_PORT: '5432',
       DB_USERNAME: 'postgres',
@@ -18,6 +19,17 @@ describe('Environment Validation', () => {
     expect(result.DB_PORT).toBe(5432);
     expect(result.DB_SSL).toBe(false);
     expect(result.NODE_ENV).toBe('development');
+    expect(result.JWT_SECRET).toBe('classroom_hub_test_jwt_secret_key_minimum_32_chars');
+  });
+
+  it('should throw an error if JWT_SECRET is missing', () => {
+    const invalidConfig = {
+      PORT: '5000',
+    };
+
+    expect(() => validateEnvironment(invalidConfig)).toThrow(
+      /LỖI CẤU HÌNH BIẾN MÔI TRƯỜNG/,
+    );
   });
 
   it('should throw an error if PORT is out of valid range', () => {
