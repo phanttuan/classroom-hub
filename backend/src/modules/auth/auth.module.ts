@@ -14,15 +14,15 @@ import { MailModule } from '../mail/mail.module.js';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => ({
-        secret: configService.get<string>(
-          'JWT_ACCESS_SECRET',
-          'eduhub_super_secret_access_jwt_key_2026_dev_hcmute',
-        ),
+        secret:
+          configService.get<string>('JWT_SECRET') ||
+          configService.get<string>(
+            'JWT_ACCESS_SECRET',
+            'eduhub_super_secret_jwt_access_key_2026_dev_hcmute',
+          ),
         signOptions: {
-          expiresIn: (configService.get<string>(
-            'JWT_ACCESS_EXPIRES_IN',
-            '15m',
-          ) as any),
+          expiresIn: (configService.get<string>('JWT_EXPIRES_IN') ||
+            configService.get<string>('JWT_ACCESS_EXPIRES_IN', '15m')) as any,
         },
       }),
     }),

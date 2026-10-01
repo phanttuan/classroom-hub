@@ -118,14 +118,10 @@ export class EnvironmentVariables {
   @IsOptional()
   DB_POOL_MIN: number = 2;
 
-  // --- Cấu hình JWT Auth ---
+  // --- Cấu hình JWT Auth (Đồng bộ chuẩn 4 biến duy nhất) ---
   @IsString()
   @IsOptional()
-  JWT_ACCESS_SECRET: string = 'eduhub_super_secret_access_jwt_key_2026_dev_hcmute';
-
-  @IsString()
-  @IsOptional()
-  JWT_ACCESS_EXPIRES_IN: string = '15m';
+  JWT_EXPIRES_IN: string = '15m';
 
   @IsString()
   @IsOptional()
@@ -134,6 +130,15 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   JWT_REFRESH_EXPIRES_IN: string = '7d';
+
+  // Tùy chọn tương thích ngược nếu còn sót lại ở môi trường cũ
+  @IsString()
+  @IsOptional()
+  JWT_ACCESS_SECRET?: string;
+
+  @IsString()
+  @IsOptional()
+  JWT_ACCESS_EXPIRES_IN?: string;
 
   // --- Cấu hình Resend Email ---
   @IsString()

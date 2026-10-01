@@ -510,10 +510,12 @@ export class AuthService {
       : null;
     const { allDevices = false, refreshTokenRaw, accessTokenRaw } = options;
 
-    const accessSecret = this.configService.get<string>(
-      'JWT_ACCESS_SECRET',
-      'eduhub_super_secret_access_jwt_key_2026_dev_hcmute',
-    );
+    const accessSecret =
+      this.configService.get<string>('JWT_SECRET') ||
+      this.configService.get<string>(
+        'JWT_ACCESS_SECRET',
+        'eduhub_super_secret_jwt_access_key_2026_dev_hcmute',
+      );
     const refreshSecret = this.configService.get<string>(
       'JWT_REFRESH_SECRET',
       'eduhub_super_secret_refresh_jwt_key_2026_dev_hcmute',
@@ -698,25 +700,31 @@ export class AuthService {
       role: user.role,
     };
 
-    const accessSecret = this.configService.get<string>(
-      'JWT_ACCESS_SECRET',
-      'eduhub_super_secret_access_jwt_key_2026_dev_hcmute',
-    );
+    const accessSecret =
+      this.configService.get<string>('JWT_SECRET') ||
+      this.configService.get<string>(
+        'JWT_ACCESS_SECRET',
+        'eduhub_super_secret_jwt_access_key_2026_dev_hcmute',
+      );
     const refreshSecret = this.configService.get<string>(
       'JWT_REFRESH_SECRET',
       'eduhub_super_secret_refresh_jwt_key_2026_dev_hcmute',
     );
+    const accessExpiresIn = (this.configService.get<string>('JWT_EXPIRES_IN') ||
+      this.configService.get<string>('JWT_ACCESS_EXPIRES_IN', '15m')) as any;
+    const refreshExpiresIn = (this.configService.get<string>('JWT_REFRESH_EXPIRES_IN') ||
+      '7d') as any;
 
     const accessToken = this.jwtService.sign(payload, {
       secret: accessSecret,
-      expiresIn: '15m',
+      expiresIn: accessExpiresIn,
     });
 
     const refreshToken = this.jwtService.sign(
       { sub: user.id.toString() },
       {
         secret: refreshSecret,
-        expiresIn: '7d',
+        expiresIn: refreshExpiresIn,
       },
     );
 
@@ -732,17 +740,9 @@ export class AuthService {
       },
     });
 
-    // Thiết lập Cookie an toàn (Hỗ trợ cả access_token backend và auth_token của Next.js proxy)
-    res.cookie('access_token', accessToken, {
-      httpOnly: true,
-      secure: this.isProduction,
-      sameSite: this.isProduction ? 'none' : 'lax',
-      maxAge: 15 * 60 * 1000, // 15 phút
-      path: '/',
-    });
-
+    // Thiết lập Cookie an toàn (Chuẩn hóa auth_token duy nhất cho Backend & Next.js Proxy)
     res.cookie('auth_token', accessToken, {
-      httpOnly: false,
+      httpOnly: false, // Để Next.js proxy và client-side nhận diện tức thì
       secure: this.isProduction,
       sameSite: this.isProduction ? 'none' : 'lax',
       maxAge: 15 * 60 * 1000, // 15 phút
@@ -774,8 +774,8 @@ export class AuthService {
       expires: new Date(0),
     };
 
-    res.clearCookie('access_token', cookieOptions);
     res.clearCookie('auth_token', { ...cookieOptions, httpOnly: false });
+    res.clearCookie('access_token', cookieOptions); // Xóa sạch nếu còn sót từ phiên cũ
     res.clearCookie('refresh_token', cookieOptions);
   }
 }

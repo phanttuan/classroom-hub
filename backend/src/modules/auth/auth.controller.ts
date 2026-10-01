@@ -109,6 +109,7 @@ export class AuthController {
     @Body() dto?: LogoutDto,
   ) {
     const accessToken =
+      req?.cookies?.['auth_token'] ||
       req?.cookies?.['access_token'] ||
       req.headers.authorization?.replace(/^Bearer\s+/i, '');
     const refreshToken = req?.cookies?.['refresh_token'] || dto?.refreshToken;
@@ -136,6 +137,7 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const accessToken =
+      req?.cookies?.['auth_token'] ||
       req?.cookies?.['access_token'] ||
       req.headers.authorization?.replace(/^Bearer\s+/i, '');
     const refreshToken = req?.cookies?.['refresh_token'];

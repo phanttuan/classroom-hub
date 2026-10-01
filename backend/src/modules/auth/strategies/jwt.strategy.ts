@@ -22,18 +22,20 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     super({
       jwtFromRequest: ExtractJwt.fromExtractors([
         (request: Request) => {
-          if (request?.cookies && request.cookies['access_token']) {
-            return request.cookies['access_token'];
+          if (request?.cookies) {
+            return request.cookies['auth_token'] || request.cookies['access_token'] || null;
           }
           return null;
         },
         ExtractJwt.fromAuthHeaderAsBearerToken(),
       ]),
       ignoreExpiration: false,
-      secretOrKey: configService.get<string>(
-        'JWT_ACCESS_SECRET',
-        'eduhub_super_secret_access_jwt_key_2026_dev_hcmute',
-      ),
+      secretOrKey:
+        configService.get<string>('JWT_SECRET') ||
+        configService.get<string>(
+          'JWT_ACCESS_SECRET',
+          'eduhub_super_secret_jwt_access_key_2026_dev_hcmute',
+        ),
     });
   }
 

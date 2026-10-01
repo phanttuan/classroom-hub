@@ -32,11 +32,8 @@ export function saveAuthSession(
 
   const accessToken = tokens?.accessToken;
   if (accessToken) {
-    // Lưu đồng thời auth_token và access_token cho Next.js middleware & API client
     document.cookie = `${AUTH_COOKIE_NAME}=${accessToken}; path=/; max-age=86400; SameSite=Lax`;
-    document.cookie = `access_token=${accessToken}; path=/; max-age=86400; SameSite=Lax`;
     localStorage.setItem(AUTH_COOKIE_NAME, accessToken);
-    localStorage.setItem('access_token', accessToken);
   }
 
   if (user) {
@@ -44,7 +41,6 @@ export function saveAuthSession(
       document.cookie = `${ROLE_COOKIE_NAME}=${user.role}; path=/; max-age=86400; SameSite=Lax`;
     }
     localStorage.setItem('user', JSON.stringify(user));
-    localStorage.setItem('auth_user', JSON.stringify(user));
   }
 }
 
@@ -76,13 +72,10 @@ export async function logoutUser(
     if (typeof window !== 'undefined') {
       try {
         localStorage.removeItem('user');
-        localStorage.removeItem('auth_user');
         localStorage.removeItem(AUTH_COOKIE_NAME);
-        localStorage.removeItem('access_token');
         sessionStorage.clear();
 
         document.cookie = `${AUTH_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
-        document.cookie = `access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
         document.cookie = `${ROLE_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
       } catch {
         // Bỏ qua nếu môi trường cấm storage
@@ -104,11 +97,9 @@ export async function logoutUser(
       try {
         localStorage.removeItem('user');
         localStorage.removeItem(AUTH_COOKIE_NAME);
-        localStorage.removeItem('access_token');
         sessionStorage.clear();
 
         document.cookie = `${AUTH_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
-        document.cookie = `access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
         document.cookie = `${ROLE_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
       } catch {
         // Bỏ qua
