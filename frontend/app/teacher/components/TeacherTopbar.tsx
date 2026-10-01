@@ -94,14 +94,24 @@ export default function TeacherTopbar({
               onClick={() => setProfileOpen((v) => !v)}
               className="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-1 transition hover:bg-slate-100 sm:pr-2"
             >
-              <span className="relative h-10 w-10 overflow-hidden rounded-full bg-slate-200">
-                <Image
-                  src={profile.avatarUrl}
-                  alt={profile.fullName}
-                  width={80}
-                  height={80}
-                  className="h-full w-full object-cover"
-                />
+              <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-slate-200">
+                {profile.avatarUrl?.startsWith("blob:") ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={profile.avatarUrl}
+                    alt={profile.fullName}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <Image
+                    src={profile.avatarUrl || "/images/teacher.webp"}
+                    alt={profile.fullName}
+                    width={80}
+                    height={80}
+                    unoptimized
+                    className="h-full w-full object-cover"
+                  />
+                )}
               </span>
               <span className="hidden text-left sm:block">
                 <span className="block text-[14px] font-bold leading-tight text-slate-900">

@@ -7,9 +7,9 @@ import { validateEnvironment } from './config/env.validation.js';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { DatabaseModule } from './database/database.module.js';
+import { UserModule } from './user/user.module.js';
 import { MailModule } from './modules/mail/mail.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
-import { JwtAuthGuard } from './common/guards/jwt-auth.guard.js';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor.js';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
 
@@ -28,6 +28,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
       },
     ]),
     DatabaseModule,
+    UserModule,
     MailModule,
     AuthModule,
   ],
@@ -37,10 +38,6 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
     {
       provide: APP_GUARD,
       useClass: ThrottlerGuard,
-    },
-    {
-      provide: APP_GUARD,
-      useClass: JwtAuthGuard,
     },
     {
       provide: APP_INTERCEPTOR,

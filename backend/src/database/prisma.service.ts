@@ -1,4 +1,5 @@
 import { Injectable, OnModuleInit, OnModuleDestroy, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../generated/prisma/client.js';
 
@@ -9,8 +10,9 @@ export class PrismaService
 {
   private readonly logger = new Logger(PrismaService.name);
 
-  constructor() {
+  constructor(configService?: ConfigService) {
     const connectionString =
+      configService?.get<string>('DATABASE_URL') ||
       process.env.DATABASE_URL ||
       'postgresql://postgres:123456@localhost:5432/classroom_hub?schema=public';
 
