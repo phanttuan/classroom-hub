@@ -179,5 +179,39 @@ describe('JwtAuthGuard', () => {
     expect(result).toBe(true);
     expect(req.user.id).toBe(25);
   });
+
+  it('should authenticate successfully with HttpOnly cookie auth_token when header is absent', async () => {
+    jwtService.verifyAsync.mockResolvedValue({
+      sub: '50',
+      email: 'cookie_user@eduhub.vn',
+      role: UserRole.TEACHER,
+      fullName: 'Teacher Cookie',
+    });
+    const req: any = { headers: {}, cookies: { auth_token: 'valid-cookie-token' } };
+    const context = createMockContext(req);
+
+    const result = await guard.canActivate(context);
+    expect(result).toBe(true);
+    expect(req.user).toEqual({
+      id: '50',
+      email: 'cookie_user@eduhub.vn',
+      role: UserRole.TEACHER,
+      fullName: 'Teacher Cookie',
+    });
+  });
+
+  it('should authenticate successfully with cookie access_token as fallback', async () => {
+    jwtService.verifyAsync.mockResolvedValue({
+      sub: '60',
+      email: 'fallback@eduhub.vn',
+      role: UserRole.STUDENT,
+    });
+    const req: any = { headers: {}, cookies: { access_token: 'valid-legacy-token' } };
+    const context = createMockContext(req);
+
+    const result = await guard.canActivate(context);
+    expect(result).toBe(true);
+    expect(req.user.id).toBe('60');
+  });
 });
 

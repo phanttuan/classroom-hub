@@ -3,16 +3,16 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Search, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 
 const NAV_LINKS = [
-  { label: "Tổng quan", href: "#overview" },
-  { label: "Quy trình", href: "#how-it-works" },
-  { label: "Tính năng", href: "#features" },
-  { label: "Vai trò", href: "#roles" },
+  { label: "Tổng quan", href: "/#overview" },
+  { label: "Quy trình", href: "/#how-it-works" },
+  { label: "Tính năng", href: "/#features" },
+  { label: "Vai trò", href: "/#roles" },
 ];
 
-export default function Navbar() {
+export default function Navbar({ forceSolid = false }: { forceSolid?: boolean } = {}) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
 
@@ -34,8 +34,8 @@ export default function Navbar() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  // Nền trắng tinh khi scroll (không mờ, không blur) — chỉ fade opacity nên mượt, không giật
-  const solid = scrolled || mobileMenuOpen;
+  // Nền trắng tinh khi scroll hoặc khi được chỉ định forceSolid
+  const solid = forceSolid || scrolled || mobileMenuOpen;
 
   return (
     <header className="fixed top-0 z-50 w-full border-0">
@@ -48,9 +48,9 @@ export default function Navbar() {
       />
 
       <div className="relative max-w-[1320px] mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-16">
+        <div className="relative flex items-center justify-between h-16">
           {/* Logo — chỉ dùng logo.webp */}
-          <Link href="/" className="flex items-center shrink-0" aria-label="EduHub trang chủ">
+          <Link href="/" className="flex items-center shrink-0 z-10" aria-label="EduHub trang chủ">
             <Image
               src="/images/logo.webp"
               alt="EduHub"
@@ -63,13 +63,13 @@ export default function Navbar() {
             />
           </Link>
 
-          {/* Desktop Nav Links */}
-          <nav className="hidden md:flex items-center gap-8">
+          {/* Desktop Nav Links — Căn chính xác giữa header tuyệt đối */}
+          <nav className="hidden md:flex items-center gap-8 absolute left-1/2 -translate-x-1/2">
             {NAV_LINKS.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`text-sm font-medium transition-colors duration-500 ${
+                className={`text-sm font-medium transition-colors duration-500 whitespace-nowrap ${
                   solid ? "text-slate-600 hover:text-blue-600" : "text-white/85 hover:text-white"
                 }`}
               >
@@ -78,20 +78,8 @@ export default function Navbar() {
             ))}
           </nav>
 
-          {/* Right Action buttons */}
-          <div className="hidden md:flex items-center gap-2.5">
-            <button
-              type="button"
-              title="Tìm kiếm"
-              className={`w-9 h-9 rounded-full flex items-center justify-center transition-colors duration-500 border ${
-                solid
-                  ? "text-slate-500 hover:text-blue-600 hover:bg-slate-100 border-slate-200/80"
-                  : "text-white bg-white/15 hover:bg-white/25 border-white/25"
-              }`}
-            >
-              <Search className="w-4 h-4" />
-            </button>
-
+          {/* Right Action buttons (Đã bỏ nút tìm kiếm kính lúp) */}
+          <div className="hidden md:flex items-center gap-3 z-10">
             <Link
               href="/login"
               className={`px-5 py-2 text-sm font-semibold rounded-full transition-colors duration-500 ${

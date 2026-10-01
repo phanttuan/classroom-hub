@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { Bell, ChevronDown, Menu, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { logoutUser } from "@/lib/auth";
 import { adminProfile } from "@/lib/mock/admin";
 import type { TeacherNotification } from "@/lib/types/teacher";
 
@@ -110,15 +111,29 @@ export default function AdminTopbar({
                   { label: "Hồ sơ quản trị", href: "/admin" },
                   { label: "Cài đặt hệ thống", href: "/admin" },
                   { label: "Đăng xuất", href: "/login" },
-                ].map((i) => (
-                  <a
-                    key={i.label}
-                    href={i.href}
-                    className="block px-4 py-2.5 text-sm text-slate-600 transition last:text-red-600 hover:bg-slate-50"
-                  >
-                    {i.label}
-                  </a>
-                ))}
+                ].map((i) =>
+                  i.label === "Đăng xuất" ? (
+                    <button
+                      key={i.label}
+                      type="button"
+                      onClick={async () => {
+                        await logoutUser();
+                        window.location.href = "/login";
+                      }}
+                      className="w-full text-left block px-4 py-2.5 text-sm text-red-600 transition hover:bg-red-50 cursor-pointer"
+                    >
+                      {i.label}
+                    </button>
+                  ) : (
+                    <a
+                      key={i.label}
+                      href={i.href}
+                      className="block px-4 py-2.5 text-sm text-slate-600 transition last:text-red-600 hover:bg-slate-50"
+                    >
+                      {i.label}
+                    </a>
+                  ),
+                )}
               </div>
             )}
           </div>

@@ -3,11 +3,14 @@ import {
   CanActivate,
   ExecutionContext,
   UnauthorizedException,
+  Optional,
 } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { UserRole } from '../../generated/prisma/enums.js';
 import type { RequestWithUser, AuthenticatedUser } from '../interfaces/request-with-user.interface.js';
+import { IS_PUBLIC_KEY } from '../decorators/public.decorator.js';
 
 function isValidUserId(id: unknown): boolean {
   if (typeof id === 'number') {
@@ -27,23 +30,44 @@ export class JwtAuthGuard implements CanActivate {
   constructor(
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
+    @Optional() private readonly reflector?: Reflector,
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
-    const req = context.switchToHttp().getRequest<RequestWithUser>();
-    const authHeader = req.headers?.authorization;
-
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      throw new UnauthorizedException('Vui lòng đăng nhập để tiếp tục');
+    if (this.reflector) {
+      const isPublic = this.reflector.getAllAndOverride<boolean>(IS_PUBLIC_KEY, [
+        context.getHandler(),
+        context.getClass(),
+      ]);
+      if (isPublic) {
+        return true;
+      }
     }
 
-    const token = authHeader.substring(7).trim();
+    const req = context.switchToHttp().getRequest<
+      RequestWithUser & { cookies?: Record<string, string> }
+    >();
+    const authHeader = req.headers?.authorization;
+    let token: string | undefined;
+
+    if (authHeader) {
+      if (!authHeader.startsWith('Bearer ')) {
+        throw new UnauthorizedException('Vui lòng đăng nhập để tiếp tục');
+      }
+      token = authHeader.substring(7).trim();
+    } else if (req.cookies) {
+      token = (req.cookies['auth_token'] || req.cookies['access_token'])?.trim();
+    }
+
     if (!token) {
       throw new UnauthorizedException('Vui lòng đăng nhập để tiếp tục');
     }
 
     try {
-      const secret = this.configService.get<string>('JWT_SECRET');
+      const secret =
+        this.configService.get<string>('JWT_SECRET') ||
+        this.configService.get<string>('JWT_ACCESS_SECRET');
+
       if (!secret) {
         throw new UnauthorizedException('Cấu hình bảo mật JWT_SECRET không hợp lệ hoặc bị thiếu');
       }
@@ -80,4 +104,3 @@ export class JwtAuthGuard implements CanActivate {
     }
   }
 }
-
