@@ -112,6 +112,36 @@ export class EnvironmentVariables {
   @Transform(({ value }) => parseInt(value, 10))
   @IsOptional()
   DB_POOL_MIN: number = 2;
+
+  // --- Cấu hình JWT Auth ---
+  @IsString()
+  @IsOptional()
+  JWT_ACCESS_SECRET: string = 'eduhub_super_secret_access_jwt_key_2026_dev_hcmute';
+
+  @IsString()
+  @IsOptional()
+  JWT_ACCESS_EXPIRES_IN: string = '15m';
+
+  @IsString()
+  @IsOptional()
+  JWT_REFRESH_SECRET: string = 'eduhub_super_secret_refresh_jwt_key_2026_dev_hcmute';
+
+  @IsString()
+  @IsOptional()
+  JWT_REFRESH_EXPIRES_IN: string = '7d';
+
+  // --- Cấu hình Resend Email ---
+  @IsString()
+  @IsOptional()
+  RESEND_API_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  EMAIL_FROM: string = 'EduHub <onboarding@resend.dev>';
+
+  @IsString()
+  @IsOptional()
+  APP_LOGO_URL: string = 'https://files.catbox.moe/27b245.png';
 }
 
 export function validateEnvironment(
