@@ -8,8 +8,13 @@ export class PrismaService extends PrismaClient implements OnModuleInit, OnModul
   constructor(configService?: ConfigService) {
     const connectionString =
       configService?.get<string>('DATABASE_URL') ||
-      process.env.DATABASE_URL ||
-      'postgresql://postgres:123456@localhost:5432/classroom_hub?schema=public';
+      process.env.DATABASE_URL;
+
+    if (!connectionString) {
+      throw new Error(
+        'DATABASE_URL is not configured. Please define DATABASE_URL in your environment or .env file.',
+      );
+    }
 
     const adapter = new PrismaPg({ connectionString });
     super({ adapter });

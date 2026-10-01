@@ -155,4 +155,59 @@ describe('ClassMemberGuard', () => {
     expect(req.classroom).toEqual(mockClassroom);
     expect(req.classMembership).toEqual(mockMembership);
   });
+
+  it('should pass and attach classroom when user is ADMIN', async () => {
+    const mockClassroom = {
+      id: BigInt(1),
+      ownerId: BigInt(10),
+      name: 'Toán 12A1',
+    };
+    prismaService.classroom.findUnique.mockResolvedValue(mockClassroom);
+
+    const req: any = {
+      user: { id: '999', role: UserRole.ADMIN },
+      params: { classId: '1' },
+    };
+    const context = createMockContext(req);
+
+    const result = await guard.canActivate(context);
+    expect(result).toBe(true);
+    expect(req.classroom).toEqual(mockClassroom);
+  });
+
+  it('should throw ForbiddenException when teacher is NOT the class owner', async () => {
+    prismaService.classroom.findUnique.mockResolvedValue({
+      id: BigInt(1),
+      ownerId: BigInt(10),
+      name: 'Toán 12A1',
+    });
+
+    const req: any = {
+      user: { id: '20', role: UserRole.TEACHER },
+      params: { classId: '1' },
+    };
+    const context = createMockContext(req);
+
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      new ForbiddenException('Bạn không phải là giáo viên phụ trách lớp học này')
+    );
+  });
+
+  it('should throw ForbiddenException when user has unexpected role', async () => {
+    prismaService.classroom.findUnique.mockResolvedValue({
+      id: BigInt(1),
+      ownerId: BigInt(10),
+      name: 'Toán 12A1',
+    });
+
+    const req: any = {
+      user: { id: '50', role: 'GUEST' as any },
+      params: { classId: '1' },
+    };
+    const context = createMockContext(req);
+
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      new ForbiddenException('Bạn không có quyền truy cập vào lớp học này')
+    );
+  });
 });

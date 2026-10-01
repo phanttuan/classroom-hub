@@ -89,7 +89,22 @@ describe('ClassOwnerGuard', () => {
       params: { classId: '1' },
     });
     await expect(guard.canActivate(context)).rejects.toThrow(
-      new ForbiddenException('Bạn không phải là giáo viên sở hữu của lớp học này')
+      new ForbiddenException('Bạn không có quyền thực hiện thao tác của giáo viên')
+    );
+  });
+
+  it('should throw ForbiddenException when non-teacher attempts access even if userId matches ownerId', async () => {
+    prismaService.classroom.findUnique.mockResolvedValue({
+      id: BigInt(1),
+      ownerId: BigInt(20),
+      name: 'Toán 12A1',
+    });
+    const context = createMockContext({
+      user: { id: '20', role: UserRole.STUDENT },
+      params: { classId: '1' },
+    });
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      new ForbiddenException('Bạn không có quyền thực hiện thao tác của giáo viên')
     );
   });
 

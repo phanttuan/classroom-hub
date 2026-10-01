@@ -42,4 +42,16 @@ describe('extractClassId', () => {
     expect(extractClassId(null)).toBeNull();
     expect(extractClassId(undefined)).toBeNull();
   });
+
+  it('should reject non-positive or decimal numbers', () => {
+    expect(extractClassId({ params: { classId: '0' } })).toBeNull();
+    expect(extractClassId({ params: { classId: '-1' } })).toBeNull();
+    expect(extractClassId({ body: { classId: 0 } })).toBeNull();
+    expect(extractClassId({ body: { classId: -10 } })).toBeNull();
+    expect(extractClassId({ body: { classId: 10.5 } })).toBeNull();
+    expect(extractClassId({ params: { classId: '10.5' } })).toBeNull();
+    expect(extractClassId({ params: { classId: 0n } })).toBeNull();
+    expect(extractClassId({ params: { classId: -5n } })).toBeNull();
+    expect(extractClassId({ params: { classId: 5n } })).toBe(5n);
+  });
 });

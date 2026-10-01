@@ -86,5 +86,56 @@ describe('JwtAuthGuard', () => {
       fullName: 'Nguyễn Văn A',
     });
   });
+
+  it('should throw UnauthorizedException when JWT_SECRET is not configured', async () => {
+    configService.get.mockReturnValue(undefined);
+    const req: any = { headers: { authorization: 'Bearer some-token' } };
+    const context = createMockContext(req);
+
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      new UnauthorizedException('Cấu hình bảo mật JWT_SECRET không hợp lệ hoặc bị thiếu')
+    );
+  });
+
+  it('should throw UnauthorizedException when JWT payload is missing sub/id', async () => {
+    jwtService.verifyAsync.mockResolvedValue({
+      email: 'teacher@eduhub.vn',
+      role: UserRole.TEACHER,
+    });
+    const req: any = { headers: { authorization: 'Bearer some-token' } };
+    const context = createMockContext(req);
+
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      new UnauthorizedException('Dữ liệu xác thực trong token không hợp lệ')
+    );
+  });
+
+  it('should throw UnauthorizedException when JWT payload has invalid role', async () => {
+    jwtService.verifyAsync.mockResolvedValue({
+      sub: '10',
+      email: 'teacher@eduhub.vn',
+      role: 'INVALID_ROLE',
+    });
+    const req: any = { headers: { authorization: 'Bearer some-token' } };
+    const context = createMockContext(req);
+
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      new UnauthorizedException('Dữ liệu xác thực trong token không hợp lệ')
+    );
+  });
+
+  it('should throw UnauthorizedException when JWT payload has empty or non-string email', async () => {
+    jwtService.verifyAsync.mockResolvedValue({
+      sub: '10',
+      email: '   ',
+      role: UserRole.STUDENT,
+    });
+    const req: any = { headers: { authorization: 'Bearer some-token' } };
+    const context = createMockContext(req);
+
+    await expect(guard.canActivate(context)).rejects.toThrow(
+      new UnauthorizedException('Dữ liệu xác thực trong token không hợp lệ')
+    );
+  });
 });
 

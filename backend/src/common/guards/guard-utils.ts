@@ -12,14 +12,28 @@ export function extractClassId(req: any): bigint | null {
     return null;
   }
 
-  if (typeof rawId === 'string' && rawId.trim() === '') {
-    return null;
+  if (typeof rawId === 'number') {
+    if (!Number.isInteger(rawId) || rawId <= 0) {
+      return null;
+    }
+    return BigInt(rawId);
   }
 
-  try {
-    const parsed = BigInt(rawId);
-    return parsed;
-  } catch {
-    return null;
+  if (typeof rawId === 'bigint') {
+    return rawId > 0n ? rawId : null;
   }
+
+  if (typeof rawId === 'string') {
+    const trimmed = rawId.trim();
+    if (!/^[1-9]\d*$/.test(trimmed)) {
+      return null;
+    }
+    try {
+      return BigInt(trimmed);
+    } catch {
+      return null;
+    }
+  }
+
+  return null;
 }

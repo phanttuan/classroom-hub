@@ -2,6 +2,29 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { AUTH_COOKIE_NAME, ROLE_COOKIE_NAME } from './lib/auth/auth-constants';
 
+function extractRoleFromToken(token?: string): string | null {
+  if (!token) return null;
+  try {
+    const parts = token.split('.');
+    if (parts.length < 2) return null;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonString =
+      typeof Buffer !== 'undefined'
+        ? Buffer.from(base64, 'base64').toString('utf-8')
+        : atob(base64);
+    const payload = JSON.parse(jsonString);
+
+    if (payload.exp && typeof payload.exp === 'number' && payload.exp * 1000 < Date.now()) {
+      return null;
+    }
+
+    return typeof payload.role === 'string' ? payload.role.toUpperCase() : null;
+  } catch {
+    return null;
+  }
+}
+
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
@@ -20,7 +43,8 @@ export function proxy(request: NextRequest) {
   }
 
   const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
-  const role = request.cookies.get(ROLE_COOKIE_NAME)?.value?.toUpperCase();
+  const tokenRole = extractRoleFromToken(token);
+  const role = tokenRole || request.cookies.get(ROLE_COOKIE_NAME)?.value?.toUpperCase();
 
   // Kiểm tra route theo role
   const isAdminRoute = pathname.startsWith('/admin');
@@ -28,10 +52,11 @@ export function proxy(request: NextRequest) {
   const isStudentRoute = pathname.startsWith('/student');
 
   if (isAdminRoute || isTeacherRoute || isStudentRoute) {
-    // 1. Chưa đăng nhập -> chuyển hướng về /login (401)
+    // 1. Chưa đăng nhập hoặc token đã hết hạn -> chuyển hướng về /login (401)
     if (!token || !role) {
       const loginUrl = new URL('/login', request.url);
-      loginUrl.searchParams.set('callbackUrl', pathname);
+      const search = request.nextUrl.search;
+      loginUrl.searchParams.set('callbackUrl', `${pathname}${search}`);
       return NextResponse.redirect(loginUrl);
     }
 

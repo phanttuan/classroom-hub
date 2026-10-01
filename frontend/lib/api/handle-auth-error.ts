@@ -3,7 +3,10 @@ export function handleAuthError(statusCode: number): void {
 
   if (statusCode === 401) {
     const loginUrl = new URL('/login', window.location.origin);
-    loginUrl.searchParams.set('callbackUrl', window.location.pathname);
+    loginUrl.searchParams.set(
+      'callbackUrl',
+      `${window.location.pathname}${window.location.search}`,
+    );
     window.location.assign(loginUrl.toString());
   } else if (statusCode === 403) {
     const forbiddenUrl = new URL('/forbidden', window.location.origin);

@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { UserRole } from '../../generated/prisma/enums.js';
 import type { RequestWithUser, AuthenticatedUser } from '../interfaces/request-with-user.interface.js';
 
 @Injectable()
@@ -29,21 +30,39 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     try {
-      const secret =
-        this.configService.get<string>('JWT_SECRET') ||
-        'classroom-hub-default-jwt-secret';
+      const secret = this.configService.get<string>('JWT_SECRET');
+      if (!secret) {
+        throw new UnauthorizedException('Cấu hình bảo mật JWT_SECRET không hợp lệ hoặc bị thiếu');
+      }
+
       const payload = await this.jwtService.verifyAsync(token, { secret });
 
+      const userId = payload?.sub ?? payload?.id;
+      const email = payload?.email;
+      const role = payload?.role;
+
+      if (
+        (userId === undefined || userId === null || userId === '') ||
+        typeof email !== 'string' ||
+        !email.trim() ||
+        !Object.values(UserRole).includes(role)
+      ) {
+        throw new UnauthorizedException('Dữ liệu xác thực trong token không hợp lệ');
+      }
+
       const user: AuthenticatedUser = {
-        id: payload.sub ?? payload.id,
-        email: payload.email,
-        role: payload.role,
-        fullName: payload.fullName,
+        id: userId,
+        email: email.trim(),
+        role: role as UserRole,
+        fullName: typeof payload.fullName === 'string' ? payload.fullName : undefined,
       };
 
       req.user = user;
       return true;
-    } catch {
+    } catch (err) {
+      if (err instanceof UnauthorizedException) {
+        throw err;
+      }
       throw new UnauthorizedException('Phiên đăng nhập không hợp lệ hoặc đã hết hạn');
     }
   }

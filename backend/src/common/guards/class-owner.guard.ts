@@ -43,6 +43,11 @@ export class ClassOwnerGuard implements CanActivate {
       return true;
     }
 
+    // Chỉ giáo viên mới có thể là chủ sở hữu lớp học
+    if (user.role !== UserRole.TEACHER) {
+      throw new ForbiddenException('Bạn không có quyền thực hiện thao tác của giáo viên');
+    }
+
     // Kiểm tra giáo viên sở hữu lớp
     const userIdBigInt = BigInt(user.id);
     if (classroom.ownerId !== userIdBigInt) {

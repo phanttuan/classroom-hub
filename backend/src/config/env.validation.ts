@@ -37,6 +37,10 @@ export class EnvironmentVariables {
   @IsOptional()
   CORS_ORIGINS: string = 'http://localhost:3000';
 
+  @IsString()
+  @IsOptional()
+  JWT_SECRET?: string;
+
   // --- Cấu hình Database PostgreSQL ---
 
   @IsString()

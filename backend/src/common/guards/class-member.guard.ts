@@ -39,10 +39,24 @@ export class ClassMemberGuard implements CanActivate {
 
     const userIdBigInt = BigInt(user.id);
 
-    // Admin hoặc Giáo viên chủ lớp luôn có quyền xem tài nguyên lớp
-    if (user.role === UserRole.ADMIN || classroom.ownerId === userIdBigInt) {
+    // 1. Admin hệ thống có quyền truy cập toàn diện
+    if (user.role === UserRole.ADMIN) {
       req.classroom = classroom;
       return true;
+    }
+
+    // 2. Giáo viên sở hữu lớp có quyền xem tài nguyên lớp
+    if (user.role === UserRole.TEACHER) {
+      if (classroom.ownerId === userIdBigInt) {
+        req.classroom = classroom;
+        return true;
+      }
+      throw new ForbiddenException('Bạn không phải là giáo viên phụ trách lớp học này');
+    }
+
+    // 3. Chỉ học sinh mới tiếp tục kiểm tra membership
+    if (user.role !== UserRole.STUDENT) {
+      throw new ForbiddenException('Bạn không có quyền truy cập vào lớp học này');
     }
 
     // Kiểm tra tư cách thành viên của học sinh
