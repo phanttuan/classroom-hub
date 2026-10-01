@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import Navbar from "../components/common/Navbar";
 import { toast } from "../components/common/Toast";
+import { saveAuthSession } from "@/lib/auth";
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api/v1";
@@ -121,7 +122,10 @@ function LoginFormContent() {
         return;
       }
 
-      // Đăng nhập thành công -> Điều hướng đúng role của user
+      // Đăng nhập thành công -> Lưu session để Next.js proxy và client-side nhận diện
+      saveAuthSession(result.data?.tokens, result.data?.user);
+
+      // Điều hướng đúng role của user
       const user = result.data?.user;
       let targetPath = "/teacher";
       let roleLabel = "Giảng viên";

@@ -369,17 +369,10 @@ function SingleToast({
 
       {/* Nội dung thông báo */}
       <div className="flex-1 pr-6 space-y-1">
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2">
           <h4 className="text-[14px] font-bold text-slate-900 leading-snug">
             {item.title}
           </h4>
-          {item.badge && (
-            <span
-              className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded-full border ${theme.badgeBg}`}
-            >
-              {item.badge}
-            </span>
-          )}
         </div>
         {item.message && (
           <p className="text-[12.5px] text-slate-600 leading-relaxed">

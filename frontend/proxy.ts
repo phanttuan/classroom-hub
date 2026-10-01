@@ -50,7 +50,9 @@ export function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const token = request.cookies.get(AUTH_COOKIE_NAME)?.value;
+  const token =
+    request.cookies.get(AUTH_COOKIE_NAME)?.value ||
+    request.cookies.get('access_token')?.value;
   // Chỉ xác thực và phân quyền dựa trên JWT token đã được ký bởi server; tuyệt đối không fallback sang cookie client có thể chỉnh sửa
   const role = extractRoleFromToken(token);
 

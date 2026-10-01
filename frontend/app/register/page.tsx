@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import Navbar from "../components/common/Navbar";
 import { toast } from "../components/common/Toast";
+import { saveAuthSession } from "@/lib/auth";
 
 type RoleKey = "TEACHER" | "STUDENT";
 
@@ -307,6 +308,9 @@ function RegisterFormContent() {
         setIsVerifyingOtp(false);
         return;
       }
+
+      // Lưu phiên xác thực (tokens & user) để Next.js proxy và các trang /teacher, /student nhận diện ngay
+      saveAuthSession(result.data?.tokens, result.data?.user);
 
       // Xác thực thành công!
       setIsVerifyingOtp(false);

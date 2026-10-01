@@ -732,9 +732,17 @@ export class AuthService {
       },
     });
 
-    // Thiết lập HttpOnly Cookie an toàn
+    // Thiết lập Cookie an toàn (Hỗ trợ cả access_token backend và auth_token của Next.js proxy)
     res.cookie('access_token', accessToken, {
       httpOnly: true,
+      secure: this.isProduction,
+      sameSite: this.isProduction ? 'none' : 'lax',
+      maxAge: 15 * 60 * 1000, // 15 phút
+      path: '/',
+    });
+
+    res.cookie('auth_token', accessToken, {
+      httpOnly: false,
       secure: this.isProduction,
       sameSite: this.isProduction ? 'none' : 'lax',
       maxAge: 15 * 60 * 1000, // 15 phút
@@ -767,6 +775,7 @@ export class AuthService {
     };
 
     res.clearCookie('access_token', cookieOptions);
+    res.clearCookie('auth_token', { ...cookieOptions, httpOnly: false });
     res.clearCookie('refresh_token', cookieOptions);
   }
 }

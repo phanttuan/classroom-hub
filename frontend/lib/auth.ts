@@ -1,4 +1,5 @@
 import { toast } from '@/app/components/common/Toast';
+import { AUTH_COOKIE_NAME, ROLE_COOKIE_NAME } from './auth/auth-constants';
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api/v1';
@@ -18,6 +19,33 @@ export interface LogoutResponse {
     allDevices: boolean;
     revokedSessions: number;
   };
+}
+
+/**
+ * Lưu thông tin session và token vào Cookie / Storage để Next.js proxy và giao diện nhận diện ngay lập tức
+ */
+export function saveAuthSession(
+  tokens?: { accessToken?: string; refreshToken?: string },
+  user?: { id?: string | bigint; email?: string; fullName?: string; role?: string },
+) {
+  if (typeof window === 'undefined') return;
+
+  const accessToken = tokens?.accessToken;
+  if (accessToken) {
+    // Lưu đồng thời auth_token và access_token cho Next.js middleware & API client
+    document.cookie = `${AUTH_COOKIE_NAME}=${accessToken}; path=/; max-age=86400; SameSite=Lax`;
+    document.cookie = `access_token=${accessToken}; path=/; max-age=86400; SameSite=Lax`;
+    localStorage.setItem(AUTH_COOKIE_NAME, accessToken);
+    localStorage.setItem('access_token', accessToken);
+  }
+
+  if (user) {
+    if (user.role) {
+      document.cookie = `${ROLE_COOKIE_NAME}=${user.role}; path=/; max-age=86400; SameSite=Lax`;
+    }
+    localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem('auth_user', JSON.stringify(user));
+  }
 }
 
 /**
@@ -44,12 +72,18 @@ export async function logoutUser(
 
     const result = await response.json();
 
-    // Dọn dẹp local storage và session storage client-side
+    // Dọn dẹp local storage, session storage và cookies client-side
     if (typeof window !== 'undefined') {
       try {
         localStorage.removeItem('user');
         localStorage.removeItem('auth_user');
+        localStorage.removeItem(AUTH_COOKIE_NAME);
+        localStorage.removeItem('access_token');
         sessionStorage.clear();
+
+        document.cookie = `${AUTH_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+        document.cookie = `access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+        document.cookie = `${ROLE_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
       } catch {
         // Bỏ qua nếu môi trường cấm storage
       }
@@ -69,7 +103,13 @@ export async function logoutUser(
     if (typeof window !== 'undefined') {
       try {
         localStorage.removeItem('user');
+        localStorage.removeItem(AUTH_COOKIE_NAME);
+        localStorage.removeItem('access_token');
         sessionStorage.clear();
+
+        document.cookie = `${AUTH_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+        document.cookie = `access_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+        document.cookie = `${ROLE_COOKIE_NAME}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
       } catch {
         // Bỏ qua
       }
