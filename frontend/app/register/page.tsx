@@ -207,7 +207,16 @@ function RegisterFormContent() {
         const msg =
           result.message || "Không thể thực hiện đăng ký. Vui lòng thử lại.";
         setErrorMessage(msg);
-        toast.error("Đăng ký không thành công", msg);
+        const isAlreadyRegistered =
+          response.status === 409 ||
+          msg.includes("đã được sử dụng") ||
+          msg.includes("đã tồn tại") ||
+          msg.includes("đã được đăng ký");
+
+        toast.error(
+          isAlreadyRegistered ? "Tài khoản đã tồn tại" : "Đăng ký không thành công",
+          msg,
+        );
         setIsLoading(false);
         return;
       }
@@ -417,9 +426,22 @@ function RegisterFormContent() {
 
               {/* Thông báo lỗi tổng quát */}
               {errorMessage && (
-                <div className="mb-3 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs sm:text-sm flex items-start gap-2 animate-fadeIn">
-                  <AlertCircle className="w-4 h-4 shrink-0 text-rose-600 mt-0.5" />
-                  <div className="leading-relaxed">{errorMessage}</div>
+                <div className="mb-3 p-3 rounded-2xl border bg-rose-50 border-rose-200 text-rose-700 text-xs sm:text-sm flex items-center justify-between gap-3 animate-fadeIn">
+                  <div className="flex items-start gap-2.5 min-w-0">
+                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-rose-600" />
+                    <div className="leading-relaxed">{errorMessage}</div>
+                  </div>
+                  {(errorMessage.includes("đăng nhập") ||
+                    errorMessage.includes("sử dụng") ||
+                    errorMessage.includes("tồn tại") ||
+                    errorMessage.includes("đã được đăng ký")) && (
+                    <Link
+                      href={`/login${email ? `?email=${encodeURIComponent(email)}` : ""}`}
+                      className="shrink-0 px-3.5 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs rounded-xl transition-all shadow-sm shadow-blue-600/20 active:scale-95 whitespace-nowrap"
+                    >
+                      Đăng nhập ngay
+                    </Link>
+                  )}
                 </div>
               )}
 
@@ -756,7 +778,7 @@ function RegisterFormContent() {
                 </h2>
                 <p className="text-xs sm:text-sm text-slate-600 max-w-sm mx-auto leading-relaxed">
                   Vui lòng nhập mã xác thực gồm 6 chữ số đã được gửi tới{" "}
-                  <strong className="text-slate-900">{email}</strong>
+                  <strong className="text-slate-900 break-all">{email}</strong>
                 </p>
               </div>
 
@@ -859,22 +881,22 @@ function RegisterFormContent() {
               <CheckCircle2 className="w-10 h-10" />
             </div>
 
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <h3 className="text-xl font-bold text-slate-900">
                 Đăng ký thành công!
               </h3>
-              <p className="text-xs sm:text-sm text-slate-500 leading-relaxed px-1">
-                <span className="sm:whitespace-nowrap">
-                  Tài khoản <strong className="text-slate-800">{email}</strong> với vai trò{" "}
+              <div className="text-xs sm:text-sm text-slate-500 leading-relaxed px-2 sm:px-4">
+                <p className="break-words">
+                  Tài khoản <strong className="text-slate-900 font-semibold break-all">{email}</strong>
+                </p>
+                <p className="mt-1">
+                  với vai trò{" "}
                   <span className="font-semibold text-blue-600">
                     {role === "TEACHER" ? "Giáo viên / Giảng viên" : "Học sinh / Sinh viên"}
-                  </span>
-                </span>
-                <br className="hidden sm:block" />
-                <span className="sm:whitespace-nowrap">
-                  {" "}đã được kích hoạt thành công trên hệ thống.
-                </span>
-              </p>
+                  </span>{" "}
+                  đã được kích hoạt thành công trên hệ thống.
+                </p>
+              </div>
             </div>
 
             <div className="pt-2">

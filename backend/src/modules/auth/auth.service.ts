@@ -56,8 +56,13 @@ export class AuthService {
       where: { email },
     });
     if (existingUser) {
+      if (existingUser.passwordHash && existingUser.passwordHash.startsWith('GOOGLE_OAUTH:')) {
+        throw new ConflictException(
+          'Email này đã được đăng ký bằng Tài khoản Google. Vui lòng sử dụng nút "Đăng nhập với Google".',
+        );
+      }
       throw new ConflictException(
-        'Địa chỉ email này đã được sử dụng. Vui lòng đăng nhập hoặc chọn email khác.',
+        'Địa chỉ email này đã được sử dụng trong hệ thống. Vui lòng dùng email khác để đăng ký.',
       );
     }
 
@@ -259,6 +264,7 @@ export class AuthService {
         fullName: newUser.fullName,
         role: newUser.role,
         status: newUser.status,
+        avatarUrl: newUser.avatarUrl ?? null,
       },
       tokens,
     };
@@ -410,6 +416,7 @@ export class AuthService {
         fullName: user.fullName,
         role: user.role,
         status: user.status,
+        avatarUrl: user.avatarUrl ?? null,
       },
       tokens,
     };
@@ -484,8 +491,14 @@ export class AuthService {
     });
 
     if (existingUser) {
+      if (existingUser.passwordHash && existingUser.passwordHash.startsWith('GOOGLE_OAUTH:')) {
+        throw new ConflictException(
+          'Tài khoản Google này đã được đăng ký trong hệ thống. Vui lòng chuyển sang trang Đăng nhập.',
+        );
+      }
+
       throw new ConflictException(
-        'Email này đã được sử dụng. Vui lòng đăng nhập hoặc dùng email khác.',
+        'Email này đã được đăng ký bằng Mật khẩu thông thường. Vui lòng chuyển sang Đăng nhập bằng Email và Mật khẩu.',
       );
     }
 
@@ -845,6 +858,7 @@ export class AuthService {
         fullName: true,
         role: true,
         status: true,
+        avatarUrl: true,
         createdAt: true,
       },
     });
@@ -859,6 +873,7 @@ export class AuthService {
       fullName: user.fullName,
       role: user.role,
       status: user.status,
+      avatarUrl: user.avatarUrl ?? null,
       createdAt: user.createdAt,
     };
   }

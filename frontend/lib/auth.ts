@@ -32,11 +32,20 @@ export function saveAuthSession(
 ) {
   if (typeof window === 'undefined') return;
 
+  if (tokens?.accessToken) {
+    document.cookie = `${AUTH_COOKIE_NAME}=${tokens.accessToken}; path=/; max-age=604800; SameSite=Lax`;
+    try {
+      localStorage.setItem(AUTH_COOKIE_NAME, tokens.accessToken);
+    } catch {}
+  }
+
   if (user) {
     if (user.role) {
       document.cookie = `${ROLE_COOKIE_NAME}=${user.role}; path=/; max-age=604800; SameSite=Lax`;
     }
-    localStorage.setItem('user', JSON.stringify(user));
+    try {
+      localStorage.setItem('user', JSON.stringify(user));
+    } catch {}
   }
 }
 

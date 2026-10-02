@@ -43,25 +43,27 @@ function formatDate(dateStr?: string) {
   }
 }
 
+const defaultProfileUser: UserProfile = {
+  id: "gv-001",
+  email: "teacher@eduhub.com",
+  fullName: "Nguyễn Văn A",
+  avatarUrl: "/images/teacher.webp",
+  role: "TEACHER",
+  status: "ACTIVE",
+  createdAt: "2026-01-01T00:00:00.000Z",
+};
+
 export default function TeacherProfilePage() {
   const [topSearch, setTopSearch] = useState("");
   const [tab, setTab] = useState<ProfileTab>("info");
   const [loading, setLoading] = useState(false);
 
-  // Dữ liệu người dùng từ CSDL PostgreSQL
-  const [user, setUser] = useState<UserProfile>({
-    id: "1",
-    email: "teacher@eduhub.com",
-    fullName: "Thầy Nguyễn Văn A",
-    avatarUrl: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300",
-    role: "TEACHER",
-    status: "ACTIVE",
-    createdAt: new Date().toISOString(),
-  });
+  // Dữ liệu người dùng từ CSDL (khởi tạo đồng nhất giữa SSR và Client để triệt tiêu lỗi Hydration)
+  const [user, setUser] = useState<UserProfile>(defaultProfileUser);
 
   // Form chỉnh sửa (chỉ gồm các trường thực tế trong Database)
-  const [name, setName] = useState(user.fullName);
-  const [avatarUrl, setAvatarUrl] = useState(user.avatarUrl ?? "");
+  const [name, setName] = useState(defaultProfileUser.fullName);
+  const [avatarUrl, setAvatarUrl] = useState("");
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [formError, setFormError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -82,12 +84,49 @@ export default function TeacherProfilePage() {
   };
 
   useEffect(() => {
+    // 1. Tải ngay từ localStorage sau khi hydrate xong
+    try {
+      const raw = localStorage.getItem("user");
+      if (raw) {
+        const cached = JSON.parse(raw);
+        const normalized: UserProfile = {
+          id: cached.id ? String(cached.id) : "gv-001",
+          fullName: cached.fullName || defaultProfileUser.fullName,
+          email: cached.email || defaultProfileUser.email,
+          role: cached.role || defaultProfileUser.role,
+          status: cached.status || defaultProfileUser.status,
+          avatarUrl: cached.avatarUrl || defaultProfileUser.avatarUrl,
+          createdAt: cached.createdAt || defaultProfileUser.createdAt,
+        };
+        setUser(normalized);
+        setName(normalized.fullName);
+        setAvatarUrl(cached.avatarUrl && cached.avatarUrl !== "/images/teacher.webp" ? cached.avatarUrl : "");
+      }
+    } catch {}
+
+    // 2. Tải dữ liệu mới nhất từ CSDL qua API /users/me
     async function loadData() {
       try {
         const u = await fetchUserProfile();
-        setUser(u);
-        setName(u.fullName);
-        setAvatarUrl(u.avatarUrl ?? "");
+        if (u) {
+          const normalized: UserProfile = {
+            id: u.id ? String(u.id) : "gv-001",
+            fullName: u.fullName || "Nguyễn Văn A",
+            email: u.email || "",
+            role: u.role || "TEACHER",
+            status: u.status || "ACTIVE",
+            avatarUrl: u.avatarUrl || "/images/teacher.webp",
+            createdAt: u.createdAt,
+          };
+          setUser(normalized);
+          setName(normalized.fullName);
+          setAvatarUrl(u.avatarUrl && u.avatarUrl !== "/images/teacher.webp" ? u.avatarUrl : "");
+          try {
+            const raw = localStorage.getItem("user");
+            const existing = raw ? JSON.parse(raw) : {};
+            localStorage.setItem("user", JSON.stringify({ ...existing, ...normalized }));
+          } catch {}
+        }
       } catch (err: unknown) {
         console.error("Failed to load user profile", err);
       }
@@ -132,6 +171,11 @@ export default function TeacherProfilePage() {
       setAvatarUrl(updated.avatarUrl ?? "");
       setAvatarPreview(null);
       if (typeof window !== "undefined") {
+        try {
+          const raw = localStorage.getItem("user");
+          const existing = raw ? JSON.parse(raw) : {};
+          localStorage.setItem("user", JSON.stringify({ ...existing, ...updated }));
+        } catch {}
         window.dispatchEvent(new CustomEvent("user-profile-updated", { detail: updated }));
       }
       showToast("Đã lưu thay đổi hồ sơ thành công");
@@ -145,8 +189,8 @@ export default function TeacherProfilePage() {
   };
 
   const resetInfo = () => {
-    setName(user.fullName);
-    setAvatarUrl(user.avatarUrl ?? "");
+    setName(user.fullName || "Nguyễn Văn A");
+    setAvatarUrl(user.avatarUrl && user.avatarUrl !== "/images/teacher.webp" ? user.avatarUrl : "");
     setAvatarPreview(null);
     setFormError("");
   };
@@ -172,7 +216,7 @@ export default function TeacherProfilePage() {
     }
   };
 
-  const avatarSrc = avatarPreview || user.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300";
+  const avatarSrc = avatarPreview || user.avatarUrl || "/images/teacher.webp";
   const strength = passwordStrength(nw);
   const strengthLabel = ["Yếu", "Yếu", "Trung bình", "Mạnh", "Rất mạnh"][strength];
   const strengthColor = ["bg-red-500", "bg-red-500", "bg-amber-500", "bg-green-500", "bg-green-600"][strength];
@@ -264,12 +308,12 @@ export default function TeacherProfilePage() {
                       <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                         <div>
                           <label className="mb-1.5 block text-[13px] text-slate-600">Họ và tên <span className="text-red-500">*</span></label>
-                          <input value={name} onChange={(e) => setName(e.target.value)} className="h-11 w-full rounded-lg border border-slate-200 px-3.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100" />
+                          <input value={name || ""} onChange={(e) => setName(e.target.value)} className="h-11 w-full rounded-lg border border-slate-200 px-3.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100" />
                         </div>
                         <div>
                           <label className="mb-1.5 block text-[13px] text-slate-600">Email đăng nhập <span className="text-red-500">*</span></label>
                           <span className="relative block">
-                            <input value={user.email} disabled className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 pr-10 text-sm text-slate-400 outline-none" />
+                            <input value={user.email || ""} disabled className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 pr-10 text-sm text-slate-400 outline-none" />
                             <Lock className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-300" />
                           </span>
                         </div>
@@ -278,7 +322,7 @@ export default function TeacherProfilePage() {
                       <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
                         <div>
                           <label className="mb-1.5 block text-[13px] text-slate-600">Mã định danh (ID)</label>
-                          <input value={`#${user.id}`} disabled className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 text-sm text-slate-400 outline-none" />
+                          <input value={user.id ? `#${user.id}` : "#1"} disabled className="h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3.5 text-sm text-slate-400 outline-none" />
                         </div>
                         <div>
                           <label className="mb-1.5 block text-[13px] text-slate-600">Vai trò</label>
@@ -292,7 +336,7 @@ export default function TeacherProfilePage() {
 
                       <div>
                         <label className="mb-1.5 block text-[13px] text-slate-600">Đường dẫn ảnh đại diện (Avatar URL)</label>
-                        <input value={avatarUrl} onChange={(e) => setAvatarUrl(e.target.value)} placeholder="https://example.com/avatar.jpg" className="h-11 w-full rounded-lg border border-slate-200 px-3.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100" />
+                        <input value={avatarUrl || ""} onChange={(e) => setAvatarUrl(e.target.value)} placeholder="https://example.com/avatar.jpg" className="h-11 w-full rounded-lg border border-slate-200 px-3.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100" />
                       </div>
 
                       {formError && <p className="rounded-lg bg-red-50 px-3 py-2 text-[13px] text-red-600">{formError}</p>}

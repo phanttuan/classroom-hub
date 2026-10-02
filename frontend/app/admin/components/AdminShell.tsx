@@ -1,11 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import AdminSidebar from "./AdminSidebar";
 import AdminTopbar from "./AdminTopbar";
 import { NotificationModal } from "../../teacher/components/TeacherModals";
 import { adminNotifications } from "@/lib/mock/admin";
 import type { TeacherNotification } from "@/lib/types/teacher";
+import { useSidebar } from "@/lib/context/sidebar-context";
 
 /** Map thông báo admin sang type dùng chung để tái dùng NotificationModal */
 const KIND_MAP: Record<string, TeacherNotification["kind"]> = {
@@ -46,14 +47,18 @@ export default function AdminShell({
     [],
   );
 
+  const { collapsed, toggleCollapse } = useSidebar();
+
   return (
     <div className="min-h-screen bg-[#F6F8FB] text-slate-900">
       <AdminSidebar
         mobileOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         activeId={activeId}
+        collapsed={collapsed}
+        onToggleCollapse={toggleCollapse}
       />
-      <div className="flex min-h-screen flex-col lg:pl-[248px]">
+      <div className={`flex min-h-screen flex-col transition-all duration-300 ease-in-out ${collapsed ? "lg:pl-[72px]" : "lg:pl-[248px]"}`}>
         <AdminTopbar
           searchQuery={searchValue}
           onSearchChange={onSearchChange}

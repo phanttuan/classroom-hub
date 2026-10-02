@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import GreetingHeader from "../components/common/GreetingHeader";
 import TeacherSidebar from "./components/TeacherSidebar";
 import TeacherTopbar from "./components/TeacherTopbar";
@@ -32,12 +32,62 @@ import type {
   ScheduleEvent,
   TeacherClass,
   TeacherNotification,
+  TeacherProfile,
 } from "@/lib/types/teacher";
+import { fetchUserProfile } from "@/lib/api/user-api";
+import { useSidebar } from "@/lib/context/sidebar-context";
 
 export default function TeacherDashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [classes, setClasses] = useState<TeacherClass[]>(teacherClasses);
+  const [profile, setProfile] = useState<TeacherProfile>(teacherProfile);
+  const { collapsed, toggleCollapse } = useSidebar();
+
+  useEffect(() => {
+    // 1. Tải ngay từ localStorage nếu có
+    try {
+      const raw = localStorage.getItem("user");
+      if (raw) {
+        const u = JSON.parse(raw);
+        setProfile({
+          id: u.id ? String(u.id) : "gv-001",
+          fullName: u.fullName || teacherProfile.fullName,
+          role: u.role === "TEACHER" ? "Giáo viên" : u.role === "ADMIN" ? "Quản trị viên" : u.role === "STUDENT" ? "Học sinh" : (u.role || "Giáo viên"),
+          avatarUrl: u.avatarUrl || "/images/teacher.webp",
+        });
+      }
+    } catch {}
+
+    // 2. Fetch dữ liệu mới nhất từ CSDL qua /users/me
+    fetchUserProfile()
+      .then((data) => {
+        if (data) {
+          setProfile({
+            id: data.id,
+            fullName: data.fullName || teacherProfile.fullName,
+            role: data.role === "TEACHER" ? "Giáo viên" : data.role === "ADMIN" ? "Quản trị viên" : data.role === "STUDENT" ? "Học sinh" : "Giáo viên",
+            avatarUrl: data.avatarUrl || "/images/teacher.webp",
+          });
+        }
+      })
+      .catch(() => {});
+
+    // 3. Lắng nghe sự kiện cập nhật hồ sơ để đồng bộ ngay lập tức
+    const handleUpdate = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (detail) {
+        setProfile((prev) => ({
+          id: detail.id || prev.id,
+          fullName: detail.fullName || prev.fullName,
+          role: detail.role === "TEACHER" ? "Giáo viên" : detail.role === "ADMIN" ? "Quản trị viên" : detail.role === "STUDENT" ? "Học sinh" : prev.role,
+          avatarUrl: detail.avatarUrl || prev.avatarUrl || "/images/teacher.webp",
+        }));
+      }
+    };
+    window.addEventListener("user-profile-updated", handleUpdate);
+    return () => window.removeEventListener("user-profile-updated", handleUpdate);
+  }, []);
 
   // popup states
   const [createOpen, setCreateOpen] = useState(false);
@@ -94,11 +144,17 @@ export default function TeacherDashboardPage() {
 
   return (
     <div className="min-h-screen bg-[#F6F8FB] text-slate-900">
-      <TeacherSidebar mobileOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} activeId="home" />
+      <TeacherSidebar
+        mobileOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        activeId="home"
+        collapsed={collapsed}
+        onToggleCollapse={toggleCollapse}
+      />
 
-      <div className="flex min-h-screen flex-col lg:pl-[248px]">
+      <div className={`flex min-h-screen flex-col transition-all duration-300 ease-in-out ${collapsed ? "lg:pl-[72px]" : "lg:pl-[248px]"}`}>
         <TeacherTopbar
-          profile={teacherProfile}
+          profile={profile}
           notifications={teacherNotifications}
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
@@ -109,7 +165,7 @@ export default function TeacherDashboardPage() {
         <main className="mx-auto w-full max-w-[1280px] flex-1 px-4 py-5 sm:px-6">
           {/* Chào mừng full-width (dùng chung 3 role) để cột Lịch bắt đầu ngang hàng stat cards */}
           <GreetingHeader
-            name={teacherProfile.fullName}
+            name={profile.fullName}
             subtitle="Đây là tổng quan hoạt động giảng dạy của bạn hôm nay."
             dateLabel={greetingDateLabel}
           />

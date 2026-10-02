@@ -108,7 +108,6 @@ export default function AdminTopbar({
             {profileOpen && (
               <div className="absolute right-0 top-[calc(100%+8px)] w-56 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl shadow-slate-900/10">
                 {[
-                  { label: "Hồ sơ quản trị", href: "/admin" },
                   { label: "Cài đặt hệ thống", href: "/admin" },
                   { label: "Đăng xuất", href: "/login" },
                 ].map((i) =>

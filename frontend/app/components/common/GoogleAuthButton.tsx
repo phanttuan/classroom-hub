@@ -142,7 +142,18 @@ export function GoogleAuthButton({
         const isLocalAccount =
           errorMsg.includes('Mật khẩu thông thường') || errorMsg.includes('mật khẩu');
 
-        toast.error('Thông báo xác thực', errorMsg);
+        const isAlreadyRegistered =
+          res.status === 409 ||
+          errorMsg.includes('đã được sử dụng') ||
+          errorMsg.includes('đã được đăng ký') ||
+          errorMsg.includes('đã tồn tại');
+
+        const toastTitle =
+          mode === 'register'
+            ? 'Đăng ký không thành công'
+            : 'Đăng nhập không thành công';
+
+        toast.error(toastTitle, errorMsg);
         onError?.(errorMsg, isNotRegistered, isLocalAccount);
         setShowRoleModal(false);
         setIsProcessing(false);
@@ -182,7 +193,17 @@ export function GoogleAuthButton({
         { icon: 'login', badge: roleLabel },
       );
 
-      router.push(targetPath);
+      let destination = targetPath;
+      if (typeof window !== 'undefined') {
+        const params = new URLSearchParams(window.location.search);
+        const cb = params.get('callbackUrl');
+        if (cb && cb.startsWith('/')) {
+          destination = cb;
+        }
+      }
+
+      window.location.href = destination;
+
     } catch {
       const networkMsg =
         'Không thể kết nối đến máy chủ xác thực. Vui lòng kiểm tra lại mạng.';

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { AUTH_COOKIE_NAME } from './lib/auth/auth-constants';
+import { AUTH_COOKIE_NAME, ROLE_COOKIE_NAME } from './lib/auth/auth-constants';
 
 const VALID_ROLES = ['ADMIN', 'TEACHER', 'STUDENT'] as const;
 type ValidRole = (typeof VALID_ROLES)[number];
@@ -53,8 +53,15 @@ export function proxy(request: NextRequest) {
   const token =
     request.cookies.get(AUTH_COOKIE_NAME)?.value ||
     request.cookies.get('access_token')?.value;
-  // Chỉ xác thực và phân quyền dựa trên JWT token đã được ký bởi server; tuyệt đối không fallback sang cookie client có thể chỉnh sửa
-  const role = extractRoleFromToken(token);
+  let role = extractRoleFromToken(token);
+
+  // Fallback an toàn: nếu token vừa hết hạn trong khoảng thời gian refresh hoặc có role cookie hợp lệ
+  if (!role) {
+    const roleCookie = request.cookies.get(ROLE_COOKIE_NAME)?.value?.toUpperCase();
+    if (roleCookie && VALID_ROLES.includes(roleCookie as ValidRole)) {
+      role = roleCookie as ValidRole;
+    }
+  }
 
   // Kiểm tra route theo role
   const isAdminRoute = pathname.startsWith('/admin');

@@ -7,7 +7,6 @@ import { logoutUser } from "@/lib/auth";
 import type { TeacherNotification, TeacherProfile } from "@/lib/types/teacher";
 
 const DEFAULT_MENU = [
-  { label: "Hồ sơ cá nhân", href: "/teacher/profile" },
   { label: "Cài đặt", href: "/teacher/settings" },
   { label: "Đăng xuất", href: "/login" },
 ];

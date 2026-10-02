@@ -7,6 +7,7 @@ import StudentSidebar from "./StudentSidebar";
 import { studentInbox, studentProfile } from "@/lib/mock/student";
 import type { TeacherNotification, TeacherProfile } from "@/lib/types/teacher";
 import { fetchUserProfile } from "@/lib/api/user-api";
+import { useSidebar } from "@/lib/context/sidebar-context";
 
 /**
  * Shell dùng chung cho mọi trang /student/*.
@@ -39,6 +40,19 @@ export default function StudentShell({
   const [loadedUser, setLoadedUser] = useState<TeacherProfile | null>(null);
 
   useEffect(() => {
+    try {
+      const raw = localStorage.getItem("user");
+      if (raw) {
+        const u = JSON.parse(raw);
+        setLoadedUser({
+          id: u.id ? String(u.id) : "st-001",
+          fullName: u.fullName || studentProfile.fullName,
+          role: u.role === "STUDENT" ? "Học sinh" : u.role === "TEACHER" ? "Giáo viên" : "Quản trị viên",
+          avatarUrl: u.avatarUrl || studentProfile.avatarUrl,
+        });
+      }
+    } catch {}
+
     fetchUserProfile()
       .then((data) => {
         if (data) {
@@ -70,7 +84,7 @@ export default function StudentShell({
   }, []);
 
   const currentProfile: TeacherProfile = useMemo(() => {
-    if (userProfile) {
+    if (userProfile && userProfile.fullName) {
       return {
         id: userProfile.id || loadedUser?.id || "st-001",
         fullName: userProfile.fullName,
@@ -102,15 +116,19 @@ export default function StudentShell({
     [],
   );
 
+  const { collapsed, toggleCollapse } = useSidebar();
+
   return (
     <div className="min-h-screen bg-[#F6F8FB] text-slate-900">
       <StudentSidebar
         mobileOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         activeId={activeId}
+        collapsed={collapsed}
+        onToggleCollapse={toggleCollapse}
       />
 
-      <div className="flex min-h-screen flex-col lg:pl-[248px]">
+      <div className={`flex min-h-screen flex-col transition-all duration-300 ease-in-out ${collapsed ? "lg:pl-[72px]" : "lg:pl-[248px]"}`}>
         <TeacherTopbar
           profile={currentProfile}
           notifications={bellNotifs}
@@ -120,7 +138,7 @@ export default function StudentShell({
           onOpenNotifications={() => setSelectedNoti(null)}
           placeholder={searchPlaceholder}
           menuItems={[
-            { label: "Hồ sơ cá nhân", href: "/student/profile" },
+            { label: "Cài đặt", href: "/student/settings" },
             { label: "Đăng xuất", href: "/login" },
           ]}
         />
