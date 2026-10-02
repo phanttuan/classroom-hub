@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/app/components/common/Toast';
 import { saveAuthSession } from '@/lib/auth';
@@ -56,6 +57,7 @@ export function GoogleAuthButton({
   className = '',
 }: GoogleAuthButtonProps) {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
   const [, setScriptLoaded] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
@@ -67,6 +69,11 @@ export function GoogleAuthButton({
   const [pendingProfile, setPendingProfile] = useState<GoogleUserProfile | null>(null);
 
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
+
+  // Đảm bảo client mount trước khi dùng createPortal
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Đồng bộ role khi prop từ cha thay đổi
   useEffect(() => {
@@ -295,13 +302,30 @@ export function GoogleAuthButton({
       </button>
 
       {/* ========================================================================= */}
-      {/* MODAL XÁC NHẬN VAI TRÒ KHI ĐĂNG KÝ BẰNG GOOGLE (CHUẨN SAAS CAO CẤP)        */}
+      {/* MODAL XÁC NHẬN VAI TRÒ KHI ĐĂNG KÝ BẰNG GOOGLE (PORTAL RA BODY)            */}
       {/* ========================================================================= */}
-      {showRoleModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-7 shadow-2xl border border-slate-100 space-y-5 animate-scaleUp">
+      {showRoleModal && mounted && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+          {/* Lớp nền mờ click ngoài để đóng */}
+          <div
+            className="absolute inset-0"
+            onClick={() => !isProcessing && setShowRoleModal(false)}
+          />
+
+          <div className="bg-white rounded-[28px] max-w-md w-full p-6 sm:p-7 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)] border border-slate-100 relative z-10 space-y-5 animate-scaleUp">
+            {/* Nút X đóng góc trên bên phải */}
+            <button
+              type="button"
+              onClick={() => setShowRoleModal(false)}
+              disabled={isProcessing}
+              className="absolute top-4 right-4 p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition-colors cursor-pointer disabled:opacity-40"
+              aria-label="Đóng"
+            >
+              <X className="w-4 h-4" />
+            </button>
+
             {/* Header: Thông tin tài khoản Google trích xuất được */}
-            <div className="text-center space-y-2">
+            <div className="text-center space-y-2 pt-1">
               <div className="relative inline-block mx-auto">
                 {pendingProfile?.picture ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -425,43 +449,50 @@ export function GoogleAuthButton({
               </button>
             </div>
 
-            {/* Footer hành động */}
-            <div className="flex items-center justify-end gap-2.5 pt-2">
-              <button
-                type="button"
-                onClick={() => setShowRoleModal(false)}
-                disabled={isProcessing}
-                className="px-4 py-2 text-xs sm:text-sm font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all cursor-pointer disabled:opacity-50"
-              >
-                Hủy
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmRegister}
-                disabled={isProcessing}
-                className="px-5 py-2.2 bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm font-semibold rounded-xl shadow-md shadow-blue-600/25 transition-all cursor-pointer flex items-center gap-2 disabled:opacity-60"
-              >
-                {isProcessing ? (
-                  <>
-                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    <span>Đang hoàn tất...</span>
-                  </>
-                ) : (
-                  <>
-                    <ShieldCheck className="w-4 h-4" />
-                    <span>Hoàn tất đăng ký</span>
-                  </>
-                )}
-              </button>
+            {/* Footer hành động: 2 nút đối xứng toàn chiều rộng, rộng rãi, chuẩn cao cấp */}
+            <div className="pt-3 border-t border-slate-100">
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowRoleModal(false)}
+                  disabled={isProcessing}
+                  className="w-full py-2.5 sm:py-3 px-4 rounded-xl border border-slate-200 hover:border-slate-300 hover:bg-slate-100 text-slate-700 font-semibold text-xs sm:text-sm transition-all duration-200 flex items-center justify-center cursor-pointer shadow-xs active:scale-[0.98] disabled:opacity-50"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmRegister}
+                  disabled={isProcessing}
+                  className="w-full py-2.5 sm:py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer shadow-md shadow-blue-600/25 hover:shadow-lg hover:shadow-blue-600/30 active:scale-[0.98] disabled:opacity-60"
+                >
+                  {isProcessing ? (
+                    <>
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin shrink-0" />
+                      <span>Đang tạo...</span>
+                    </>
+                  ) : (
+                    <>
+                      <ShieldCheck className="w-4 h-4 shrink-0" />
+                      <span>Hoàn tất đăng ký</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Modal hướng dẫn khi chưa điền CLIENT_ID */}
-      {showConfigModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fadeIn">
-          <div className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-slate-100 space-y-4">
+      {showConfigModal && mounted && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+          <div
+            className="absolute inset-0"
+            onClick={() => setShowConfigModal(false)}
+          />
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-slate-100 relative z-10 space-y-4">
             <div className="flex items-start justify-between">
               <div className="flex items-center gap-2 text-blue-600">
                 <Sparkles className="w-5 h-5 shrink-0" />
@@ -505,7 +536,8 @@ export function GoogleAuthButton({
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   );

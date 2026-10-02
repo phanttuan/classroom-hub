@@ -387,7 +387,7 @@ function RegisterFormContent() {
 
       {/* 3. Card Đăng ký căn giữa hoàn hảo (Khoảng cách trên và dưới bằng nhau tuyệt đối) */}
       <main className="relative z-10 flex-1 flex items-center justify-center px-4 sm:px-6 py-2.5 sm:py-3">
-        <div className="w-full max-w-[800px] bg-white/95 backdrop-blur-xl rounded-3xl shadow-[0_20px_50px_rgba(15,23,42,0.2)] border border-white/80 px-8 py-5.5 sm:px-11 sm:py-6.5 transition-all duration-300">
+        <div className="w-full max-w-[800px] bg-white/95 backdrop-blur-xl rounded-3xl shadow-[0_20px_50px_rgba(15,23,42,0.2)] border border-white/80 px-8 py-5.5 sm:px-11 sm:py-6.5 transition-all duration-300 overflow-hidden">
           {/* ========================================================================= */}
           {/* GIAO DIỆN BƯỚC 1: FORM ĐIỀN THÔNG TIN ĐĂNG KÝ                           */}
           {/* ========================================================================= */}
