@@ -8,6 +8,7 @@ import React, {
   useCallback,
   useRef,
 } from "react";
+import { usePathname } from "next/navigation";
 import {
   CheckCircle2,
   AlertCircle,
@@ -194,7 +195,9 @@ export default function ToastProvider({
     setToasts([]);
   }, []);
 
-  // Lắng nghe sự kiện toàn cục & kiểm tra flash toast từ sessionStorage
+  const pathname = usePathname();
+
+  // Lắng nghe sự kiện toàn cục
   useEffect(() => {
     const handleCustomToast = (event: Event) => {
       const customEvent = event as CustomEvent<Omit<ToastItem, "id">>;
@@ -205,25 +208,27 @@ export default function ToastProvider({
 
     window.addEventListener(TOAST_EVENT, handleCustomToast);
 
-    // Kiểm tra và kích hoạt flash toast (nếu có sau khi chuyển trang)
+    return () => {
+      window.removeEventListener(TOAST_EVENT, handleCustomToast);
+    };
+  }, [showToast]);
+
+  // Kiểm tra và kích hoạt flash toast khi chuyển trang (route transition) hoặc mount
+  useEffect(() => {
     try {
       const stored = sessionStorage.getItem(FLASH_STORAGE_KEY);
       if (stored) {
         sessionStorage.removeItem(FLASH_STORAGE_KEY);
         const parsed = JSON.parse(stored);
-        // Delay nhẹ 200ms để hiệu ứng chuyển trang êm dịu trước khi toast trượt vào
-        setTimeout(() => {
+        const timer = setTimeout(() => {
           showToast(parsed);
-        }, 200);
+        }, 150);
+        return () => clearTimeout(timer);
       }
     } catch {
       // Bỏ qua nếu lỗi
     }
-
-    return () => {
-      window.removeEventListener(TOAST_EVENT, handleCustomToast);
-    };
-  }, [showToast]);
+  }, [pathname, showToast]);
 
   return (
     <ToastContext.Provider value={{ toasts, showToast, removeToast, clearAll }}>

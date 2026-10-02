@@ -36,6 +36,7 @@ interface GoogleAuthButtonProps {
   mode: 'login' | 'register';
   role?: 'TEACHER' | 'STUDENT';
   onError?: (errorMsg: string, isNotRegistered?: boolean, isLocalAccount?: boolean) => void;
+  onSuccess?: (userData: { fullName: string; email: string; role: 'TEACHER' | 'STUDENT' }) => void;
   onLoading?: (loading: boolean) => void;
   className?: string;
 }
@@ -53,6 +54,7 @@ export function GoogleAuthButton({
   mode,
   role = 'STUDENT',
   onError,
+  onSuccess,
   onLoading,
   className = '',
 }: GoogleAuthButtonProps) {
@@ -148,10 +150,19 @@ export function GoogleAuthButton({
         return;
       }
 
-      // Đăng nhập / Đăng ký thành công -> Lưu session và chuyển trang
+      // Đăng nhập / Đăng ký thành công -> Lưu session
       setShowRoleModal(false);
       const user = result.data?.user;
       saveAuthSession(result.data?.tokens, user);
+
+      if (mode === 'register' && onSuccess) {
+        onSuccess({
+          fullName: user?.fullName || pendingProfile?.name || 'Người dùng',
+          email: user?.email || pendingProfile?.email || '',
+          role: (user?.role || targetRole || selectedRole) as 'TEACHER' | 'STUDENT',
+        });
+        return;
+      }
 
       let targetPath = '/student';
       let roleLabel = 'Học sinh';

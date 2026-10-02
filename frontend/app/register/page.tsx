@@ -709,6 +709,13 @@ function RegisterFormContent() {
                   mode="register"
                   role={role}
                   onError={(msg) => setErrorMessage(msg)}
+                  onSuccess={(userData) => {
+                    setEmail(userData.email);
+                    setFullName(userData.fullName);
+                    setRole(userData.role as RoleKey);
+                    setSuccessModalOpen(true);
+                    toast.registerSuccess(userData.fullName);
+                  }}
                 />
               </div>
 
