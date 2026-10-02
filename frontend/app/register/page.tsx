@@ -145,7 +145,7 @@ function RegisterFormContent() {
     const trimmedEmail = email.trim().toLowerCase();
 
     if (!trimmedName || trimmedName.length < 2) {
-      errors.fullName = "Vui lòng nhập họ và tên đầy đủ (tối thiểu 2 ký tự).";
+      errors.fullName = "Vui lòng nhập họ và\u00A0tên đầy\u00A0đủ (tối\u00A0thiểu 2\u00A0ký\u00A0tự).";
     }
 
     if (!trimmedEmail) {
@@ -153,26 +153,26 @@ function RegisterFormContent() {
     } else {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(trimmedEmail)) {
-        errors.email = "Địa chỉ email không đúng định dạng (vd: user@example.com).";
+        errors.email = "Email không đúng định dạng (vd:\u00A0name@domain.com).";
       }
     }
 
     if (!password) {
       errors.password = "Vui lòng nhập mật khẩu.";
     } else if (password.length < 8) {
-      errors.password = "Mật khẩu phải chứa ít nhất 8 ký tự.";
+      errors.password = "Mật khẩu phải có tối\u00A0thiểu 8\u00A0ký\u00A0tự.";
     } else if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(password)) {
-      errors.password = "Mật khẩu cần có ít nhất một chữ hoa, chữ thường và chữ số.";
+      errors.password = "Mật khẩu cần gồm chữ hoa, chữ thường và\u00A0chữ\u00A0số.";
     }
 
     if (!confirmPassword) {
-      errors.confirmPassword = "Vui lòng xác nhận lại mật khẩu.";
+      errors.confirmPassword = "Vui lòng xác nhận mật khẩu.";
     } else if (password !== confirmPassword) {
-      errors.confirmPassword = "Mật khẩu xác nhận không khớp.";
+      errors.confirmPassword = "Mật khẩu xác nhận không\u00A0khớp.";
     }
 
     if (!acceptTerms) {
-      errors.acceptTerms = "Vui lòng đồng ý với Điều khoản dịch vụ để tiếp tục.";
+      errors.acceptTerms = "Vui lòng đồng ý Điều khoản dịch vụ để\u00A0tiếp\u00A0tục.";
     }
 
     if (Object.keys(errors).length > 0) {
@@ -501,9 +501,9 @@ function RegisterFormContent() {
                       />
                     </div>
                     {fieldErrors.fullName && (
-                      <p className="text-xs text-rose-600 pl-0.5 flex items-center gap-1 animate-fadeIn">
-                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                        <span>{fieldErrors.fullName}</span>
+                      <p className="text-xs text-rose-600 pl-0.5 flex items-start gap-1.5 leading-snug animate-fadeIn">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-rose-500" />
+                        <span className="[text-wrap:pretty]">{fieldErrors.fullName}</span>
                       </p>
                     )}
                   </div>
@@ -537,9 +537,9 @@ function RegisterFormContent() {
                       />
                     </div>
                     {fieldErrors.email && (
-                      <p className="text-xs text-rose-600 pl-0.5 flex items-center gap-1 animate-fadeIn">
-                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                        <span>{fieldErrors.email}</span>
+                      <p className="text-xs text-rose-600 pl-0.5 flex items-start gap-1.5 leading-snug animate-fadeIn">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-rose-500" />
+                        <span className="[text-wrap:pretty]">{fieldErrors.email}</span>
                       </p>
                     )}
                   </div>
@@ -583,9 +583,9 @@ function RegisterFormContent() {
                     </div>
 
                     {fieldErrors.password ? (
-                      <p className="text-xs text-rose-600 pl-0.5 flex items-center gap-1 animate-fadeIn">
-                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                        <span>{fieldErrors.password}</span>
+                      <p className="text-xs text-rose-600 pl-0.5 flex items-start gap-1.5 leading-snug animate-fadeIn">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-rose-500" />
+                        <span className="[text-wrap:pretty]">{fieldErrors.password}</span>
                       </p>
                     ) : password ? (
                       <div className="flex items-center gap-2 pt-0.5">
@@ -641,9 +641,9 @@ function RegisterFormContent() {
                       </button>
                     </div>
                     {fieldErrors.confirmPassword && (
-                      <p className="text-xs text-rose-600 pl-0.5 flex items-center gap-1 animate-fadeIn">
-                        <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                        <span>{fieldErrors.confirmPassword}</span>
+                      <p className="text-xs text-rose-600 pl-0.5 flex items-start gap-1.5 leading-snug animate-fadeIn">
+                        <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-rose-500" />
+                        <span className="[text-wrap:pretty]">{fieldErrors.confirmPassword}</span>
                       </p>
                     )}
                   </div>
@@ -669,9 +669,9 @@ function RegisterFormContent() {
                     </span>
                   </label>
                   {fieldErrors.acceptTerms && (
-                    <p className="text-xs text-rose-600 mt-0.5 pl-0.5 flex items-center gap-1 animate-fadeIn">
-                      <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                      <span>{fieldErrors.acceptTerms}</span>
+                    <p className="text-xs text-rose-600 mt-1 pl-0.5 flex items-start gap-1.5 leading-snug animate-fadeIn">
+                      <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-rose-500" />
+                      <span className="[text-wrap:pretty]">{fieldErrors.acceptTerms}</span>
                     </p>
                   )}
                 </div>

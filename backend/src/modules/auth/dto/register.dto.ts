@@ -19,7 +19,7 @@ export class RegisterDto {
   fullName: string;
 
   @IsNotEmpty({ message: 'Địa chỉ email không được để trống.' })
-  @IsEmail({}, { message: 'Địa chỉ email không đúng định dạng.' })
+  @IsEmail({}, { message: 'Email không đúng định dạng (vd: name@domain.com).' })
   @Transform(({ value }) =>
     typeof value === 'string' ? value.trim().toLowerCase() : value,
   )
@@ -28,12 +28,11 @@ export class RegisterDto {
   @IsNotEmpty({ message: 'Mật khẩu không được để trống.' })
   @IsString({ message: 'Mật khẩu phải là chuỗi ký tự.' })
   @MinLength(8, {
-    message: 'Mật khẩu phải có tối thiểu 8 ký tự theo quy định hệ thống.',
+    message: 'Mật khẩu phải có tối thiểu 8 ký tự.',
   })
   @MaxLength(64, { message: 'Mật khẩu không được vượt quá 64 ký tự.' })
   @Matches(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/, {
-    message:
-      'Mật khẩu phải chứa ít nhất một chữ hoa, một chữ thường và một chữ số.',
+    message: 'Mật khẩu cần gồm chữ hoa, chữ thường và chữ số.',
   })
   password: string;
 

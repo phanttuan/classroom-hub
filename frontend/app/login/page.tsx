@@ -77,14 +77,14 @@ function LoginFormContent() {
     } else {
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
       if (!emailRegex.test(trimmedEmail)) {
-        errors.email = "Địa chỉ email không đúng định dạng (vd: user@example.com).";
+        errors.email = "Email không đúng định dạng (vd:\u00A0name@domain.com).";
       }
     }
 
     if (!password) {
       errors.password = "Vui lòng nhập mật khẩu.";
     } else if (password.length < 6) {
-      errors.password = "Mật khẩu phải có tối thiểu 6 ký tự.";
+      errors.password = "Mật khẩu phải có tối\u00A0thiểu 6\u00A0ký\u00A0tự.";
     }
 
     if (Object.keys(errors).length > 0) {
@@ -273,9 +273,9 @@ function LoginFormContent() {
               </div>
               {/* Lỗi chữ đỏ bên dưới trường */}
               {fieldErrors.email && (
-                <p className="text-xs text-rose-600 pl-0.5 flex items-center gap-1 animate-fadeIn">
-                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                  <span>{fieldErrors.email}</span>
+                <p className="text-xs text-rose-600 pl-0.5 flex items-start gap-1.5 leading-snug animate-fadeIn">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-rose-500" />
+                  <span className="[text-wrap:pretty]">{fieldErrors.email}</span>
                 </p>
               )}
             </div>
@@ -317,9 +317,9 @@ function LoginFormContent() {
               </div>
               {/* Lỗi chữ đỏ bên dưới trường */}
               {fieldErrors.password && (
-                <p className="text-xs text-rose-600 pl-0.5 flex items-center gap-1 animate-fadeIn">
-                  <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-                  <span>{fieldErrors.password}</span>
+                <p className="text-xs text-rose-600 pl-0.5 flex items-start gap-1.5 leading-snug animate-fadeIn">
+                  <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-rose-500" />
+                  <span className="[text-wrap:pretty]">{fieldErrors.password}</span>
                 </p>
               )}
             </div>
