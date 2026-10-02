@@ -252,34 +252,52 @@ function SingleToast({
   onDismiss: (id: string) => void;
 }) {
   const [progress, setProgress] = useState(100);
-  const [isPaused, setIsPaused] = useState(false);
   const duration = item.duration || 4500;
   const onDismissRef = useRef(onDismiss);
   onDismissRef.current = onDismiss;
 
-  // Thanh đo thời gian tự động đóng
+  // Thanh đo thời gian tự động đóng dựa trên mốc thời gian thực Date.now()
+  // Hoạt động chính xác ngay cả khi người dùng chuyển sang tab khác trong trình duyệt!
   useEffect(() => {
-    if (isPaused) return;
+    const startTime = Date.now();
+    const endTime = startTime + duration;
 
-    const intervalTime = 40;
-    const step = (intervalTime / duration) * 100;
+    const handleDismiss = () => {
+      onDismissRef.current(item.id);
+    };
 
-    const timer = setInterval(() => {
-      setProgress((prev) => {
-        if (prev <= step) {
-          clearInterval(timer);
-          // Đưa onDismiss ra ngoài vòng render của React để tránh lỗi setState trong lúc render
-          setTimeout(() => {
-            onDismissRef.current(item.id);
-          }, 0);
-          return 0;
-        }
-        return prev - step;
-      });
-    }, intervalTime);
+    // 1. Timeout chạy theo thời gian thực tuyệt đối
+    const dismissTimer = setTimeout(handleDismiss, duration);
 
-    return () => clearInterval(timer);
-  }, [duration, isPaused, item.id]);
+    // 2. Interval cập nhật thanh đo mượt mà
+    const intervalTimer = setInterval(() => {
+      const now = Date.now();
+      const timeLeft = Math.max(0, endTime - now);
+      const newProgress = (timeLeft / duration) * 100;
+
+      if (newProgress <= 0) {
+        clearInterval(intervalTimer);
+        setProgress(0);
+        handleDismiss();
+      } else {
+        setProgress(newProgress);
+      }
+    }, 40);
+
+    // 3. Tự động kiểm tra và ẩn ngay lập tức nếu đã hết giờ khi người dùng mở lại tab
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && Date.now() >= endTime) {
+        handleDismiss();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      clearTimeout(dismissTimer);
+      clearInterval(intervalTimer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [duration, item.id]);
 
   // Cấu hình style và icon theo từng loại toast
   const getTheme = () => {
@@ -357,8 +375,6 @@ function SingleToast({
 
   return (
     <div
-      onMouseEnter={() => setIsPaused(true)}
-      onMouseLeave={() => setIsPaused(false)}
       className={`pointer-events-auto w-full bg-white/95 backdrop-blur-xl border rounded-2xl p-4 transition-all duration-300 transform translate-y-0 opacity-100 flex items-start gap-3.5 relative overflow-hidden group hover:scale-[1.01] ${theme.wrapperBorder}`}
       style={{
         animation: "toastSlideIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards",

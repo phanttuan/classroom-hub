@@ -224,12 +224,30 @@ export function GoogleAuthButton({
                 d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
               />
             </svg>
-            <span>
-              {mode === 'register' ? 'Đăng ký với Google' : 'Đăng nhập với Google'}
-            </span>
+            {mode === 'register' ? (
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <span>Đăng ký với Google</span>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-50 text-blue-700 text-[11px] font-bold border border-blue-200/80">
+                  {role === 'TEACHER' ? '🎓 Giảng viên' : '📖 Học sinh'}
+                </span>
+              </div>
+            ) : (
+              <span>Đăng nhập với Google</span>
+            )}
           </>
         )}
       </button>
+
+      {/* Dòng chú thích minh bạch cho người dùng khi Đăng ký Google */}
+      {mode === 'register' && (
+        <p className="text-[11px] text-slate-500 mt-1.5 text-center flex items-center justify-center gap-1.5">
+          <span>✓ Tự động lấy Họ tên & Email từ Google</span>
+          <span className="text-slate-300">•</span>
+          <span>
+            Vai trò: <strong className="text-blue-600 font-semibold">{role === 'TEACHER' ? 'Giảng viên' : 'Học sinh'}</strong>
+          </span>
+        </p>
+      )}
 
       {/* Modal hướng dẫn khi chưa điền CLIENT_ID */}
       {showConfigModal && (
