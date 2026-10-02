@@ -18,6 +18,9 @@ import { RegisterDto } from './dto/register.dto.js';
 import { VerifyOtpDto } from './dto/verify-otp.dto.js';
 import { ResendOtpDto } from './dto/resend-otp.dto.js';
 import { LoginDto } from './dto/login.dto.js';
+import { GoogleLoginDto } from './dto/google-login.dto.js';
+import { GoogleRegisterDto } from './dto/google-register.dto.js';
+import { OAuth2Client } from 'google-auth-library';
 import { UserRole, UserStatus, OtpType } from '../../generated/prisma/enums.js';
 
 export interface TokenPayload {
@@ -373,6 +376,13 @@ export class AuthService {
       throw new UnauthorizedException('Email hoặc mật khẩu không chính xác.');
     }
 
+    // Kiểm tra nếu tài khoản được đăng ký qua Google OAuth
+    if (user.passwordHash && user.passwordHash.startsWith('GOOGLE_OAUTH:')) {
+      throw new BadRequestException(
+        'Tài khoản này được đăng ký thông qua Google. Vui lòng sử dụng nút "Đăng nhập với Google".',
+      );
+    }
+
     // 2. Kiểm tra mật khẩu
     const isPasswordValid = await bcrypt.compare(
       dto.password,
@@ -400,6 +410,171 @@ export class AuthService {
         fullName: user.fullName,
         role: user.role,
         status: user.status,
+      },
+      tokens,
+    };
+  }
+
+  /**
+   * Xác thực Google Token (Hỗ trợ cả ID Token và Access Token)
+   */
+  private async verifyGoogleToken(token: string) {
+    const clientId = this.configService.get<string>('GOOGLE_CLIENT_ID');
+    if (!clientId) {
+      throw new BadRequestException(
+        'Hệ thống chưa được cấu hình GOOGLE_CLIENT_ID. Vui lòng cấu hình GOOGLE_CLIENT_ID trong file .env.',
+      );
+    }
+
+    // 1. Thử xác thực theo chuẩn Google ID Token (JWT) bằng google-auth-library
+    try {
+      const client = new OAuth2Client(clientId);
+      const ticket = await client.verifyIdToken({
+        idToken: token,
+        audience: clientId,
+      });
+      const payload = ticket.getPayload();
+      if (payload && payload.email && payload.email_verified) {
+        return {
+          sub: payload.sub,
+          email: payload.email,
+          name: payload.name || payload.email.split('@')[0],
+          picture: payload.picture || null,
+        };
+      }
+    } catch {
+      // Tiếp tục fallback sang kiểm tra Google UserInfo nếu là Access Token
+    }
+
+    // 2. Fallback: Xác thực trực tiếp qua Google OAuth2 Userinfo API
+    try {
+      const res = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const info = (await res.json()) as any;
+        if (info.email && info.email_verified !== false) {
+          return {
+            sub: info.sub as string,
+            email: info.email as string,
+            name: (info.name as string) || (info.email as string).split('@')[0],
+            picture: (info.picture as string) || null,
+          };
+        }
+      }
+    } catch {
+      // Bỏ qua
+    }
+
+    throw new BadRequestException(
+      'Mã xác thực Google không hợp lệ hoặc đã hết hạn. Vui lòng đăng nhập lại.',
+    );
+  }
+
+  /**
+   * ĐĂNG KÝ TÀI KHOẢN QUA GOOGLE OAUTH
+   */
+  async googleRegister(dto: GoogleRegisterDto, res: Response) {
+    const payload = await this.verifyGoogleToken(dto.idToken);
+    const email = payload.email.trim().toLowerCase();
+
+    // 1. Kiểm tra tài khoản đã tồn tại chưa
+    const existingUser = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (existingUser) {
+      throw new ConflictException(
+        'Email này đã được sử dụng. Vui lòng đăng nhập hoặc dùng email khác.',
+      );
+    }
+
+    // 2. Tạo tài khoản Google mới với Role người dùng đã chọn
+    const googleId = payload.sub;
+    const fullName = payload.name;
+    const avatarUrl = payload.picture;
+    const passwordHash = `GOOGLE_OAUTH:${googleId}`;
+
+    const newUser = await this.prisma.user.create({
+      data: {
+        email,
+        fullName,
+        passwordHash,
+        avatarUrl,
+        role: dto.role,
+        status: UserStatus.ACTIVE,
+      },
+    });
+
+    // 3. Cấp phát JWT HttpOnly Cookie
+    const tokens = await this.generateAndSetTokens(newUser, res);
+
+    return {
+      message: 'Đăng ký tài khoản Google thành công!',
+      user: {
+        id: newUser.id.toString(),
+        email: newUser.email,
+        fullName: newUser.fullName,
+        role: newUser.role,
+        status: newUser.status,
+        avatarUrl: newUser.avatarUrl,
+      },
+      tokens,
+    };
+  }
+
+  /**
+   * ĐĂNG NHẬP QUA GOOGLE OAUTH
+   */
+  async googleLogin(dto: GoogleLoginDto, res: Response) {
+    const payload = await this.verifyGoogleToken(dto.idToken);
+    const email = payload.email.trim().toLowerCase();
+
+    // 1. Tìm tài khoản trong hệ thống
+    const user = await this.prisma.user.findUnique({
+      where: { email },
+    });
+
+    if (!user) {
+      throw new NotFoundException(
+        'Tài khoản Google này chưa được đăng ký trong hệ thống. Vui lòng tạo tài khoản mới.',
+      );
+    }
+
+    // 2. Phân tách loại tài khoản: Nếu đăng ký bằng mật khẩu thì từ chối Google login
+    if (!user.passwordHash || !user.passwordHash.startsWith('GOOGLE_OAUTH:')) {
+      throw new BadRequestException(
+        'Email này đã được đăng ký bằng Mật khẩu thông thường. Vui lòng đăng nhập bằng Email & Mật khẩu thay vì Google.',
+      );
+    }
+
+    // 3. Kiểm tra tài khoản bị khóa
+    if (user.status === UserStatus.LOCKED) {
+      throw new ForbiddenException(
+        'Tài khoản của bạn hiện đang bị KHÓA bởi Quản trị viên (BR-EDU-206). Vui lòng liên hệ hỗ trợ.',
+      );
+    }
+
+    // 4. Cập nhật ảnh đại diện nếu có thay đổi từ Google
+    if (payload.picture && (!user.avatarUrl || user.avatarUrl !== payload.picture)) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { avatarUrl: payload.picture },
+      });
+    }
+
+    // 5. Cấp phát JWT HttpOnly Cookie
+    const tokens = await this.generateAndSetTokens(user, res);
+
+    return {
+      message: 'Đăng nhập Google thành công!',
+      user: {
+        id: user.id.toString(),
+        email: user.email,
+        fullName: user.fullName,
+        role: user.role,
+        status: user.status,
+        avatarUrl: user.avatarUrl || payload.picture,
       },
       tokens,
     };

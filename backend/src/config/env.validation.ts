@@ -152,6 +152,15 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   APP_LOGO_URL: string = 'https://files.catbox.moe/27b245.png';
+
+  // --- Cấu hình Google OAuth 2.0 ---
+  @IsString()
+  @IsOptional()
+  GOOGLE_CLIENT_ID?: string;
+
+  @IsString()
+  @IsOptional()
+  GOOGLE_CLIENT_SECRET?: string;
 }
 
 export function validateEnvironment(

@@ -16,6 +16,8 @@ import { RegisterDto } from './dto/register.dto.js';
 import { VerifyOtpDto } from './dto/verify-otp.dto.js';
 import { ResendOtpDto } from './dto/resend-otp.dto.js';
 import { LoginDto } from './dto/login.dto.js';
+import { GoogleLoginDto } from './dto/google-login.dto.js';
+import { GoogleRegisterDto } from './dto/google-register.dto.js';
 import { LogoutDto } from './dto/logout.dto.js';
 import { Public } from '../../common/decorators/public.decorator.js';
 import { CurrentUser } from '../../common/decorators/current-user.decorator.js';
@@ -77,6 +79,34 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     return this.authService.login(dto, res);
+  }
+
+  /**
+   * Đăng ký tài khoản bằng Google OAuth
+   */
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Post('google/register')
+  @HttpCode(HttpStatus.CREATED)
+  async googleRegister(
+    @Body() dto: GoogleRegisterDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.authService.googleRegister(dto, res);
+  }
+
+  /**
+   * Đăng nhập bằng Google OAuth
+   */
+  @Public()
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @Post('google/login')
+  @HttpCode(HttpStatus.OK)
+  async googleLogin(
+    @Body() dto: GoogleLoginDto,
+    @Res({ passthrough: true }) res: Response,
+  ) {
+    return this.authService.googleLogin(dto, res);
   }
 
   /**
