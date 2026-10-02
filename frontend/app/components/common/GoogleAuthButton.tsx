@@ -1,22 +1,23 @@
 'use client';
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { toast } from '@/app/components/common/Toast';
 import { saveAuthSession } from '@/lib/auth';
-import { Sparkles, Info, X } from 'lucide-react';
+import { Sparkles, X } from 'lucide-react';
 
 declare global {
   interface Window {
     google?: {
       accounts: {
-        id: {
+        id?: {
           initialize: (config: any) => void;
-          renderButton: (parent: HTMLElement, options: any) => void;
           prompt: () => void;
         };
-        oauth2: {
-          initTokenClient: (config: any) => any;
+        oauth2?: {
+          initTokenClient: (config: any) => {
+            requestAccessToken: (overrideConfig?: any) => void;
+          };
         };
       };
     };
@@ -42,18 +43,17 @@ export function GoogleAuthButton({
   className = '',
 }: GoogleAuthButtonProps) {
   const router = useRouter();
-  const googleBtnContainerRef = useRef<HTMLDivElement>(null);
   const [scriptLoaded, setScriptLoaded] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
 
-  // 1. Tải Google Identity Services Script
+  // 1. Tải Google Identity Services SDK
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    if (window.google?.accounts?.id) {
+    if (window.google?.accounts) {
       setScriptLoaded(true);
       return;
     }
@@ -69,50 +69,10 @@ export function GoogleAuthButton({
       console.warn('Không thể tải Google Identity Services SDK.');
     };
     document.body.appendChild(script);
-
-    return () => {
-      // Giữ script trong cache trang
-    };
   }, []);
 
-  // 2. Khởi tạo và Render Button Google chuẩn
-  useEffect(() => {
-    if (!scriptLoaded || !googleClientId || !googleBtnContainerRef.current) return;
-    if (!window.google?.accounts?.id) return;
-
-    try {
-      window.google.accounts.id.initialize({
-        client_id: googleClientId,
-        callback: handleGoogleCredentialResponse,
-        auto_select: false,
-        cancel_on_tap_outside: true,
-      });
-
-      googleBtnContainerRef.current.innerHTML = '';
-      window.google.accounts.id.renderButton(googleBtnContainerRef.current, {
-        type: 'standard',
-        theme: 'outline',
-        size: 'large',
-        text: mode === 'register' ? 'signup_with' : 'signin_with',
-        shape: 'rectangular',
-        logo_alignment: 'left',
-        width: 360,
-        locale: 'vi',
-      });
-    } catch (err) {
-      console.error('Lỗi khởi tạo Google Sign-in button:', err);
-    }
-  }, [scriptLoaded, googleClientId, mode, role]);
-
-  // 3. Xử lý phản hồi mã ID Token từ Google
-  const handleGoogleCredentialResponse = async (response: { credential?: string }) => {
-    const idToken = response.credential;
-    if (!idToken) {
-      toast.error('Lỗi đăng nhập', 'Không nhận được mã xác thực từ Google.');
-      onError?.('Không nhận được mã xác thực từ Google.');
-      return;
-    }
-
+  // 2. Gửi Token xác thực lên Backend
+  const sendTokenToBackend = async (token: string) => {
     setIsProcessing(true);
     onLoading?.(true);
 
@@ -123,14 +83,14 @@ export function GoogleAuthButton({
           : `${API_BASE_URL}/auth/google/login`;
 
       const bodyData =
-        mode === 'register' ? { idToken, role } : { idToken };
+        mode === 'register' ? { idToken: token, role } : { idToken: token };
 
       const res = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        credentials: 'include', // Nhận HttpOnly cookie từ máy chủ
+        credentials: 'include', // Tự động nhận HttpOnly cookie từ Backend
         body: JSON.stringify(bodyData),
       });
 
@@ -140,11 +100,10 @@ export function GoogleAuthButton({
         const errorMsg =
           result.message || 'Xác thực Google không thành công. Vui lòng thử lại.';
 
-        // Trường hợp 1: Đăng nhập nhưng tài khoản chưa đăng ký (404)
+        // Phân loại lỗi chính xác theo yêu cầu người dùng
         const isNotRegistered =
           res.status === 404 || errorMsg.includes('chưa được đăng ký');
 
-        // Trường hợp 2: Tài khoản đã đăng ký bằng mật khẩu (400)
         const isLocalAccount =
           errorMsg.includes('Mật khẩu thông thường') || errorMsg.includes('mật khẩu');
 
@@ -155,7 +114,7 @@ export function GoogleAuthButton({
         return;
       }
 
-      // Đăng nhập / Đăng ký thành công!
+      // Đăng nhập / Đăng ký thành công -> Lưu session và chuyển trang
       const user = result.data?.user;
       saveAuthSession(result.data?.tokens, user);
 
@@ -189,39 +148,65 @@ export function GoogleAuthButton({
     }
   };
 
-  // Nút dự phòng khi chưa cấu hình CLIENT_ID hoặc đang tải
-  const handleFallbackClick = () => {
+  // 3. Xử lý khi người dùng bấm nút
+  const handleButtonClick = () => {
+    // Nếu chưa cấu hình Google Client ID -> Mở modal hướng dẫn
     if (!googleClientId) {
       setShowConfigModal(true);
       return;
     }
 
-    if (window.google?.accounts?.id) {
-      window.google.accounts.id.prompt();
-    } else {
-      toast.info('Đang kết nối Google...', 'Vui lòng đợi vài giây và bấm lại.');
+    if (typeof window === 'undefined' || !window.google?.accounts?.oauth2) {
+      toast.info('Đang kết nối Google...', 'Vui lòng thử lại sau vài giây.');
+      return;
+    }
+
+    try {
+      // Mở Google OAuth 2.0 Account Picker Popup trực tiếp
+      const tokenClient = window.google.accounts.oauth2.initTokenClient({
+        client_id: googleClientId,
+        scope: 'email profile openid',
+        callback: async (tokenResponse: any) => {
+          if (tokenResponse.error) {
+            if (tokenResponse.error !== 'popup_closed_by_user') {
+              toast.error(
+                'Lỗi xác thực Google',
+                tokenResponse.error_description || tokenResponse.error,
+              );
+            }
+            return;
+          }
+
+          if (tokenResponse.access_token) {
+            await sendTokenToBackend(tokenResponse.access_token);
+          }
+        },
+      });
+
+      tokenClient.requestAccessToken({ prompt: 'select_account' });
+    } catch (err: any) {
+      console.error('Google Auth Error:', err);
+      toast.error('Không thể mở popup Google', 'Vui lòng kiểm tra lại cấu hình Client ID.');
     }
   };
 
   return (
     <>
-      <div className={`w-full flex flex-col items-center justify-center ${className}`}>
-        {/* Container cho Google Official Rendered Button (chuẩn hóa hiển thị tiếng Việt, độ rộng đầy đủ) */}
-        {googleClientId && scriptLoaded ? (
-          <div className="w-full flex justify-center overflow-hidden rounded-xl border border-slate-200/90 shadow-xs hover:shadow-sm transition-all duration-200">
-            <div
-              ref={googleBtnContainerRef}
-              className="w-full flex justify-center py-0.5"
-            />
-          </div>
+      {/* Nút bấm chuẩn duy nhất 1 khung, toàn chiều rộng, đồng bộ thẩm mỹ cao cấp */}
+      <button
+        type="button"
+        onClick={handleButtonClick}
+        disabled={isProcessing}
+        className={`w-full py-2.2 sm:py-2.5 px-4 rounded-xl border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-2.5 cursor-pointer shadow-xs hover:shadow-sm disabled:opacity-60 active:scale-[0.99] ${className}`}
+      >
+        {isProcessing ? (
+          <>
+            <div className="w-4 h-4 border-2 border-slate-300 border-t-blue-600 rounded-full animate-spin shrink-0" />
+            <span>Đang xác thực Google...</span>
+          </>
         ) : (
-          <button
-            type="button"
-            onClick={handleFallbackClick}
-            disabled={isProcessing}
-            className="w-full py-2.5 sm:py-3 px-4 rounded-xl border border-slate-200 hover:border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold text-xs sm:text-sm transition-all duration-200 flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-60"
-          >
-            <svg className="w-4 h-4" viewBox="0 0 24 24">
+          <>
+            <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
               <path
                 fill="#4285F4"
                 d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.65v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.14z"
@@ -240,15 +225,11 @@ export function GoogleAuthButton({
               />
             </svg>
             <span>
-              {isProcessing
-                ? 'Đang xử lý...'
-                : mode === 'register'
-                  ? 'Đăng ký với Google'
-                  : 'Đăng nhập với Google'}
+              {mode === 'register' ? 'Đăng ký với Google' : 'Đăng nhập với Google'}
             </span>
-          </button>
+          </>
         )}
-      </div>
+      </button>
 
       {/* Modal hướng dẫn khi chưa điền CLIENT_ID */}
       {showConfigModal && (
@@ -269,17 +250,21 @@ export function GoogleAuthButton({
             </div>
 
             <p className="text-xs sm:text-sm text-slate-600 leading-relaxed">
-              Tính năng <strong>Google Sign-In</strong> đã sẵn sàng về mặt mã nguồn! Bạn chỉ cần điền mã Client ID vào cấu hình để kích hoạt popup Google trực tiếp:
+              Tính năng <strong>Google Sign-In</strong> đã sẵn sàng! Bạn chỉ cần điền mã Client ID lấy từ Google Cloud Console vào 2 file môi trường:
             </p>
 
-            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs font-mono space-y-1.5 text-slate-700">
-              <div className="text-slate-500 font-sans font-medium">1. File frontend/.env.local:</div>
-              <div className="text-blue-700 select-all bg-white p-1.5 rounded border border-slate-200">
-                NEXT_PUBLIC_GOOGLE_CLIENT_ID=your_id.apps.googleusercontent.com
+            <div className="bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs font-mono space-y-2 text-slate-700">
+              <div>
+                <div className="text-slate-500 font-sans font-medium mb-1">1. File frontend/.env.local:</div>
+                <div className="text-blue-700 select-all bg-white p-1.5 rounded border border-slate-200">
+                  NEXT_PUBLIC_GOOGLE_CLIENT_ID=your_client_id.apps.googleusercontent.com
+                </div>
               </div>
-              <div className="text-slate-500 font-sans font-medium pt-1">2. File backend/.env:</div>
-              <div className="text-blue-700 select-all bg-white p-1.5 rounded border border-slate-200">
-                GOOGLE_CLIENT_ID=your_id.apps.googleusercontent.com
+              <div>
+                <div className="text-slate-500 font-sans font-medium mb-1">2. File backend/.env:</div>
+                <div className="text-blue-700 select-all bg-white p-1.5 rounded border border-slate-200">
+                  GOOGLE_CLIENT_ID=your_client_id.apps.googleusercontent.com
+                </div>
               </div>
             </div>
 
