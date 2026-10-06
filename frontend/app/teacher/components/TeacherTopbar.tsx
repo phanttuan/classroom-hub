@@ -3,10 +3,10 @@
 import Image from "next/image";
 import { Bell, ChevronDown, Menu, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { logoutUser } from "@/lib/auth";
 import type { TeacherNotification, TeacherProfile } from "@/lib/types/teacher";
 
 const DEFAULT_MENU = [
-  { label: "Hồ sơ cá nhân", href: "/teacher/profile" },
   { label: "Cài đặt", href: "/teacher/settings" },
   { label: "Đăng xuất", href: "/login" },
 ];
@@ -93,14 +93,24 @@ export default function TeacherTopbar({
               onClick={() => setProfileOpen((v) => !v)}
               className="flex items-center gap-2.5 rounded-full py-1 pl-1 pr-1 transition hover:bg-slate-100 sm:pr-2"
             >
-              <span className="relative h-10 w-10 overflow-hidden rounded-full bg-slate-200">
-                <Image
-                  src={profile.avatarUrl}
-                  alt={profile.fullName}
-                  width={80}
-                  height={80}
-                  className="h-full w-full object-cover"
-                />
+              <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-full bg-slate-200">
+                {profile.avatarUrl?.startsWith("blob:") ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={profile.avatarUrl}
+                    alt={profile.fullName}
+                    className="h-full w-full object-cover"
+                  />
+                ) : (
+                  <Image
+                    src={profile.avatarUrl || "/images/teacher.webp"}
+                    alt={profile.fullName}
+                    width={80}
+                    height={80}
+                    unoptimized
+                    className="h-full w-full object-cover"
+                  />
+                )}
               </span>
               <span className="hidden text-left sm:block">
                 <span className="block text-[14px] font-bold leading-tight text-slate-900">
@@ -115,15 +125,29 @@ export default function TeacherTopbar({
 
             {profileOpen && (
               <div className="absolute right-0 top-[calc(100%+8px)] w-56 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl shadow-slate-900/10">
-                {menuItems.map((i) => (
-                  <a
-                    key={i.label}
-                    href={i.href}
-                    className="block px-4 py-2.5 text-sm text-slate-600 transition last:text-red-600 hover:bg-slate-50"
-                  >
-                    {i.label}
-                  </a>
-                ))}
+                {menuItems.map((i) =>
+                  i.label === "Đăng xuất" ? (
+                    <button
+                      key={i.label}
+                      type="button"
+                      onClick={async () => {
+                        await logoutUser();
+                        window.location.href = "/login";
+                      }}
+                      className="w-full text-left block px-4 py-2.5 text-sm text-red-600 transition hover:bg-red-50 cursor-pointer"
+                    >
+                      {i.label}
+                    </button>
+                  ) : (
+                    <a
+                      key={i.label}
+                      href={i.href}
+                      className="block px-4 py-2.5 text-sm text-slate-600 transition last:text-red-600 hover:bg-slate-50"
+                    >
+                      {i.label}
+                    </a>
+                  ),
+                )}
               </div>
             )}
           </div>

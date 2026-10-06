@@ -1,6 +1,12 @@
 import { NestFactory } from '@nestjs/core';
-import { ConsoleLogger, Logger, ValidationPipe } from '@nestjs/common';
+import {
+  ConsoleLogger,
+  Logger,
+  ValidationPipe,
+  BadRequestException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module.js';
 
 /**
@@ -36,7 +42,10 @@ async function bootstrap() {
   // 1. Kích hoạt Graceful Shutdown
   app.enableShutdownHooks();
 
-  // 2. Cấu hình CORS
+  // 2. Middleware phân tích Cookie (đọc HttpOnly token)
+  app.use(cookieParser());
+
+  // 3. Cấu hình CORS (cho phép gửi kèm credentials/cookie)
   app.enableCors({
     origin: corsOrigins,
     credentials: true,
@@ -49,7 +58,7 @@ async function bootstrap() {
     exclude: ['/'],
   });
 
-  // 4. Global Validation Pipe
+  // 4. Global Validation Pipe với format lỗi chuẩn theo từng trường input
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
@@ -57,6 +66,18 @@ async function bootstrap() {
       forbidNonWhitelisted: true,
       transformOptions: {
         enableImplicitConversion: true,
+      },
+      exceptionFactory: (validationErrors = []) => {
+        const errors: Record<string, string> = {};
+        for (const err of validationErrors) {
+          if (err.constraints) {
+            errors[err.property] = Object.values(err.constraints)[0];
+          }
+        }
+        return new BadRequestException({
+          message: 'Dữ liệu không hợp lệ. Vui lòng kiểm tra lại.',
+          errors,
+        });
       },
     }),
   );

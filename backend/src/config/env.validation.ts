@@ -4,6 +4,7 @@ import {
   IsBoolean,
   IsEnum,
   IsInt,
+  IsNotEmpty,
   IsOptional,
   IsString,
   Max,
@@ -36,6 +37,10 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   CORS_ORIGINS: string = 'http://localhost:3000';
+
+  @IsString()
+  @IsNotEmpty({ message: 'JWT_SECRET là bắt buộc để xác thực người dùng' })
+  JWT_SECRET: string;
 
   // --- Cấu hình Database PostgreSQL ---
 
@@ -112,6 +117,50 @@ export class EnvironmentVariables {
   @Transform(({ value }) => parseInt(value, 10))
   @IsOptional()
   DB_POOL_MIN: number = 2;
+
+  // --- Cấu hình JWT Auth (Đồng bộ chuẩn 4 biến duy nhất) ---
+  @IsString()
+  @IsOptional()
+  JWT_EXPIRES_IN: string = '15m';
+
+  @IsString()
+  @IsOptional()
+  JWT_REFRESH_SECRET: string = 'eduhub_super_secret_refresh_jwt_key_2026_dev_hcmute';
+
+  @IsString()
+  @IsOptional()
+  JWT_REFRESH_EXPIRES_IN: string = '7d';
+
+  // Tùy chọn tương thích ngược nếu còn sót lại ở môi trường cũ
+  @IsString()
+  @IsOptional()
+  JWT_ACCESS_SECRET?: string;
+
+  @IsString()
+  @IsOptional()
+  JWT_ACCESS_EXPIRES_IN?: string;
+
+  // --- Cấu hình Resend Email ---
+  @IsString()
+  @IsOptional()
+  RESEND_API_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  EMAIL_FROM: string = 'EduHub <onboarding@resend.dev>';
+
+  @IsString()
+  @IsOptional()
+  APP_LOGO_URL: string = 'https://files.catbox.moe/27b245.png';
+
+  // --- Cấu hình Google OAuth 2.0 ---
+  @IsString()
+  @IsOptional()
+  GOOGLE_CLIENT_ID?: string;
+
+  @IsString()
+  @IsOptional()
+  GOOGLE_CLIENT_SECRET?: string;
 }
 
 export function validateEnvironment(

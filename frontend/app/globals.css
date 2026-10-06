@@ -26,9 +26,7 @@ body {
     "Segoe UI", Roboto, sans-serif;
 }
 
-html {
-  scroll-behavior: smooth;
-}
+/* Hành vi cuộn mượt (smooth scroll) cho anchor links đã được quản lý mượt mà qua SmoothScrollHandler */
 
 /* Offset cho anchor khi navbar fixed (giống DUDI: scroll-mt-16/20/24) */
 section[id] {
@@ -186,3 +184,40 @@ html {
 .reveal-flip-in.is-revealed {
   transform: perspective(1000px) rotateY(0deg) translate3d(0, 0, 0);
 }
+
+/* Toast Slide In Animation */
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translate3d(40px, -12px, 0) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+}
+
+/* ========================================================================= */
+/* Ẩn con mắt hiển thị mật khẩu mặc định của trình duyệt (Edge, Chrome, Safari) */
+/* Để tránh bị hiện 2 con mắt đè lên nhau khi dùng nút xem mật khẩu tự tạo  */
+/* ========================================================================= */
+input[type="password"]::-ms-reveal,
+input[type="password"]::-ms-clear,
+input::-ms-reveal,
+input::-ms-clear {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  pointer-events: none !important;
+}
+
+input::-webkit-contacts-auto-fill-button,
+input::-webkit-credentials-auto-fill-button {
+  visibility: hidden !important;
+  display: none !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  right: 0 !important;
+}
+
+

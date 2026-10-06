@@ -111,6 +111,13 @@ enum EventSource {
   QUIZ_DEADLINE
 }
 
+enum OtpType {
+  REGISTER_VERIFY
+  PASSWORD_RESET
+  CHANGE_EMAIL
+  TWO_FACTOR_AUTH
+}
+
 // ==============================================================================
 // 2. CORE IDENTITY & CLASSROOM DOMAIN (NGƯỜI DÙNG & LỚP HỌC)
 // ==============================================================================
@@ -120,6 +127,7 @@ model User {
   email        String     @unique @db.VarChar(255)
   fullName     String     @map("full_name") @db.VarChar(255)
   passwordHash String     @map("password_hash") @db.VarChar(255)
+  avatarUrl    String?    @map("avatar_url") @db.VarChar(500)
   role         UserRole   @default(STUDENT)
   status       UserStatus @default(ACTIVE)
   createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -142,6 +150,7 @@ model User {
   notifications         Notification[]
   calendarEvents        CalendarEvent[]   @relation("CalendarEventCreator")
   auditLogs             AuditLog[]        @relation("AuditLogActor")
+  refreshTokens         RefreshToken[]
 
   @@map("users")
 }
@@ -598,3 +607,40 @@ model AuditLog {
 
   @@map("audit_logs")
 }
+
+// ==============================================================================
+// 9. AUTHENTICATION & SECURITY DOMAIN (OTP & REFRESH TOKENS)
+// ==============================================================================
+
+model Otp {
+  id           BigInt    @id @default(autoincrement())
+  email        String    @db.VarChar(255)
+  type         OtpType   @default(REGISTER_VERIFY)
+  otpHash      String    @map("otp_hash") @db.VarChar(255)
+  attempts     Int       @default(0)
+  maxAttempts  Int       @default(5) @map("max_attempts")
+  expiresAt    DateTime  @map("expires_at") @db.Timestamptz(6)
+  consumedAt   DateTime? @map("consumed_at") @db.Timestamptz(6)
+  blockedUntil DateTime? @map("blocked_until") @db.Timestamptz(6)
+  payload      String?   @db.Text
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  @@index([email, type], name: "idx_otps_email_type")
+  @@index([expiresAt], name: "idx_otps_expires_at")
+  @@map("otps")
+}
+
+model RefreshToken {
+  id        BigInt   @id @default(autoincrement())
+  userId    BigInt   @map("user_id")
+  tokenHash String   @map("token_hash") @db.VarChar(255)
+  expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+  revoked   Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId], name: "idx_refresh_tokens_user")
+  @@map("refresh_tokens")
+}
+
