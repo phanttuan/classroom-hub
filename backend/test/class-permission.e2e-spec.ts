@@ -17,6 +17,7 @@ describe('Class Management Permissions & Authorization (E2E)', () => {
   let teacherB: { id: bigint; token: string };
   let student: { id: bigint; token: string };
   let classOfTeacherAId: bigint;
+  let classOfTeacherACode: string;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -94,6 +95,7 @@ describe('Class Management Permissions & Authorization (E2E)', () => {
 
   afterAll(async () => {
     if (classOfTeacherAId) {
+      await prisma.classMembership.deleteMany({ where: { classId: classOfTeacherAId } });
       await prisma.classroom.deleteMany({ where: { id: classOfTeacherAId } });
     }
     if (teacherA?.id) await prisma.user.deleteMany({ where: { id: teacherA.id } });
@@ -133,6 +135,7 @@ describe('Class Management Permissions & Authorization (E2E)', () => {
       expect(res.body.data.id).toBeDefined();
       expect(res.body.data.classCode).toHaveLength(8);
       classOfTeacherAId = BigInt(res.body.data.id);
+      classOfTeacherACode = res.body.data.classCode;
     });
   });
 
@@ -185,6 +188,84 @@ describe('Class Management Permissions & Authorization (E2E)', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.data.status).toBe(ClassStatus.CLOSED);
+    });
+  });
+
+  describe('4. Quyền và luồng tham gia lớp học (POST /classes/join) & Xem danh sách (GET /classes)', () => {
+    it('Giáo viên cố tình gọi API join lớp -> 403 Forbidden (RolesGuard)', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/classes/join')
+        .set('Authorization', `Bearer ${teacherB.token}`)
+        .send({ classCode: classOfTeacherACode });
+
+      expect(res.status).toBe(403);
+    });
+
+    it('Lớp học đang CLOSED -> Học sinh tham gia bị chặn 403 Forbidden', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/classes/join')
+        .set('Authorization', `Bearer ${student.token}`)
+        .send({ classCode: classOfTeacherACode });
+
+      expect(res.status).toBe(403);
+      expect(res.body.message).toContain('đã đóng hoặc lưu trữ');
+    });
+
+    it('Mã lớp không tồn tại -> 404 Not Found', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/classes/join')
+        .set('Authorization', `Bearer ${student.token}`)
+        .send({ classCode: 'NOTFOUND' });
+
+      expect(res.status).toBe(404);
+    });
+
+    it('Giáo viên A mở lại lớp (ACTIVE) và Học sinh tham gia thành công -> 200 OK', async () => {
+      // 1. Thầy A mở lại lớp
+      await request(app.getHttpServer())
+        .patch(`/classes/${classOfTeacherAId}/status`)
+        .set('Authorization', `Bearer ${teacherA.token}`)
+        .send({ status: ClassStatus.ACTIVE });
+
+      // 2. Học sinh join
+      const res = await request(app.getHttpServer())
+        .post('/classes/join')
+        .set('Authorization', `Bearer ${student.token}`)
+        .send({ classCode: classOfTeacherACode });
+
+      expect(res.status).toBe(200);
+      expect(res.body.message).toContain('Tham gia lớp học thành công');
+      expect(res.body.data.id).toBe(classOfTeacherAId.toString());
+    });
+
+    it('Học sinh tham gia lại lớp đã có mặt -> 409 Conflict', async () => {
+      const res = await request(app.getHttpServer())
+        .post('/classes/join')
+        .set('Authorization', `Bearer ${student.token}`)
+        .send({ classCode: classOfTeacherACode });
+
+      expect(res.status).toBe(409);
+      expect(res.body.message).toContain('đã là thành viên');
+    });
+
+    it('Học sinh gọi GET /classes -> 200 OK, thấy lớp mình đang tham gia', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/classes')
+        .set('Authorization', `Bearer ${student.token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.items).toBeDefined();
+      expect(res.body.data.items.some((c: any) => c.id === classOfTeacherAId.toString())).toBe(true);
+    });
+
+    it('Giáo viên A gọi GET /classes -> 200 OK, thấy lớp do mình làm chủ', async () => {
+      const res = await request(app.getHttpServer())
+        .get('/classes')
+        .set('Authorization', `Bearer ${teacherA.token}`);
+
+      expect(res.status).toBe(200);
+      expect(res.body.data.items).toBeDefined();
+      expect(res.body.data.items.some((c: any) => c.id === classOfTeacherAId.toString())).toBe(true);
     });
   });
 });

@@ -4,6 +4,7 @@ import {
   ConflictException,
   BadRequestException,
   InternalServerErrorException,
+  ForbiddenException,
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service.js';
@@ -231,6 +232,222 @@ export class ClassService {
         limit,
         totalPages: Math.ceil(total / limit),
       },
+    };
+  }
+
+  /**
+   * Lấy danh sách lớp học mà sinh viên đang tham gia (UC-08, FR-EDU-022)
+   */
+  async findStudentClasses(studentId: bigint, filter: ClassListFilter) {
+    const page = Math.max(1, filter.page ?? 1);
+    const limit = Math.min(50, Math.max(1, filter.limit ?? 20));
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.ClassroomWhereInput = {
+      memberships: {
+        some: {
+          studentId,
+          status: MembershipStatus.ACTIVE,
+        },
+      },
+    };
+
+    if (filter.status && filter.status !== 'all') {
+      const upperStatus = filter.status.toUpperCase();
+      if (Object.values(ClassStatus).includes(upperStatus as ClassStatus)) {
+        where.status = upperStatus as ClassStatus;
+      }
+    } else if (!filter.status) {
+      // Mặc định ẩn ARCHIVED nếu không truyền query status
+      where.status = {
+        in: [ClassStatus.ACTIVE, ClassStatus.CLOSED],
+      };
+    }
+
+    if (filter.search) {
+      const trimmed = filter.search.trim();
+      where.OR = [
+        { name: { contains: trimmed, mode: 'insensitive' } },
+        { classCode: { contains: trimmed, mode: 'insensitive' } },
+      ];
+    }
+
+    const [total, items] = await Promise.all([
+      this.prisma.classroom.count({ where }),
+      this.prisma.classroom.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          owner: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+              avatarUrl: true,
+            },
+          },
+          _count: {
+            select: {
+              memberships: {
+                where: { status: MembershipStatus.ACTIVE },
+              },
+              courses: true,
+              assignments: true,
+              quizzes: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    return {
+      items,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  /**
+   * Lấy danh sách tất cả lớp học (UC-08: Quản trị viên)
+   */
+  async findAllClasses(filter: ClassListFilter) {
+    const page = Math.max(1, filter.page ?? 1);
+    const limit = Math.min(50, Math.max(1, filter.limit ?? 20));
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.ClassroomWhereInput = {};
+
+    if (filter.status && filter.status !== 'all') {
+      const upperStatus = filter.status.toUpperCase();
+      if (Object.values(ClassStatus).includes(upperStatus as ClassStatus)) {
+        where.status = upperStatus as ClassStatus;
+      }
+    }
+
+    if (filter.search) {
+      const trimmed = filter.search.trim();
+      where.OR = [
+        { name: { contains: trimmed, mode: 'insensitive' } },
+        { classCode: { contains: trimmed, mode: 'insensitive' } },
+      ];
+    }
+
+    const [total, items] = await Promise.all([
+      this.prisma.classroom.count({ where }),
+      this.prisma.classroom.findMany({
+        where,
+        skip,
+        take: limit,
+        orderBy: { updatedAt: 'desc' },
+        include: {
+          owner: {
+            select: {
+              id: true,
+              fullName: true,
+              email: true,
+              avatarUrl: true,
+            },
+          },
+          _count: {
+            select: {
+              memberships: {
+                where: { status: MembershipStatus.ACTIVE },
+              },
+              courses: true,
+              assignments: true,
+              quizzes: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    return {
+      items,
+      meta: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
+  /**
+   * Sinh viên tham gia lớp học bằng mã mời (UC-07, FR-EDU-020, BR-EDU-018, BR-EDU-021, BR-EDU-022)
+   * Tự động tái kích hoạt và khôi phục quyền nếu sinh viên từng bị xóa trước đó.
+   */
+  async joinClass(studentId: bigint, classCode: string) {
+    const normalizedCode = classCode.trim().toUpperCase();
+
+    const classroom = await this.prisma.classroom.findUnique({
+      where: { classCode: normalizedCode },
+    });
+
+    if (!classroom) {
+      throw new NotFoundException('Mã lớp học không hợp lệ hoặc không tồn tại');
+    }
+
+    if (
+      classroom.status === ClassStatus.CLOSED ||
+      classroom.status === ClassStatus.ARCHIVED
+    ) {
+      throw new ForbiddenException(
+        'Lớp học đã đóng hoặc lưu trữ, không thể tham gia',
+      );
+    }
+
+    // Kiểm tra thông tin thành viên hiện tại
+    const existingMembership = await this.prisma.classMembership.findUnique({
+      where: {
+        uk_class_memberships_class_student: {
+          classId: classroom.id,
+          studentId,
+        },
+      },
+    });
+
+    if (existingMembership) {
+      if (existingMembership.status === MembershipStatus.ACTIVE) {
+        throw new ConflictException('Bạn đã là thành viên của lớp học này');
+      }
+
+      // Tái kích hoạt membership đã bị REMOVED (BR-EDU-021)
+      const updatedMembership = await this.prisma.classMembership.update({
+        where: { id: existingMembership.id },
+        data: {
+          status: MembershipStatus.ACTIVE,
+          removedAt: null,
+          joinedAt: new Date(),
+        },
+      });
+
+      return {
+        classroom,
+        membership: updatedMembership,
+        isReactivated: true,
+      };
+    }
+
+    // Tạo mới membership
+    const newMembership = await this.prisma.classMembership.create({
+      data: {
+        classId: classroom.id,
+        studentId,
+        status: MembershipStatus.ACTIVE,
+      },
+    });
+
+    return {
+      classroom,
+      membership: newMembership,
+      isReactivated: false,
     };
   }
 }

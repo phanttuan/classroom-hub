@@ -41,38 +41,7 @@ export const studentProfile: StudentProfile = {
   linkedin: "linkedin.com/in/nguyenthaochi",
 };
 
-export const studentClasses: StudentClass[] = [
-  {
-    id: "c-web301", code: "WEB301", name: "Lập trình Web nâng cao",
-    teacher: "Nguyễn Văn A", progress: 45, status: "studying",
-    lessonsDone: 9, lessonsTotal: 20, currentScore: 8.5,
-    coverGradient: "from-amber-100 via-orange-100 to-stone-300", coverEmoji: "💻",
-    timeRange: "01/09/2026 - 15/12/2026", scheduleText: "Thứ 2, Thứ 4 (10:00 - 11:30)",
-    room: "Phòng 301", assignmentNote: "3 bài • 1 sắp đến hạn", quizNote: "2 bài • 1 sắp đến hạn",
-  },
-  {
-    id: "c-py101", code: "PY101", name: "Lập trình Python cơ bản",
-    teacher: "Trần Thị B", progress: 70, status: "studying",
-    lessonsDone: 14, lessonsTotal: 20, currentScore: 9.0,
-    coverGradient: "from-slate-900 via-blue-950 to-slate-800", coverEmoji: "🐍",
-    timeRange: "28/08/2026 - 10/12/2026", scheduleText: "Thứ 3, Thứ 5 (08:00 - 09:30)",
-    room: "Phòng 201", assignmentNote: "4 bài • 2 sắp đến hạn", quizNote: "3 bài • 1 sắp đến hạn",
-  },
-  {
-    id: "c-db201", code: "DB201", name: "Cơ sở dữ liệu",
-    teacher: "Lê Minh C", progress: 100, status: "finished",
-    lessonsDone: 20, lessonsTotal: 20, currentScore: 7.0,
-    coverGradient: "from-blue-950 via-blue-800 to-cyan-700", coverEmoji: "🗄️",
-    timeRange: "15/05/2026 - 20/08/2026", scheduleText: "Thứ 6 (13:00 - 16:00)",
-    room: "Phòng 203", assignmentNote: "8 bài", quizNote: "5 bài",
-  },
-  {
-    id: "c-web302", code: "WEB302", name: "Phát triển API với Node.js",
-    teacher: "Phạm Gia D", progress: 0, status: "upcoming",
-    lessonsDone: 0, lessonsTotal: 18, currentScore: null,
-    coverGradient: "from-emerald-950 via-green-900 to-lime-800", coverEmoji: "⬢",
-  },
-];
+export const studentClasses: StudentClass[] = [];
 
 export const studentDeadlines: StudentDeadline[] = [
   { id: "d1", kind: "assignment", title: "Bài tập 2: JavaScript cơ bản", course: "Lập trình Web nâng cao", dueLabel: "Hạn nộp: 25/09/2026 23:59", daysLeft: "Còn 1 ngày", tone: "red" },

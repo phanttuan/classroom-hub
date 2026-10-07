@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   BarChart3,
@@ -10,20 +10,24 @@ import {
   FileText,
   Megaphone,
   MoreVertical,
+  Loader2,
+  Plus,
 } from "lucide-react";
 import GreetingHeader from "../components/common/GreetingHeader";
 import StudentShell, { Toast } from "./components/StudentShell";
-import { Progress, SectionHead, StatCard, TONE_BOX } from "./components/student-shared";
+import { SectionHead, StatCard, TONE_BOX } from "./components/student-shared";
 import {
   daySchedule24,
   greetingDateLabel,
-  studentClasses,
   studentDeadlines,
   studentDocs,
   studentNotifs,
   studentProfile,
   studentRecentScores,
 } from "@/lib/mock/student";
+import { fetchStudentClasses } from "@/lib/api/class-api";
+import { mapClassroomDtoToStudentClass } from "@/lib/types/class";
+import type { StudentClass } from "@/lib/types/student";
 
 const WD = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 
@@ -66,16 +70,36 @@ export default function StudentDashboardPage() {
   const [menuId, setMenuId] = useState<string | null>(null);
   const [calDay, setCalDay] = useState(24);
   const [toast, setToast] = useState("");
+  const [classList, setClassList] = useState<StudentClass[]>([]);
+  const [loading, setLoading] = useState(true);
+
   const showToast = (m: string) => {
     setToast(m);
     window.setTimeout(() => setToast(""), 2500);
   };
 
+  useEffect(() => {
+    let active = true;
+    fetchStudentClasses()
+      .then((res) => {
+        if (!active) return;
+        const mapped = (res.items || []).map(mapClassroomDtoToStudentClass);
+        setClassList(mapped);
+      })
+      .catch(() => {})
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   const classes = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return studentClasses.slice(0, 3);
-    return studentClasses.filter((c) => `${c.name} ${c.code}`.toLowerCase().includes(q));
-  }, [search]);
+    if (!q) return classList.slice(0, 3);
+    return classList.filter((c) => `${c.name} ${c.code}`.toLowerCase().includes(q));
+  }, [search, classList]);
 
   return (
     <StudentShell activeId="home" searchPlaceholder="Tìm kiếm khóa học, bài học, tài liệu..." searchValue={search} onSearchChange={setSearch}>
@@ -88,7 +112,7 @@ export default function StudentDashboardPage() {
 
       {/* Stats */}
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={<BookOpen className="h-6 w-6" />} iconCls="bg-blue-50 text-blue-600" value="3" label="Lớp học đang tham gia" />
+        <StatCard icon={<BookOpen className="h-6 w-6" />} iconCls="bg-blue-50 text-blue-600" value={loading ? "..." : classList.length.toString()} label="Lớp học đang tham gia" />
         <StatCard icon={<FileText className="h-6 w-6" />} iconCls="bg-red-50 text-red-500" value="5" label="Bài tập cần nộp" />
         <StatCard icon={<CheckSquare className="h-6 w-6" />} iconCls="bg-purple-50 text-purple-600" value="2" label="Bài kiểm tra sắp tới" />
         <StatCard icon={<BarChart3 className="h-6 w-6" />} iconCls="bg-green-50 text-green-600" value="7.8" label="Điểm trung bình" />
@@ -99,43 +123,71 @@ export default function StudentDashboardPage() {
         <div className="min-w-0 space-y-5">
           <section className="rounded-xl border border-slate-200/70 bg-white p-4 sm:p-5">
             <SectionHead title="Lớp học của tôi" onAction={() => router.push("/student/classes")} />
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {classes.map((c) => (
-                <article key={c.id} className="overflow-hidden rounded-xl border border-slate-200/70 transition hover:shadow-md">
-                  <div className={`grid h-28 place-items-center bg-gradient-to-br text-5xl ${c.coverGradient}`}>
-                    <span aria-hidden>{c.coverEmoji}</span>
-                  </div>
-                  <div className="p-3.5">
-                    <div className="flex items-center gap-2">
-                      <span className="shrink-0 whitespace-nowrap rounded-md bg-blue-50 px-2 py-0.5 text-[11.5px] font-bold text-blue-600">{c.code}</span>
-                      <span className="shrink-0 whitespace-nowrap rounded-md bg-green-100/80 px-2 py-0.5 text-[11.5px] font-medium text-green-700">Đang học</span>
-                      <span className="relative ml-auto">
-                        <button onClick={() => setMenuId(menuId === c.id ? null : c.id)} aria-label="Tùy chọn" className="grid h-7 w-7 place-items-center rounded-md text-slate-400 hover:bg-slate-100">
-                          <MoreVertical className="h-4 w-4" />
-                        </button>
-                        {menuId === c.id && (
-                          <>
-                            <button aria-label="Đóng" onClick={() => setMenuId(null)} className="fixed inset-0 z-10 cursor-default" />
-                            <span className="absolute right-0 top-full z-20 w-40 overflow-hidden rounded-xl border bg-white py-1 text-left shadow-xl">
-                              <button onClick={() => { setMenuId(null); router.push("/student/classes"); }} className="block w-full px-3.5 py-2 text-[12.5px] text-slate-600 hover:bg-slate-50">Xem lớp học</button>
-                              <button onClick={() => { setMenuId(null); showToast(`Đã ghim ${c.code} lên đầu`); }} className="block w-full px-3.5 py-2 text-[12.5px] text-slate-600 hover:bg-slate-50">Ghim lớp học</button>
-                            </span>
-                          </>
-                        )}
-                      </span>
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-12">
+                <Loader2 className="h-7 w-7 animate-spin text-blue-600" />
+                <p className="mt-2 text-[13px] text-slate-500">Đang tải lớp học...</p>
+              </div>
+            ) : classList.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-200 py-10 text-center">
+                <BookOpen className="mx-auto h-10 w-10 text-slate-300" />
+                <p className="mt-2 text-[14px] font-semibold text-slate-700">Chưa tham gia lớp học nào</p>
+                <p className="mt-0.5 text-[12.5px] text-slate-400">Tham gia lớp học bằng mã mời để bắt đầu học tập</p>
+                <button
+                  onClick={() => router.push("/student/classes")}
+                  className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-2 text-[12.5px] font-semibold text-white hover:bg-blue-700"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Tham gia lớp học
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                {classes.map((c) => (
+                  <article key={c.id} className="overflow-hidden rounded-xl border border-slate-200/70 transition hover:shadow-md">
+                    <div className={`grid h-28 place-items-center bg-gradient-to-br text-5xl ${c.coverGradient}`}>
+                      <span aria-hidden>{c.coverEmoji}</span>
                     </div>
-                    <h3 className="mt-1.5 text-[14.5px] font-bold leading-snug">{c.name}</h3>
-                    <p className="mt-1.5 flex items-center gap-2 text-[12.5px] text-slate-500">
-                      <span className="grid h-6 w-6 place-items-center rounded-full bg-gradient-to-br from-slate-300 to-slate-400 text-[10px] font-bold text-white">
-                        {c.teacher.charAt(0)}
-                      </span>
-                      <span>{c.teacher}<br /><span className="text-[11px] text-slate-400">Giáo viên</span></span>
-                    </p>
-                    <div className="mt-2"><Progress value={c.progress} /></div>
-                  </div>
-                </article>
-              ))}
-            </div>
+                    <div className="p-3.5">
+                      <div className="flex items-center gap-2">
+                        <span className="shrink-0 whitespace-nowrap rounded-md bg-blue-50 px-2 py-0.5 text-[11.5px] font-bold text-blue-600">{c.code}</span>
+                        <span className="shrink-0 whitespace-nowrap rounded-md bg-green-100/80 px-2 py-0.5 text-[11.5px] font-medium text-green-700">Đang học</span>
+                        <span className="relative ml-auto">
+                          <button onClick={() => setMenuId(menuId === c.id ? null : c.id)} aria-label="Tùy chọn" className="grid h-7 w-7 place-items-center rounded-md text-slate-400 hover:bg-slate-100">
+                            <MoreVertical className="h-4 w-4" />
+                          </button>
+                          {menuId === c.id && (
+                            <>
+                              <button aria-label="Đóng" onClick={() => setMenuId(null)} className="fixed inset-0 z-10 cursor-default" />
+                              <span className="absolute right-0 top-full z-20 w-40 overflow-hidden rounded-xl border bg-white py-1 text-left shadow-xl">
+                                <button onClick={() => { setMenuId(null); router.push("/student/classes"); }} className="block w-full px-3.5 py-2 text-[12.5px] text-slate-600 hover:bg-slate-50">Xem lớp học</button>
+                                <button onClick={() => { setMenuId(null); showToast(`Đã ghim ${c.code} lên đầu`); }} className="block w-full px-3.5 py-2 text-[12.5px] text-slate-600 hover:bg-slate-50">Ghim lớp học</button>
+                              </span>
+                            </>
+                          )}
+                        </span>
+                      </div>
+                      <h3 className="mt-1.5 text-[14.5px] font-bold leading-snug">{c.name}</h3>
+                      <p className="mt-1.5 flex items-center gap-2 text-[12.5px] text-slate-500">
+                        <span className="grid h-6 w-6 place-items-center rounded-full bg-gradient-to-br from-slate-300 to-slate-400 text-[10px] font-bold text-white">
+                          {c.teacher.charAt(0)}
+                        </span>
+                        <span>{c.teacher}<br /><span className="text-[11px] text-slate-400">Giáo viên</span></span>
+                      </p>
+                      <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2 text-[12px] text-slate-500">
+                        <span>Sĩ số: <b className="text-slate-700">{c.memberCount ?? 0}</b></span>
+                        <button
+                          onClick={() => router.push("/student/classes")}
+                          className="font-medium text-blue-600 hover:underline cursor-pointer"
+                        >
+                          Vào lớp →
+                        </button>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
           </section>
 
           <section className="rounded-xl border border-slate-200/70 bg-white p-4 sm:p-5">

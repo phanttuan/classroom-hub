@@ -4,6 +4,7 @@ import {
   ConflictException,
   BadRequestException,
   InternalServerErrorException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { ClassService } from './class.service.js';
 import { PrismaService } from '../../database/prisma.service.js';
@@ -20,6 +21,11 @@ describe('ClassService', () => {
       count: ReturnType<typeof vi.fn>;
       update: ReturnType<typeof vi.fn>;
     };
+    classMembership: {
+      findUnique: ReturnType<typeof vi.fn>;
+      create: ReturnType<typeof vi.fn>;
+      update: ReturnType<typeof vi.fn>;
+    };
   };
 
   beforeEach(() => {
@@ -29,6 +35,11 @@ describe('ClassService', () => {
         findUnique: vi.fn(),
         findMany: vi.fn(),
         count: vi.fn(),
+        update: vi.fn(),
+      },
+      classMembership: {
+        findUnique: vi.fn(),
+        create: vi.fn(),
         update: vi.fn(),
       },
     };
@@ -296,5 +307,193 @@ describe('ClassService', () => {
       );
     });
   });
+
+  describe('findStudentClasses', () => {
+    it('should list active enrolled classes for student', async () => {
+      const studentId = 20n;
+      const mockClasses = [
+        {
+          id: 1n,
+          name: 'Lớp Lập trình Web',
+          classCode: 'WEB101XX',
+          status: ClassStatus.ACTIVE,
+          owner: { id: 10n, fullName: 'Thầy A', email: 'teacher@school.edu.vn', avatarUrl: null },
+          _count: { memberships: 25, courses: 2, assignments: 3, quizzes: 1 },
+        },
+      ];
+
+      prisma.classroom.count.mockResolvedValue(1);
+      prisma.classroom.findMany.mockResolvedValue(mockClasses);
+
+      const result = await service.findStudentClasses(studentId, {});
+      expect(result.items).toEqual(mockClasses);
+      expect(result.meta.total).toBe(1);
+      expect(prisma.classroom.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({
+            memberships: {
+              some: {
+                studentId,
+                status: MembershipStatus.ACTIVE,
+              },
+            },
+            status: {
+              in: [ClassStatus.ACTIVE, ClassStatus.CLOSED],
+            },
+          }),
+        }),
+      );
+    });
+  });
+
+  describe('findAllClasses', () => {
+    it('should list all classes for admin with pagination', async () => {
+      const mockClasses = [
+        {
+          id: 1n,
+          name: 'Lớp A',
+          classCode: 'ABCDEFGH',
+          status: ClassStatus.ACTIVE,
+        },
+      ];
+
+      prisma.classroom.count.mockResolvedValue(1);
+      prisma.classroom.findMany.mockResolvedValue(mockClasses);
+
+      const result = await service.findAllClasses({});
+      expect(result.items).toEqual(mockClasses);
+      expect(result.meta.total).toBe(1);
+    });
+  });
+
+  describe('joinClass', () => {
+    const studentId = 20n;
+    const classCode = 'CODE1234';
+
+    it('should throw NotFoundException if class code does not exist', async () => {
+      prisma.classroom.findUnique.mockResolvedValue(null);
+
+      await expect(service.joinClass(studentId, classCode)).rejects.toThrow(
+        NotFoundException,
+      );
+      expect(prisma.classroom.findUnique).toHaveBeenCalledWith({
+        where: { classCode: 'CODE1234' },
+      });
+    });
+
+    it('should throw ForbiddenException if class is CLOSED', async () => {
+      prisma.classroom.findUnique.mockResolvedValue({
+        id: 1n,
+        classCode: 'CODE1234',
+        status: ClassStatus.CLOSED,
+      });
+
+      await expect(service.joinClass(studentId, classCode)).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('should throw ForbiddenException if class is ARCHIVED', async () => {
+      prisma.classroom.findUnique.mockResolvedValue({
+        id: 1n,
+        classCode: 'CODE1234',
+        status: ClassStatus.ARCHIVED,
+      });
+
+      await expect(service.joinClass(studentId, classCode)).rejects.toThrow(
+        ForbiddenException,
+      );
+    });
+
+    it('should throw ConflictException if student is already an ACTIVE member', async () => {
+      prisma.classroom.findUnique.mockResolvedValue({
+        id: 1n,
+        classCode: 'CODE1234',
+        status: ClassStatus.ACTIVE,
+      });
+      prisma.classMembership.findUnique.mockResolvedValue({
+        id: 100n,
+        classId: 1n,
+        studentId,
+        status: MembershipStatus.ACTIVE,
+      });
+
+      await expect(service.joinClass(studentId, classCode)).rejects.toThrow(
+        ConflictException,
+      );
+    });
+
+    it('should reactivate membership if student was previously REMOVED (BR-EDU-021)', async () => {
+      const classroom = {
+        id: 1n,
+        classCode: 'CODE1234',
+        status: ClassStatus.ACTIVE,
+      };
+      const existingMembership = {
+        id: 100n,
+        classId: 1n,
+        studentId,
+        status: MembershipStatus.REMOVED,
+        removedAt: new Date(),
+      };
+      const updatedMembership = {
+        ...existingMembership,
+        status: MembershipStatus.ACTIVE,
+        removedAt: null,
+      };
+
+      prisma.classroom.findUnique.mockResolvedValue(classroom);
+      prisma.classMembership.findUnique.mockResolvedValue(existingMembership);
+      prisma.classMembership.update.mockResolvedValue(updatedMembership);
+
+      const result = await service.joinClass(studentId, classCode);
+
+      expect(prisma.classMembership.update).toHaveBeenCalledWith({
+        where: { id: 100n },
+        data: expect.objectContaining({
+          status: MembershipStatus.ACTIVE,
+          removedAt: null,
+        }),
+      });
+      expect(result.isReactivated).toBe(true);
+      expect(result.classroom).toEqual(classroom);
+      expect(result.membership).toEqual(updatedMembership);
+    });
+
+    it('should create new membership when student joins for the first time', async () => {
+      const classroom = {
+        id: 1n,
+        classCode: 'CODE1234',
+        status: ClassStatus.ACTIVE,
+      };
+      const newMembership = {
+        id: 200n,
+        classId: 1n,
+        studentId,
+        status: MembershipStatus.ACTIVE,
+      };
+
+      prisma.classroom.findUnique.mockResolvedValue(classroom);
+      prisma.classMembership.findUnique.mockResolvedValue(null);
+      prisma.classMembership.create.mockResolvedValue(newMembership);
+
+      const result = await service.joinClass(studentId, '  code1234  ');
+
+      expect(prisma.classroom.findUnique).toHaveBeenCalledWith({
+        where: { classCode: 'CODE1234' },
+      });
+      expect(prisma.classMembership.create).toHaveBeenCalledWith({
+        data: {
+          classId: 1n,
+          studentId,
+          status: MembershipStatus.ACTIVE,
+        },
+      });
+      expect(result.isReactivated).toBe(false);
+      expect(result.classroom).toEqual(classroom);
+      expect(result.membership).toEqual(newMembership);
+    });
+  });
 });
+
 
