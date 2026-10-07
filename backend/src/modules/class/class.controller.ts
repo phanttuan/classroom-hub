@@ -11,10 +11,12 @@ import {
   HttpStatus,
   ForbiddenException,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { ClassService } from './class.service.js';
 import { CreateClassDto } from './dto/create-class.dto.js';
 import { UpdateClassDto } from './dto/update-class.dto.js';
 import { UpdateClassStatusDto } from './dto/update-class-status.dto.js';
+import { JoinClassDto } from './dto/join-class.dto.js';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
@@ -51,8 +53,33 @@ export class ClassController {
   }
 
   /**
-   * Xem danh sách lớp học theo vai trò
-   * (Phase A: Giáo viên xem các lớp mình phụ trách)
+   * Tham gia lớp học bằng mã mời (UC-07: Sinh viên)
+   * Giới hạn Rate Limit 10 lần / phút để chống brute-force quét mã.
+   */
+  @Post('join')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.STUDENT)
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @HttpCode(HttpStatus.OK)
+  async joinClass(
+    @Req() req: RequestWithUser,
+    @Body() dto: JoinClassDto,
+  ) {
+    const studentId = BigInt(req.user!.id);
+    const result = await this.classService.joinClass(studentId, dto.classCode);
+    return {
+      message: result.isReactivated
+        ? 'Tham gia lại lớp học thành công. Lịch sử học tập trước đó đã được khôi phục.'
+        : 'Tham gia lớp học thành công',
+      data: result.classroom,
+    };
+  }
+
+  /**
+   * Xem danh sách lớp học theo vai trò (UC-08)
+   * - Giáo viên: xem các lớp mình phụ trách
+   * - Sinh viên: xem các lớp mình đang tham gia (ACTIVE)
+   * - Quản trị viên: xem tất cả các lớp
    */
   @Get()
   async listClasses(
@@ -64,25 +91,23 @@ export class ClassController {
   ) {
     const userRole = req.user!.role;
     const userId = BigInt(req.user!.id);
+    const filter = {
+      status,
+      search,
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+    };
 
     if (userRole === UserRole.TEACHER) {
-      return this.classService.findTeacherClasses(userId, {
-        status,
-        search,
-        page: page ? parseInt(page, 10) : undefined,
-        limit: limit ? parseInt(limit, 10) : undefined,
-      });
+      return this.classService.findTeacherClasses(userId, filter);
     }
 
-    // Nếu không phải Teacher (Phase B sẽ bổ sung Student join list)
+    if (userRole === UserRole.STUDENT) {
+      return this.classService.findStudentClasses(userId, filter);
+    }
+
     if (userRole === UserRole.ADMIN) {
-      // Admin xem tất cả các lớp
-      return this.classService.findTeacherClasses(userId, {
-        status,
-        search,
-        page: page ? parseInt(page, 10) : undefined,
-        limit: limit ? parseInt(limit, 10) : undefined,
-      });
+      return this.classService.findAllClasses(filter);
     }
 
     throw new ForbiddenException('Chưa hỗ trợ danh sách lớp học cho vai trò này');

@@ -1,23 +1,28 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import {
   BookOpen,
-  CalendarDays,
-  CheckSquare,
-  Clock,
   FileText,
-  MapPin,
-  MoreVertical,
   Search,
-  User,
+  Plus,
+  Loader2,
+  Users,
+  Copy,
+  Check,
 } from "lucide-react";
 import StudentShell, { Toast } from "../components/StudentShell";
 import Modal from "../../teacher/components/Modal";
-import { Progress, TONE_BOX } from "../components/student-shared";
-import { daySchedule24, studentClasses, studentNotifs } from "@/lib/mock/student";
+import JoinClassModal from "../components/JoinClassModal";
+import { TONE_BOX } from "../components/student-shared";
+import { daySchedule24, studentNotifs } from "@/lib/mock/student";
 import type { StudentClass } from "@/lib/types/student";
+import { fetchStudentClasses } from "@/lib/api/class-api";
+import {
+  mapClassroomDtoToStudentClass,
+  type ClassroomDto,
+} from "@/lib/types/class";
 
 type Tab = "all" | "ongoing" | "finished";
 
@@ -27,49 +32,97 @@ export default function StudentClassesPage() {
   const [tab, setTab] = useState<Tab>("all");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("Mới nhất");
-  const [menuId, setMenuId] = useState<string | null>(null);
-  const [leaving, setLeaving] = useState<StudentClass | null>(null);
-  const [hidden, setHidden] = useState<string[]>([]);
+  const [copied, setCopied] = useState("");
   const [guideOpen, setGuideOpen] = useState(false);
+  const [joinModalOpen, setJoinModalOpen] = useState(false);
+  const [classes, setClasses] = useState<StudentClass[]>([]);
+  const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState("");
+
   const showToast = (m: string) => {
     setToast(m);
     window.setTimeout(() => setToast(""), 2500);
   };
 
+  const copyCode = async (code: string) => {
+    try {
+      await navigator.clipboard.writeText(code);
+    } catch {
+      /* clipboard fallback */
+    }
+    setCopied(code);
+    showToast(`Đã sao chép mã lớp ${code}`);
+    window.setTimeout(() => setCopied(""), 1500);
+  };
+
+  const loadClasses = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await fetchStudentClasses();
+      const mapped = (res.items || []).map(mapClassroomDtoToStudentClass);
+      setClasses(mapped);
+    } catch (err: any) {
+      showToast(err?.message || "Không thể tải danh sách lớp học");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadClasses();
+  }, [loadClasses]);
+
+  const handleJoinSuccess = (joinedDto: ClassroomDto, message: string) => {
+    const newClass = mapClassroomDtoToStudentClass(joinedDto);
+    setClasses((prev) => {
+      const idx = prev.findIndex((c) => c.id === newClass.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = newClass;
+        return next;
+      }
+      return [newClass, ...prev];
+    });
+    showToast(message);
+  };
+
   const counts = useMemo(
     () => ({
-      all: studentClasses.length,
-      ongoing: studentClasses.filter((c) => c.status === "studying").length,
-      finished: studentClasses.filter((c) => c.status === "finished").length,
+      all: classes.length,
+      ongoing: classes.filter((c) => c.status === "studying").length,
+      finished: classes.filter((c) => c.status === "finished").length,
     }),
-    [],
+    [classes],
   );
 
   const filtered = useMemo(() => {
     const q = (query || topSearch).trim().toLowerCase();
-    let list = studentClasses.filter((c) => !hidden.includes(c.id));
+    let list = classes;
     if (tab === "ongoing") list = list.filter((c) => c.status === "studying");
     if (tab === "finished") list = list.filter((c) => c.status === "finished");
     if (q) list = list.filter((c) => `${c.name} ${c.code} ${c.teacher}`.toLowerCase().includes(q));
     if (sort === "Tên A-Z") list = [...list].sort((a, b) => a.name.localeCompare(b.name, "vi"));
-    if (sort === "Tiến độ cao nhất") list = [...list].sort((a, b) => b.progress - a.progress);
+    if (sort === "Sĩ số nhiều nhất") list = [...list].sort((a, b) => (b.memberCount ?? 0) - (a.memberCount ?? 0));
     return list;
-  }, [tab, query, topSearch, sort, hidden]);
-
-  const tiles = (c: StudentClass) => [
-    { icon: <BookOpen className="h-5 w-5" />, label: "Nội dung học tập", sub: c.status === "finished" ? "Xem lại tài liệu" : "Xem bài học, tài liệu", go: () => router.push("/student/content") },
-    { icon: <FileText className="h-5 w-5" />, label: "Bài tập", sub: c.assignmentNote ?? "", go: () => router.push("/student/assignments"), hot: (c.assignmentNote ?? "").includes("sắp đến hạn") },
-    { icon: <CheckSquare className="h-5 w-5" />, label: "Kiểm tra trắc nghiệm", sub: c.quizNote ?? "", go: () => router.push("/student/quizzes"), hot: (c.quizNote ?? "").includes("sắp đến hạn") },
-    { icon: <BookOpen className="h-5 w-5" />, label: "Sổ điểm", sub: "Xem điểm chi tiết", go: () => router.push("/student/grades") },
-  ];
+  }, [classes, tab, query, topSearch, sort]);
 
   return (
     <StudentShell activeId="classes" searchPlaceholder="Tìm kiếm khóa học, bài học, tài liệu, bài tập..." searchValue={topSearch} onSearchChange={setTopSearch}>
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_330px]">
         <div className="min-w-0">
-          <h1 className="text-[26px] font-extrabold tracking-tight">Lớp học của tôi</h1>
-          <p className="mt-0.5 text-[14px] text-slate-500">Danh sách các lớp học bạn đang tham gia</p>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h1 className="text-[26px] font-extrabold tracking-tight">Lớp học của tôi</h1>
+              <p className="mt-0.5 text-[14px] text-slate-500">Danh sách các lớp học bạn đang tham gia</p>
+            </div>
+            <button
+              onClick={() => setJoinModalOpen(true)}
+              className="inline-flex items-center gap-2 self-start rounded-xl bg-blue-600 px-4 py-2.5 text-[13.5px] font-semibold text-white shadow-sm transition hover:bg-blue-700 sm:self-auto"
+            >
+              <Plus className="h-4 w-4" />
+              Tham gia lớp học
+            </button>
+          </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <div className="flex gap-1 border-b border-slate-200">
@@ -85,76 +138,164 @@ export default function StudentClassesPage() {
               <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm kiếm lớp học..."
                 className="h-10 w-[220px] rounded-lg bg-white pl-9 pr-3 text-[13px] outline-none ring-1 ring-slate-200 placeholder:text-slate-400 focus:ring-4 focus:ring-blue-100" />
             </span>
-            <select value={sort} onChange={(e) => setSort(e.target.value)} className="h-10 rounded-lg bg-white px-3 text-[13px] outline-none ring-1 ring-slate-200" aria-label="Sắp xếp">
-              {["Mới nhất", "Tên A-Z", "Tiến độ cao nhất"].map((o) => (<option key={o}>Sắp xếp: {o}</option>))}
+            <select
+              value={sort}
+              onChange={(e) => setSort(e.target.value)}
+              className="h-10 rounded-lg bg-white px-3 text-[13px] outline-none ring-1 ring-slate-200"
+              aria-label="Sắp xếp"
+            >
+              <option value="Mới nhất">Sắp xếp: Mới nhất</option>
+              <option value="Tên A-Z">Sắp xếp: Tên A-Z</option>
+              <option value="Sĩ số nhiều nhất">Sắp xếp: Sĩ số nhiều nhất</option>
             </select>
           </div>
 
-          <div className="mt-4 space-y-4">
-            {filtered.map((c) => (
-              <article key={c.id} className="rounded-xl border border-slate-200/70 bg-white p-4">
-                <div className="flex flex-col gap-4 md:flex-row">
-                  <div className={`relative h-44 w-full shrink-0 overflow-hidden rounded-xl bg-gradient-to-br md:h-auto md:w-52 ${c.coverGradient}`}>
-                    <span className="absolute inset-0 grid place-items-center text-6xl" aria-hidden>{c.coverEmoji}</span>
-                    <span className={`absolute left-2.5 top-2.5 whitespace-nowrap rounded-full px-2.5 py-1 text-[11px] font-medium ${c.status === "finished" ? "bg-white/90 text-slate-600" : "bg-green-100/90 text-green-700"}`}>
-                      {c.status === "finished" ? "⏸ Đã kết thúc" : "🟢 Đang học"}
-                    </span>
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <h2 className="text-[17px] font-extrabold">{c.name}</h2>
-                        <span className="mt-1 inline-block rounded-md bg-blue-50 px-2 py-0.5 text-[12px] font-bold text-blue-600">{c.code}</span>
-                      </div>
-                      <span className="relative">
-                        <button onClick={() => setMenuId(menuId === c.id ? null : c.id)} aria-label="Tùy chọn" className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-slate-100">
-                          <MoreVertical className="h-4 w-4" />
-                        </button>
-                        {menuId === c.id && (
-                          <>
-                            <button aria-label="Đóng" onClick={() => setMenuId(null)} className="fixed inset-0 z-10 cursor-default" />
-                            <span className="absolute right-0 top-full z-20 w-44 overflow-hidden rounded-xl border bg-white py-1 text-left shadow-xl">
-                              <button onClick={() => { setMenuId(null); showToast(`Chi tiết ${c.code} (demo)`); }} className="block w-full px-3.5 py-2 text-[12.5px] text-slate-600 hover:bg-slate-50">Xem chi tiết</button>
-                              <button onClick={() => { setMenuId(null); setHidden((h) => [...h, c.id]); showToast(`Đã ẩn ${c.code} khỏi danh sách`); }} className="block w-full px-3.5 py-2 text-[12.5px] text-slate-600 hover:bg-slate-50">Ẩn khỏi danh sách</button>
-                              <button onClick={() => { setMenuId(null); setLeaving(c); }} className="block w-full px-3.5 py-2 text-left text-[12.5px] text-red-600 hover:bg-red-50">Rời lớp học</button>
-                            </span>
-                          </>
-                        )}
+          <div className="mt-4">
+            {loading ? (
+              <div className="flex flex-col items-center justify-center rounded-xl border border-slate-200/70 bg-white py-16">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                <p className="mt-3 text-[13.5px] font-medium text-slate-500">Đang tải danh sách lớp học...</p>
+              </div>
+            ) : filtered.length === 0 ? (
+              <div className="rounded-xl border border-slate-200/70 bg-white px-4 py-14 text-center">
+                <BookOpen className="mx-auto h-12 w-12 text-slate-300" />
+                <h3 className="mt-3 text-[16px] font-bold text-slate-800">
+                  {classes.length === 0 ? "Chưa tham gia lớp học nào" : "Không tìm thấy lớp học phù hợp"}
+                </h3>
+                <p className="mx-auto mt-1 max-w-sm text-[13px] text-slate-500">
+                  {classes.length === 0
+                    ? "Nhập mã lớp học do giảng viên cung cấp để tham gia vào lớp và bắt đầu học tập."
+                    : "Thử thay đổi từ khóa tìm kiếm hoặc kiểm tra lại bộ lọc trạng thái."}
+                </p>
+                {classes.length === 0 && (
+                  <button
+                    onClick={() => setJoinModalOpen(true)}
+                    className="mt-4 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-[13px] font-semibold text-white shadow-sm transition hover:bg-blue-700"
+                  >
+                    <Plus className="h-4 w-4" />
+                    Tham gia lớp học ngay
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {filtered.map((c) => (
+                  <article
+                    key={c.id}
+                    className="group relative flex flex-col rounded-2xl border border-slate-200/80 bg-white transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-lg hover:shadow-slate-100"
+                  >
+                    {/* 1. Ảnh bìa (Google Classroom style banner) */}
+                    <div
+                      className={`relative h-32 w-full overflow-hidden rounded-t-2xl bg-gradient-to-r ${
+                        c.coverGradient || "from-blue-600 via-indigo-600 to-sky-600"
+                      }`}
+                    >
+                      {c.coverImageUrl ? (
+                        <img
+                          src={c.coverImageUrl}
+                          alt={c.name}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        /* Họa tiết trang trí tự sinh + Biểu tượng môn học */
+                        <div className="absolute inset-0 flex items-center justify-between px-4 overflow-hidden">
+                          <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]" />
+                          <div className="relative z-0 opacity-20 text-white font-extrabold text-7xl select-none -translate-x-2">
+                            {c.code.slice(0, 3)}
+                          </div>
+                          <span
+                            className="relative z-0 select-none text-5xl opacity-40 transition-transform group-hover:scale-110"
+                            aria-hidden
+                          >
+                            {c.coverEmoji || "📚"}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* 2. Trạng thái */}
+                      <span className="absolute left-3 top-3 z-10">
+                        <span
+                          className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-semibold shadow-xs backdrop-blur-md ${
+                            c.status === "finished"
+                              ? "bg-slate-900/75 text-slate-200 border border-white/20"
+                              : "bg-emerald-500/90 text-white border border-emerald-300/30"
+                          }`}
+                        >
+                          {c.status === "finished" ? "⏸ Đã kết thúc" : "🟢 Đang học"}
+                        </span>
                       </span>
                     </div>
-                    <ul className="mt-2 space-y-1 text-[12.5px] text-slate-500">
-                      <li className="flex items-center gap-1.5"><User className="h-3.5 w-3.5" /> Giảng viên: {c.teacher}</li>
-                      <li className="flex items-center gap-1.5"><Clock className="h-3.5 w-3.5" /> Thời gian: {c.timeRange}</li>
-                      <li className="flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5" /> Lịch học: {c.scheduleText}</li>
-                      <li className="flex items-center gap-1.5"><MapPin className="h-3.5 w-3.5" /> Phòng học: {c.room}</li>
-                    </ul>
-                    <div className="mt-3 grid grid-cols-2 gap-2 lg:grid-cols-4">
-                      {tiles(c).map((t) => (
-                        <button key={t.label} onClick={t.go} className="flex items-center gap-2 rounded-xl border border-slate-200/70 p-2.5 text-left transition hover:border-blue-200 hover:bg-blue-50/40">
-                          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-blue-50 text-blue-600">{t.icon}</span>
-                          <span className="min-w-0">
-                            <b className="block truncate text-[12px]">{t.label}</b>
-                            <span className={`block truncate text-[11px] ${t.hot ? "text-red-500" : "text-slate-400"}`}>{t.sub}</span>
-                          </span>
+
+                    {/* Thân thẻ: 4 thông tin còn lại */}
+                    <div className="flex flex-1 flex-col p-4">
+                      {/* 3. Tên lớp */}
+                      <h2
+                        className="text-[16px] font-extrabold text-slate-800 line-clamp-1 transition group-hover:text-blue-600 cursor-pointer"
+                        onClick={() => router.push("/student/content")}
+                        title={c.name}
+                      >
+                        {c.name}
+                      </h2>
+
+                      {/* 4. Mã lớp */}
+                      <div className="mt-2 flex items-center gap-1.5">
+                        <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-[11.5px] font-mono font-bold text-blue-700">
+                          Mã lớp: {c.code}
+                        </span>
+                        <button
+                          onClick={() => copyCode(c.code)}
+                          aria-label={`Sao chép mã ${c.code}`}
+                          title="Sao chép mã lớp"
+                          className="grid h-6 w-6 place-items-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-blue-600"
+                        >
+                          {copied === c.code ? (
+                            <Check className="h-3.5 w-3.5 text-green-600" />
+                          ) : (
+                            <Copy className="h-3.5 w-3.5" />
+                          )}
                         </button>
-                      ))}
+                      </div>
+
+                      {/* 5. Giáo viên & 6. Sĩ số */}
+                      <div className="mt-3 flex flex-col gap-1.5 border-t border-slate-100 pt-3 text-[12.5px] text-slate-600">
+                        <div className="flex items-center gap-2">
+                          <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-slate-100 text-[11px] font-bold text-slate-600">
+                            {c.teacher.charAt(0)}
+                          </span>
+                          <span className="truncate">
+                            <span className="text-slate-400">Giảng viên:</span>{" "}
+                            <span className="font-medium text-slate-700">{c.teacher}</span>
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-2 text-slate-500">
+                          <span className="grid h-6 w-6 shrink-0 place-items-center text-slate-400">
+                            <Users className="h-4 w-4" />
+                          </span>
+                          <span>
+                            <span className="text-slate-400">Sĩ số:</span>{" "}
+                            <span className="font-semibold text-slate-700">
+                              {c.memberCount ?? 0}
+                            </span>{" "}
+                            học sinh
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Nút hành động Vào lớp */}
+                      <div className="mt-4 pt-1">
+                        <button
+                          onClick={() => router.push("/student/content")}
+                          className="w-full rounded-xl bg-slate-50 py-2 text-center text-[12.5px] font-semibold text-slate-700 transition hover:bg-blue-600 hover:text-white cursor-pointer"
+                        >
+                          Vào lớp học
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                  <div className="w-full shrink-0 md:w-44">
-                    <p className="flex items-center justify-between text-[12px] text-slate-500">Tiến độ học tập <b className="text-slate-700">{c.progress}%</b></p>
-                    <div className="mt-1"><Progress value={c.progress} /></div>
-                    <p className="mt-1 text-[11.5px] text-slate-400">Hoàn thành {c.lessonsDone} / {c.lessonsTotal} bài học</p>
-                    <div className={`mt-2.5 rounded-xl p-3 text-center ${c.status === "finished" ? "bg-orange-50" : "bg-green-50/70"}`}>
-                      <p className="text-[11.5px] text-slate-500">{c.status === "finished" ? "Tổng điểm cuối kỳ" : "Tổng điểm hiện tại"}</p>
-                      <button onClick={() => router.push("/student/grades")} className={`text-[19px] font-extrabold ${c.currentScore !== null && c.currentScore >= 8 ? "text-green-600" : "text-orange-500"}`}>
-                        {c.currentScore === null ? "-" : `${c.currentScore.toFixed(1)} `}<span className="text-[13px] font-medium text-slate-400">/ 10</span>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </article>
-            ))}
-            {filtered.length === 0 && <p className="rounded-xl bg-white px-4 py-10 text-center text-sm text-slate-500">Không tìm thấy lớp học nào.</p>}
+                  </article>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -166,13 +307,12 @@ export default function StudentClassesPage() {
             </div>
             <ul className="space-y-3.5">
               {daySchedule24.slice(0, 1).concat([
-                { id: "u2", time: "10:00 - 11:30", title: "Buổi học: Responsive Web Design", meta: "Lớp: WEB301 - Phòng 301", action: "join" as const, tone: "blue" as const },
-                { id: "u3", time: "23:59", title: "Hạn nộp bài tập 2: JavaScript", meta: "Lớp: WEB301", action: "none" as const, tone: "orange" as const },
-                { id: "u4", time: "08:00 - 09:30", title: "Buổi học: Python nâng cao", meta: "Lớp: PY101 - Phòng 201", action: "none" as const, tone: "blue" as const },
+                { id: "u2", time: "10:00 - 11:30", title: "Buổi học: Lập trình Web", meta: "Classroom Hub", action: "join" as const, tone: "blue" as const },
+                { id: "u3", time: "23:59", title: "Hạn nộp bài tập", meta: "Classroom Hub", action: "none" as const, tone: "orange" as const },
               ]).map((e, i) => (
                 <li key={e.id} className="flex gap-3">
                   <span className="w-10 shrink-0 text-center">
-                    <b className="block text-[17px] leading-none">{["24", "24", "25", "26"][i]}</b>
+                    <b className="block text-[17px] leading-none">{["24", "25", "26"][i] || "24"}</b>
                     <span className="block text-[10.5px] text-slate-400">Th09</span>
                   </span>
                   <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${TONE_BOX[e.tone as string] ?? "bg-blue-50 text-blue-600"}`}>
@@ -217,20 +357,17 @@ export default function StudentClassesPage() {
         </div>
       </div>
 
-      <Modal open={!!leaving} onClose={() => setLeaving(null)} title="Rời lớp học?" widthClass="max-w-[420px]">
-        {leaving && (
-          <div className="space-y-4 text-sm">
-            <p className="text-slate-600">Bạn chắc chắn muốn rời lớp <b className="text-slate-900">{leaving.name}</b>? Tiến độ học tập sẽ không được lưu.</p>
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setLeaving(null)} className="rounded-lg px-4 py-2.5 font-semibold text-slate-600 hover:bg-slate-100">Ở lại</button>
-              <button onClick={() => { setHidden((h) => [...h, leaving.id]); setLeaving(null); showToast("Đã rời lớp (demo)"); }} className="rounded-lg bg-red-600 px-5 py-2.5 font-semibold text-white hover:bg-red-700">Rời lớp</button>
-            </div>
-          </div>
-        )}
-      </Modal>
+      <JoinClassModal
+        open={joinModalOpen}
+        onClose={() => setJoinModalOpen(false)}
+        onSuccess={handleJoinSuccess}
+      />
+
+
 
       <Modal open={guideOpen} onClose={() => setGuideOpen(false)} title="Hướng dẫn sử dụng">
         <ol className="list-decimal space-y-2 pl-5 text-[13.5px] leading-relaxed text-slate-600">
+          <li>Nhấn &ldquo;Tham gia lớp học&rdquo; và nhập mã mời từ giảng viên.</li>
           <li>Vào lớp học để xem bài học, tài liệu và tiến độ.</li>
           <li>Nộp bài tập trước hạn trong mục Bài tập.</li>
           <li>Làm bài kiểm tra đúng khung giờ quy định.</li>

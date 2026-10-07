@@ -78,3 +78,30 @@ export async function updateClassStatus(
   );
   return unwrap(res);
 }
+
+export interface JoinClassResult {
+  message: string;
+  classroom: ClassroomDto;
+}
+
+export async function joinClass(classCode: string): Promise<JoinClassResult> {
+  const res = await apiFetch<ApiEnvelope<ClassroomDto>>('/classes/join', {
+    method: 'POST',
+    body: JSON.stringify({ classCode }),
+    skipAuthRedirect: true,
+  });
+  return {
+    message: res.message || 'Tham gia lớp học thành công',
+    classroom: res.data,
+  };
+}
+
+export async function fetchStudentClasses(params?: {
+  status?: string;
+  search?: string;
+  page?: number;
+  limit?: number;
+}): Promise<ClassListResponse> {
+  return fetchTeacherClasses(params);
+}
+

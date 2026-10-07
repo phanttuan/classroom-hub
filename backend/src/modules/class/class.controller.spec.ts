@@ -24,6 +24,9 @@ describe('ClassController', () => {
       changeStatus: vi.fn(),
       findOne: vi.fn(),
       findTeacherClasses: vi.fn(),
+      findStudentClasses: vi.fn(),
+      findAllClasses: vi.fn(),
+      joinClass: vi.fn(),
     };
     controller = new ClassController(service as unknown as ClassService);
   });
@@ -122,6 +125,82 @@ describe('ClassController', () => {
         limit: 10,
       });
       expect(result).toEqual(mockList);
+    });
+
+    it('should call service.findStudentClasses when user is STUDENT', async () => {
+      const req = {
+        user: { id: '20', role: UserRole.STUDENT, email: 's@school.edu.vn' },
+      } as RequestWithUser;
+
+      const mockList = { items: [], meta: { total: 0, page: 1, limit: 20, totalPages: 0 } };
+      service.findStudentClasses.mockResolvedValue(mockList);
+
+      const result = await controller.listClasses(req, 'ACTIVE', 'Web', '1', '10');
+      expect(service.findStudentClasses).toHaveBeenCalledWith(20n, {
+        status: 'ACTIVE',
+        search: 'Web',
+        page: 1,
+        limit: 10,
+      });
+      expect(result).toEqual(mockList);
+    });
+
+    it('should call service.findAllClasses when user is ADMIN', async () => {
+      const req = {
+        user: { id: '1', role: UserRole.ADMIN, email: 'admin@school.edu.vn' },
+      } as RequestWithUser;
+
+      const mockList = { items: [], meta: { total: 0, page: 1, limit: 20, totalPages: 0 } };
+      service.findAllClasses.mockResolvedValue(mockList);
+
+      const result = await controller.listClasses(req, 'ACTIVE', 'Web', '1', '10');
+      expect(service.findAllClasses).toHaveBeenCalledWith({
+        status: 'ACTIVE',
+        search: 'Web',
+        page: 1,
+        limit: 10,
+      });
+      expect(result).toEqual(mockList);
+    });
+  });
+
+  describe('joinClass', () => {
+    it('should call service.joinClass with studentId and classCode', async () => {
+      const req = {
+        user: { id: '20', role: UserRole.STUDENT, email: 's@school.edu.vn' },
+      } as RequestWithUser;
+      const dto = { classCode: 'CODE1234' };
+      const classroom = { id: 1n, name: 'Lớp Tin', classCode: 'CODE1234' };
+
+      service.joinClass.mockResolvedValue({
+        classroom,
+        membership: { id: 100n },
+        isReactivated: false,
+      });
+
+      const result = await controller.joinClass(req, dto);
+      expect(service.joinClass).toHaveBeenCalledWith(20n, 'CODE1234');
+      expect(result).toEqual({
+        message: 'Tham gia lớp học thành công',
+        data: classroom,
+      });
+    });
+
+    it('should show reactivation message if membership was previously removed', async () => {
+      const req = {
+        user: { id: '20', role: UserRole.STUDENT, email: 's@school.edu.vn' },
+      } as RequestWithUser;
+      const dto = { classCode: 'CODE1234' };
+      const classroom = { id: 1n, name: 'Lớp Tin', classCode: 'CODE1234' };
+
+      service.joinClass.mockResolvedValue({
+        classroom,
+        membership: { id: 100n },
+        isReactivated: true,
+      });
+
+      const result = await controller.joinClass(req, dto);
+      expect(result.message).toContain('Lịch sử học tập trước đó đã được khôi phục');
     });
   });
 });

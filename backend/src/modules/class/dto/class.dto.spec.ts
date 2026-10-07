@@ -4,6 +4,7 @@ import { plainToInstance } from 'class-transformer';
 import { CreateClassDto } from './create-class.dto.js';
 import { UpdateClassDto } from './update-class.dto.js';
 import { UpdateClassStatusDto } from './update-class-status.dto.js';
+import { JoinClassDto } from './join-class.dto.js';
 import { ClassStatus } from '../../../generated/prisma/enums.js';
 
 describe('Class DTOs Validation', () => {
@@ -82,6 +83,50 @@ describe('Class DTOs Validation', () => {
     it('should fail with invalid status value', async () => {
       const dto = plainToInstance(UpdateClassStatusDto, {
         status: 'INVALID_STATUS',
+      });
+      const errors = await validate(dto);
+      expect(errors.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('JoinClassDto', () => {
+    it('should pass with valid 8-character uppercase class code', async () => {
+      const dto = plainToInstance(JoinClassDto, {
+        classCode: 'ABCDEF12',
+      });
+      const errors = await validate(dto);
+      expect(errors.length).toBe(0);
+      expect(dto.classCode).toBe('ABCDEF12');
+    });
+
+    it('should trim and uppercase class code automatically', async () => {
+      const dto = plainToInstance(JoinClassDto, {
+        classCode: '  abcdef12  ',
+      });
+      const errors = await validate(dto);
+      expect(errors.length).toBe(0);
+      expect(dto.classCode).toBe('ABCDEF12');
+    });
+
+    it('should fail when class code is empty', async () => {
+      const dto = plainToInstance(JoinClassDto, {
+        classCode: '   ',
+      });
+      const errors = await validate(dto);
+      expect(errors.length).toBeGreaterThan(0);
+    });
+
+    it('should fail when class code contains invalid characters like dashes or symbols', async () => {
+      const dto = plainToInstance(JoinClassDto, {
+        classCode: 'ABC-1234',
+      });
+      const errors = await validate(dto);
+      expect(errors.length).toBeGreaterThan(0);
+    });
+
+    it('should fail when class code is too short (less than 6 chars)', async () => {
+      const dto = plainToInstance(JoinClassDto, {
+        classCode: 'ABC12',
       });
       const errors = await validate(dto);
       expect(errors.length).toBeGreaterThan(0);
