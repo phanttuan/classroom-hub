@@ -191,15 +191,9 @@ export const teacherSidebarNav: SidebarItem[] = [
   { id: "classes", label: "Lớp học", icon: "classes", href: "/teacher/classes" },
   {
     id: "content",
-    label: "Nội dung học tập",
+    label: "Khóa học",
     icon: "content",
-    href: "/teacher/content",
-    expandable: true,
-    children: [
-      { label: "Khóa học", href: "/teacher/content/courses" },
-      { label: "Bài học", href: "/teacher/content/lessons" },
-      { label: "Tài liệu", href: "/teacher/content/docs" },
-    ],
+    href: "/teacher/content/courses",
   },
   {
     id: "assignments",

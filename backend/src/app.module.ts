@@ -11,6 +11,7 @@ import { UserModule } from './user/user.module.js';
 import { MailModule } from './modules/mail/mail.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
 import { ClassModule } from './modules/class/class.module.js';
+import { LearningContentModule } from './modules/learning-content/learning-content.module.js';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor.js';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
 
@@ -33,6 +34,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
     MailModule,
     AuthModule,
     ClassModule,
+    LearningContentModule,
   ],
   controllers: [AppController],
   providers: [

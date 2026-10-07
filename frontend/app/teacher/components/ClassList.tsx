@@ -88,14 +88,23 @@ export default function ClassList({
             </div>
 
             <span
-              className={`hidden shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-[12px] font-medium sm:inline-block ${
+              className={`hidden shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-[11.5px] font-semibold sm:inline-flex items-center gap-1.5 border shadow-xs ${
                 c.status === "active"
-                  ? "bg-green-100/80 text-green-700"
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                   : c.status === "closed"
-                  ? "bg-slate-100 text-slate-600"
-                  : "bg-slate-200 text-slate-600"
+                  ? "bg-slate-50 text-slate-600 border-slate-200"
+                  : "bg-amber-50 text-amber-700 border-amber-200"
               }`}
             >
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${
+                  c.status === "active"
+                    ? "bg-emerald-500 animate-pulse"
+                    : c.status === "closed"
+                    ? "bg-slate-400"
+                    : "bg-amber-500"
+                }`}
+              />
               {c.status === "active"
                 ? "Đang hoạt động"
                 : c.status === "closed"

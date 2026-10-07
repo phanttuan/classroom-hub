@@ -15,6 +15,7 @@ import { useSidebar } from "@/lib/context/sidebar-context";
  */
 export default function StudentShell({
   activeId,
+  activeHref,
   searchPlaceholder = "Tìm kiếm khóa học, bài học, tài liệu...",
   searchValue,
   onSearchChange,
@@ -22,6 +23,7 @@ export default function StudentShell({
   children,
 }: {
   activeId: string;
+  activeHref?: string;
   searchPlaceholder?: string;
   searchValue: string;
   onSearchChange: (v: string) => void;
@@ -124,6 +126,7 @@ export default function StudentShell({
         mobileOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         activeId={activeId}
+        activeHref={activeHref}
         collapsed={collapsed}
         onToggleCollapse={toggleCollapse}
       />

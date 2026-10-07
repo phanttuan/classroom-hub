@@ -135,7 +135,7 @@ export default function TeacherSidebar({
 
         {/* Header logo */}
         <div
-          className={`flex items-center pt-5 pb-3 border-b border-slate-100/70 transition-all ${
+          className={`flex h-[68px] items-center border-b border-slate-200/80 bg-white transition-all ${
             collapsed ? "justify-center px-2" : "px-4"
           }`}
         >

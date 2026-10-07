@@ -7,23 +7,33 @@ import {
   BookOpen,
   CalendarDays,
   CheckSquare,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
-  GraduationCap,
   Home,
   NotebookPen,
   Users,
   User,
   type LucideIcon,
 } from "lucide-react";
+import { useState } from "react";
 
 type NavIcon = "home" | "classes" | "content" | "assignment" | "quiz" | "gradebook" | "bell" | "calendar" | "profile";
 
-const NAV: { id: string; label: string; icon: NavIcon; href: string }[] = [
+interface NavItem {
+  id: string;
+  label: string;
+  icon: NavIcon;
+  href: string;
+  expandable?: boolean;
+  children?: { label: string; href: string }[];
+}
+
+const NAV: NavItem[] = [
   { id: "home", label: "Tổng quan", icon: "home", href: "/student" },
   { id: "classes", label: "Lớp học", icon: "classes", href: "/student/classes" },
-  { id: "content", label: "Nội dung học tập", icon: "content", href: "/student/content" },
+  { id: "content", label: "Khóa học", icon: "content", href: "/student/content" },
   { id: "assignments", label: "Bài tập", icon: "assignment", href: "/student/assignments" },
   { id: "quizzes", label: "Kiểm tra trắc nghiệm", icon: "quiz", href: "/student/quizzes" },
   { id: "grades", label: "Sổ điểm", icon: "gradebook", href: "/student/grades" },
@@ -81,15 +91,28 @@ export default function StudentSidebar({
   mobileOpen,
   onClose,
   activeId = "home",
+  activeHref,
   collapsed = false,
   onToggleCollapse,
 }: {
   mobileOpen: boolean;
   onClose: () => void;
   activeId?: string;
+  activeHref?: string;
   collapsed?: boolean;
   onToggleCollapse?: () => void;
 }) {
+  const defaultExpanded =
+    activeId === "content" || activeHref?.startsWith("/student/content")
+      ? ["content"]
+      : ["content"];
+  const [expanded, setExpanded] = useState<string[]>(defaultExpanded);
+
+  const toggle = (id: string) =>
+    setExpanded((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+
   return (
     <>
       {mobileOpen && (
@@ -105,7 +128,7 @@ export default function StudentSidebar({
           collapsed ? "lg:w-[72px]" : "lg:w-[248px]"
         } ${mobileOpen ? "w-[248px] translate-x-0" : "max-lg:-translate-x-full lg:translate-x-0"}`}
       >
-        {/* Nút tròn nổi viền (floating toggle) thu gọn / mở rộng (<>) đặt ngay chính giữa chiều cao sidebar */}
+        {/* Nút tròn nổi viền thu gọn / mở rộng (<>) */}
         {onToggleCollapse && (
           <button
             type="button"
@@ -124,7 +147,7 @@ export default function StudentSidebar({
 
         {/* Header logo */}
         <div
-          className={`flex items-center pt-5 pb-3 border-b border-slate-100/70 transition-all ${
+          className={`flex h-[68px] items-center border-b border-slate-200/80 bg-white transition-all ${
             collapsed ? "justify-center px-2" : "px-4"
           }`}
         >
@@ -135,6 +158,78 @@ export default function StudentSidebar({
           <ul className="space-y-1.5">
             {NAV.map((item) => {
               const Icon = ICON_MAP[item.icon];
+              const isOpen = expanded.includes(item.id);
+
+              if (item.expandable) {
+                const parentActive = activeId === item.id;
+                if (collapsed) {
+                  return (
+                    <li key={item.id} className="relative group">
+                      <Link
+                        href={item.children?.[0]?.href || "/student/content"}
+                        onClick={onClose}
+                        className={`flex h-11 w-11 mx-auto items-center justify-center rounded-xl transition ${
+                          parentActive
+                            ? "bg-blue-50 text-blue-600 font-semibold"
+                            : "text-slate-600 hover:bg-slate-100 hover:text-slate-900"
+                        }`}
+                      >
+                        <Icon className="h-5 w-5" />
+                        <span className="pointer-events-none absolute left-full ml-3 z-50 hidden rounded-md bg-slate-900 px-2.5 py-1 text-xs font-medium text-white shadow-xl whitespace-nowrap group-hover:block">
+                          {item.label}
+                        </span>
+                      </Link>
+                    </li>
+                  );
+                }
+
+                return (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      onClick={() => toggle(item.id)}
+                      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-[15px] font-medium transition ${
+                        parentActive
+                          ? "border-l-[3px] border-blue-600 bg-blue-50 text-blue-600"
+                          : "text-slate-700 hover:bg-slate-100"
+                      }`}
+                    >
+                      <Icon className={`h-5 w-5 ${parentActive ? "text-blue-600" : "text-slate-500"}`} />
+                      <span className="flex-1 text-left">{item.label}</span>
+                      <ChevronDown
+                        className={`h-4 w-4 text-slate-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                    {isOpen && (
+                      <ul className="mt-1 space-y-1 pl-11 pr-2">
+                        {item.children?.map((c) => {
+                          const childActive =
+                            activeHref === c.href ||
+                            (c.href === "/student/content" &&
+                              (activeHref === "/student/content" ||
+                                (!activeHref && activeId === "content")));
+                          return (
+                            <li key={c.label}>
+                              <Link
+                                href={c.href}
+                                onClick={onClose}
+                                className={`block rounded-md px-2 py-1.5 text-[14px] transition ${
+                                  childActive
+                                    ? "bg-blue-50 font-semibold text-blue-600"
+                                    : "text-slate-500 hover:bg-blue-50 hover:text-blue-600"
+                                }`}
+                              >
+                                {c.label}
+                              </Link>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </li>
+                );
+              }
+
               const active = activeId === item.id;
 
               if (collapsed) {
