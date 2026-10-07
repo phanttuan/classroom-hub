@@ -17,84 +17,109 @@ function CreateClassForm({
 }: {
   initial?: TeacherClass | null;
   onClose: () => void;
-  onSubmit: (v: { name: string; code: string; status: TeacherClass["status"] }) => void;
+  onSubmit: (v: { name: string; description?: string; code?: string; status?: TeacherClass["status"] }) => void;
 }) {
   const [name, setName] = useState(initial?.name ?? "");
-  const [code, setCode] = useState(initial?.code ?? "");
-  const [status, setStatus] = useState<TeacherClass["status"]>(initial?.status ?? "active");
+  const [description, setDescription] = useState(initial?.description ?? "");
   const [error, setError] = useState("");
+  const isArchived = initial?.status === "archived";
 
   const submit = () => {
-    if (name.trim().length < 3) {
-      setError("Tên lớp phải có ít nhất 3 ký tự.");
+    if (name.trim().length < 1) {
+      setError("Tên lớp học không được để trống.");
       return;
     }
-    if (!/^[A-Za-z0-9]{3,10}$/.test(code.trim())) {
-      setError("Mã lớp 3–10 ký tự, chỉ gồm chữ và số (VD: WEB302).");
+    if (name.trim().length > 255) {
+      setError("Tên lớp học không được vượt quá 255 ký tự.");
       return;
     }
-    onSubmit({ name: name.trim(), code: code.trim().toUpperCase(), status });
+    if (description.length > 2000) {
+      setError("Mô tả lớp học không được vượt quá 2000 ký tự.");
+      return;
+    }
+    onSubmit({
+      name: name.trim(),
+      description: description.trim() || undefined,
+      code: initial?.code,
+      status: initial?.status ?? "active",
+    });
   };
 
   return (
     <div className="space-y-3.5">
-        <div>
-          <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
-            Tên lớp học *
-          </label>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="VD: Lập trình Web nâng cao"
-            className="h-11 w-full rounded-lg border border-slate-200 px-3.5 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
-          />
+      {isArchived && (
+        <div className="rounded-lg bg-amber-50 p-3 text-[13px] text-amber-700">
+          Lớp học này đã lưu trữ (chỉ đọc). Bạn không thể chỉnh sửa thông tin cho đến khi khôi phục lớp.
         </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
-              Mã lớp *
-            </label>
-            <input
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="VD: WEB302"
-              className="h-11 w-full rounded-lg border border-slate-200 px-3.5 text-sm uppercase outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100"
-            />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
-              Trạng thái
-            </label>
-            <select
-              value={status}
-              onChange={(e) => setStatus(e.target.value as TeacherClass["status"])}
-              className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none focus:border-blue-400"
-            >
-              <option value="active">Đang hoạt động</option>
-              <option value="closed">Đã đóng</option>
-            </select>
-          </div>
-        </div>
+      )}
 
-        {error && (
-          <p className="rounded-lg bg-red-50 px-3 py-2 text-[13px] text-red-600">{error}</p>
-        )}
-
-        <div className="flex justify-end gap-2 pt-1">
-          <button
-            onClick={onClose}
-            className="rounded-lg px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
-          >
-            Hủy
-          </button>
-          <button
-            onClick={submit}
-            className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/30 transition hover:bg-blue-700"
-          >
-            {initial ? "Lưu thay đổi" : "Tạo lớp"}
-          </button>
-        </div>
+      <div>
+        <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
+          Tên lớp học *
+        </label>
+        <input
+          disabled={isArchived}
+          value={name}
+          onChange={(e) => {
+            setName(e.target.value);
+            if (error) setError("");
+          }}
+          placeholder="VD: Lập trình Web nâng cao"
+          className="h-11 w-full rounded-lg border border-slate-200 px-3.5 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-500"
+        />
       </div>
+
+      <div>
+        <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
+          Mô tả lớp học
+        </label>
+        <textarea
+          disabled={isArchived}
+          value={description}
+          onChange={(e) => {
+            setDescription(e.target.value);
+            if (error) setError("");
+          }}
+          rows={3}
+          placeholder="Giới thiệu mục tiêu môn học, tài liệu hoặc ghi chú cho sinh viên..."
+          className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-500"
+        />
+      </div>
+
+      {initial ? (
+        <div className="rounded-lg bg-slate-50 p-3 text-[13px] text-slate-600">
+          <span className="font-semibold text-slate-700">Mã lớp:</span>{" "}
+          <span className="font-mono font-bold text-blue-600">{initial.code}</span>{" "}
+          <span className="text-xs text-slate-400">(Mã do hệ thống cấp phát cố định)</span>
+        </div>
+      ) : (
+        <p className="text-xs text-slate-500">
+          * Mã lớp học (8 ký tự duy nhất) sẽ được hệ thống sinh tự động sau khi tạo.
+        </p>
+      )}
+
+      {error && (
+        <p className="rounded-lg bg-red-50 px-3 py-2 text-[13px] text-red-600">{error}</p>
+      )}
+
+      <div className="flex justify-end gap-2 pt-1">
+        <button
+          type="button"
+          onClick={onClose}
+          className="rounded-lg px-4 py-2.5 text-sm font-semibold text-slate-600 transition hover:bg-slate-100"
+        >
+          Hủy
+        </button>
+        <button
+          type="button"
+          disabled={isArchived}
+          onClick={submit}
+          className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/30 transition hover:bg-blue-700 disabled:opacity-50"
+        >
+          {initial ? "Lưu thay đổi" : "Tạo lớp"}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -107,7 +132,7 @@ export function CreateClassModal({
   open: boolean;
   initial?: TeacherClass | null;
   onClose: () => void;
-  onSubmit: (v: { name: string; code: string; status: TeacherClass["status"] }) => void;
+  onSubmit: (v: { name: string; description?: string; code?: string; status?: TeacherClass["status"] }) => void;
 }) {
   return (
     <Modal
@@ -142,6 +167,9 @@ export function ClassDetailModal({
             <span>{classInfo.coverEmoji}</span>
           </div>
           <h4 className="text-[16px] font-bold text-slate-900">{classInfo.name}</h4>
+          {classInfo.description && (
+            <p className="text-[13px] leading-relaxed text-slate-600">{classInfo.description}</p>
+          )}
           <dl className="grid grid-cols-2 gap-2 text-sm">
             <div className="rounded-lg bg-slate-50 p-3">
               <dt className="text-xs text-slate-500">Mã lớp</dt>
@@ -150,7 +178,11 @@ export function ClassDetailModal({
             <div className="rounded-lg bg-slate-50 p-3">
               <dt className="text-xs text-slate-500">Trạng thái</dt>
               <dd className="font-bold text-slate-900">
-                {classInfo.status === "active" ? "Đang hoạt động" : "Đã đóng"}
+                {classInfo.status === "active"
+                  ? "Đang hoạt động"
+                  : classInfo.status === "closed"
+                  ? "Đã đóng"
+                  : "Đã lưu trữ"}
               </dd>
             </div>
             <div className="rounded-lg bg-slate-50 p-3">
@@ -174,7 +206,67 @@ export function ClassDetailModal({
   );
 }
 
-/* ---------- Xác nhận xóa ---------- */
+/* ---------- Modal Chuyển trạng thái lớp học (Đóng / Lưu trữ / Khôi phục) ---------- */
+export function ConfirmStatusChangeModal({
+  classInfo,
+  targetStatus,
+  onClose,
+  onConfirm,
+}: {
+  classInfo: TeacherClass | null;
+  targetStatus: "active" | "closed" | "archived" | null;
+  onClose: () => void;
+  onConfirm: () => void;
+}) {
+  if (!classInfo || !targetStatus) return null;
+
+  const config = {
+    closed: {
+      title: "Đóng lớp học?",
+      message: `Bạn có chắc muốn đóng lớp "${classInfo.name}" (${classInfo.code})? Lớp sẽ ngừng tiếp nhận học sinh mới và không tạo thêm hoạt động mới.`,
+      btnText: "Đóng lớp",
+      btnClass: "bg-amber-600 hover:bg-amber-700 text-white",
+    },
+    archived: {
+      title: "Lưu trữ lớp học?",
+      message: `Bạn có chắc muốn lưu trữ lớp "${classInfo.name}" (${classInfo.code})? Lớp học sẽ chuyển sang chế độ chỉ đọc. Toàn bộ tài liệu và kết quả học tập sẽ được bảo toàn.`,
+      btnText: "Lưu trữ lớp",
+      btnClass: "bg-slate-700 hover:bg-slate-800 text-white",
+    },
+    active: {
+      title: "Khôi phục lớp học?",
+      message: `Bạn có chắc muốn mở lại hoạt động cho lớp "${classInfo.name}" (${classInfo.code})?`,
+      btnText: "Khôi phục hoạt động",
+      btnClass: "bg-blue-600 hover:bg-blue-700 text-white",
+    },
+  }[targetStatus];
+
+  return (
+    <Modal open={true} onClose={onClose} title={config.title} widthClass="max-w-[440px]">
+      <div className="space-y-4">
+        <p className="text-sm leading-relaxed text-slate-600">{config.message}</p>
+        <div className="flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-100"
+          >
+            Hủy
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            className={`rounded-lg px-5 py-2.5 text-sm font-semibold shadow-sm ${config.btnClass}`}
+          >
+            {config.btnText}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+/* ---------- Xác nhận xóa (fallback) ---------- */
 export function ConfirmDeleteModal({
   classInfo,
   onClose,
@@ -185,12 +277,12 @@ export function ConfirmDeleteModal({
   onConfirm: () => void;
 }) {
   return (
-    <Modal open={!!classInfo} onClose={onClose} title="Xóa lớp học?" widthClass="max-w-[420px]">
+    <Modal open={!!classInfo} onClose={onClose} title="Lưu trữ lớp học?" widthClass="max-w-[420px]">
       {classInfo && (
         <div className="space-y-4">
           <p className="text-sm leading-relaxed text-slate-600">
-            Bạn chắc chắn muốn xóa lớp <b className="text-slate-900">{classInfo.name}</b> (
-            {classInfo.code})? Hành động này không thể hoàn tác.
+            Theo chính sách hệ thống, lớp học không xóa vĩnh viễn để bảo tồn kết quả của sinh viên.
+            Bạn có muốn chuyển lớp <b className="text-slate-900">{classInfo.name}</b> sang trạng thái lưu trữ?
           </p>
           <div className="flex justify-end gap-2">
             <button
@@ -201,9 +293,9 @@ export function ConfirmDeleteModal({
             </button>
             <button
               onClick={onConfirm}
-              className="rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700"
+              className="rounded-lg bg-slate-800 px-5 py-2.5 text-sm font-semibold text-white hover:bg-slate-900"
             >
-              Xóa lớp
+              Lưu trữ
             </button>
           </div>
         </div>

@@ -115,29 +115,41 @@ export default function TeacherDashboardPage() {
     (showToast as unknown as { t?: number }).t = window.setTimeout(() => setToast(""), 2600);
   };
 
-  const handleCreateSubmit = (v: { name: string; code: string; status: TeacherClass["status"] }) => {
+  const handleCreateSubmit = (v: {
+    name: string;
+    description?: string;
+    code?: string;
+    status?: TeacherClass["status"];
+  }) => {
+    const classCode = v.code || `CLS${Math.floor(1000 + Math.random() * 9000)}`;
+    const classStatus = v.status || "active";
     if (editingClass) {
       setClasses((prev) =>
-        prev.map((c) => (c.id === editingClass.id ? { ...c, ...v, updatedAt: "15/09/2026" } : c)),
+        prev.map((c) =>
+          c.id === editingClass.id
+            ? { ...c, name: v.name, description: v.description, updatedAt: "15/09/2026" }
+            : c,
+        ),
       );
-      showToast(`Đã lưu thay đổi lớp ${v.code}`);
+      showToast(`Đã lưu thay đổi lớp ${classCode}`);
       setEditingClass(null);
     } else {
       setClasses((prev) => [
         {
           id: `cls-${Date.now()}`,
           name: v.name,
-          code: v.code,
-          status: v.status,
+          code: classCode,
+          status: classStatus,
           studentCount: 0,
           courseCount: 0,
           updatedAt: "15/09/2026",
           coverGradient: "from-blue-100 via-sky-100 to-slate-200",
           coverEmoji: "📚",
+          description: v.description,
         },
         ...prev,
       ]);
-      showToast(`Đã tạo lớp ${v.code} thành công`);
+      showToast(`Đã tạo lớp ${classCode} thành công`);
     }
     setCreateOpen(false);
   };
