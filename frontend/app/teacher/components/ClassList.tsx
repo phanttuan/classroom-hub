@@ -51,9 +51,18 @@ export default function ClassList({
 
       <div ref={wrapRef} className="space-y-3">
         {classes.length === 0 && (
-          <p className="rounded-lg bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
-            Không tìm thấy lớp học nào. Thử từ khóa khác hoặc tạo lớp mới.
-          </p>
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 py-10 text-center">
+            <p className="text-[14px] font-semibold text-slate-700">Chưa có lớp học nào</p>
+            <p className="mt-1 max-w-[360px] text-[13px] text-slate-400">
+              Hãy bấm nút &quot;Tạo lớp học&quot; để bắt đầu giảng dạy và chia sẻ mã lớp cho học sinh.
+            </p>
+            <button
+              onClick={onCreate}
+              className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white shadow-sm transition hover:bg-blue-700"
+            >
+              <Plus className="h-4 w-4" /> Tạo lớp học ngay
+            </button>
+          </div>
         )}
         {classes.map((c) => (
           <div

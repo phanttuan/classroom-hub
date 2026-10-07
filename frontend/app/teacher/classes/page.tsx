@@ -107,8 +107,7 @@ export default function TeacherClassesPage() {
         setClasses(mapped);
       }
     } catch {
-      // Fallback sang dữ liệu mẫu nếu chưa đăng nhập hoặc offline
-      setClasses(classPageClasses);
+      setClasses([]);
     } finally {
       setLoading(false);
     }
