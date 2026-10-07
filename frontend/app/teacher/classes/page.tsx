@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import {
   BarChart3,
   CalendarDays,
@@ -12,25 +12,37 @@ import {
   Copy,
   Eye,
   FileText,
+  Lock,
   MoreVertical,
   Pencil,
   Archive,
   Plus,
+  RotateCcw,
   Search,
   Settings,
   SlidersHorizontal,
-  Trash2,
   Users,
+  Loader2,
 } from "lucide-react";
 import TeacherShell, { Toast } from "../components/TeacherShell";
 import {
   ClassDetailModal,
-  ConfirmDeleteModal,
+  ConfirmStatusChangeModal,
   CreateClassModal,
 } from "../components/TeacherModals";
 import { classPageClasses, demoAvatars, type ClassTab } from "@/lib/mock/teacher-classes";
 import { dashboardStats } from "@/lib/mock/teacher-dashboard";
 import type { TeacherClass } from "@/lib/types/teacher";
+import {
+  fetchTeacherClasses,
+  createClass,
+  updateClass,
+  updateClassStatus,
+} from "@/lib/api/class-api";
+import {
+  mapClassroomDtoToTeacherClass,
+  type BackendClassStatus,
+} from "@/lib/types/class";
 
 const TABS: { id: ClassTab; label: (counts: Record<ClassTab, number>) => string }[] = [
   { id: "all", label: (c) => `Tất cả (${c.all})` },
@@ -48,7 +60,7 @@ function StatusBadge({ status }: { status: TeacherClass["status"] }) {
     );
   if (status === "closed")
     return (
-      <span className="whitespace-nowrap rounded-full bg-white/90 px-3 py-1 text-[12px] font-medium text-slate-600">
+      <span className="whitespace-nowrap rounded-full bg-slate-100/90 px-3 py-1 text-[12px] font-medium text-slate-600">
         Đã đóng
       </span>
     );
@@ -64,12 +76,16 @@ export default function TeacherClassesPage() {
   const [tab, setTab] = useState<ClassTab>("all");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("Mới cập nhật");
-  const [classes, setClasses] = useState<TeacherClass[]>(classPageClasses);
+  const [classes, setClasses] = useState<TeacherClass[]>([]);
+  const [loading, setLoading] = useState(true);
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<TeacherClass | null>(null);
   const [viewing, setViewing] = useState<TeacherClass | null>(null);
-  const [deleting, setDeleting] = useState<TeacherClass | null>(null);
+  const [statusConfirm, setStatusConfirm] = useState<{
+    classInfo: TeacherClass;
+    targetStatus: "active" | "closed" | "archived";
+  } | null>(null);
   const [copied, setCopied] = useState("");
   const [toast, setToast] = useState("");
   const toastTimer = useRef<number | undefined>(undefined);
@@ -79,6 +95,27 @@ export default function TeacherClassesPage() {
     window.clearTimeout(toastTimer.current);
     toastTimer.current = window.setTimeout(() => setToast(""), 2500);
   };
+
+  // Load danh sách lớp học từ Backend API
+  const loadClasses = useCallback(async () => {
+    try {
+      setLoading(true);
+      // Gửi query 'all' để lấy cả ACTIVE, CLOSED và ARCHIVED
+      const res = await fetchTeacherClasses({ status: "all" });
+      if (res && res.items) {
+        const mapped = res.items.map(mapClassroomDtoToTeacherClass);
+        setClasses(mapped);
+      }
+    } catch {
+      setClasses([]);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadClasses();
+  }, [loadClasses]);
 
   const counts = useMemo(() => {
     const c: Record<ClassTab, number> = {
@@ -104,46 +141,78 @@ export default function TeacherClassesPage() {
     try {
       await navigator.clipboard.writeText(code);
     } catch {
-      /* clipboard có thể bị chặn — vẫn toast */
+      /* clipboard có thể bị chặn */
     }
     setCopied(code);
     showToast(`Đã sao chép mã lớp ${code}`);
     window.setTimeout(() => setCopied(""), 1500);
   };
 
-  const handleCreate = (v: { name: string; code: string; status: TeacherClass["status"] }) => {
+  // Xử lý Tạo / Chỉnh sửa lớp học qua API
+  const handleSaveClass = async (v: {
+    name: string;
+    description?: string;
+  }) => {
     if (editing) {
-      setClasses((prev) => prev.map((c) => (c.id === editing.id ? { ...c, ...v } : c)));
-      showToast(`Đã lưu lớp ${v.code}`);
-      setEditing(null);
-    } else {
-      setClasses((prev) => [
-        {
-          id: `cls-${Date.now()}`,
+      try {
+        const res = await updateClass(editing.id, {
           name: v.name,
-          code: v.code,
-          status: v.status,
-          studentCount: 0,
-          courseCount: 0,
-          updatedAt: "15/09/2026",
-          coverGradient: "from-blue-100 via-sky-100 to-slate-200",
-          coverEmoji: "📚",
-          description: "Lớp học mới tạo — bổ sung mô tả sau.",
-          assignmentCount: 0,
-          quizCount: 0,
-          dateRange: "15/09/2026 - 15/12/2026",
-        },
-        ...prev,
-      ]);
-      showToast(`Đã tạo lớp ${v.code}`);
+          description: v.description,
+        });
+        const updated = mapClassroomDtoToTeacherClass(res);
+        setClasses((prev) => prev.map((c) => (c.id === editing.id ? updated : c)));
+        showToast(`Đã lưu thay đổi lớp ${res.classCode}`);
+        setEditing(null);
+        setCreateOpen(false);
+      } catch (err: unknown) {
+        const error = err as { message?: string };
+        showToast(error?.message || "Không thể lưu thay đổi lớp học");
+      }
+    } else {
+      try {
+        const res = await createClass({
+          name: v.name,
+          description: v.description,
+        });
+        const newClass = mapClassroomDtoToTeacherClass(res);
+        setClasses((prev) => [newClass, ...prev]);
+        showToast(`Đã tạo lớp ${res.classCode} thành công!`);
+        setCreateOpen(false);
+      } catch (err: unknown) {
+        const error = err as { message?: string };
+        showToast(error?.message || "Không thể tạo lớp học");
+      }
     }
-    setCreateOpen(false);
   };
 
-  const archiveClass = (c: TeacherClass) => {
-    setClasses((prev) => prev.map((x) => (x.id === c.id ? { ...x, status: "archived" as const } : x)));
-    setOpenMenuId(null);
-    showToast(`Đã lưu trữ lớp ${c.code}`);
+  // Xử lý chuyển trạng thái lớp học qua API
+  const handleConfirmStatusChange = async () => {
+    if (!statusConfirm) return;
+    const { classInfo, targetStatus } = statusConfirm;
+
+    const statusMap: Record<"active" | "closed" | "archived", BackendClassStatus> = {
+      active: "ACTIVE",
+      closed: "CLOSED",
+      archived: "ARCHIVED",
+    };
+
+    try {
+      const res = await updateClassStatus(classInfo.id, statusMap[targetStatus]);
+      const updated = mapClassroomDtoToTeacherClass(res);
+      setClasses((prev) => prev.map((c) => (c.id === classInfo.id ? updated : c)));
+
+      const labelMap = {
+        active: "khôi phục",
+        closed: "đóng",
+        archived: "lưu trữ",
+      };
+      showToast(`Đã ${labelMap[targetStatus]} lớp ${res.classCode}`);
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      showToast(error?.message || "Không thể thay đổi trạng thái lớp");
+    } finally {
+      setStatusConfirm(null);
+    }
   };
 
   return (
@@ -183,7 +252,9 @@ export default function TeacherClassesPage() {
             </span>
             <span>
               <span className="block text-[13px] text-slate-500">{s.label}</span>
-              <span className="block text-[22px] font-extrabold leading-tight">{s.value}</span>
+              <span className="block text-[22px] font-extrabold leading-tight">
+                {i === 0 ? classes.length : s.value}
+              </span>
             </span>
           </div>
         ))}
@@ -225,111 +296,216 @@ export default function TeacherClassesPage() {
           </label>
         </div>
 
+        {/* Loading Spinner */}
+        {loading && (
+          <div className="flex h-48 flex-col items-center justify-center gap-2 text-slate-400">
+            <Loader2 className="h-7 w-7 animate-spin text-blue-600" />
+            <span className="text-[13px]">Đang tải danh sách lớp học...</span>
+          </div>
+        )}
+
         {/* Cards */}
-        <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((c) => (
-            <article key={c.id} className="overflow-hidden rounded-xl border border-slate-200/70 transition hover:shadow-lg hover:shadow-slate-200">
-              <div className={`relative grid h-[168px] place-items-center bg-gradient-to-br text-6xl ${c.coverGradient}`}>
-                <span aria-hidden>{c.coverEmoji}</span>
-                <span className="absolute left-3 top-3">
-                  <StatusBadge status={c.status} />
-                </span>
-                <span className="absolute right-3 top-3">
-                  <button
-                    onClick={() => setOpenMenuId(openMenuId === c.id ? null : c.id)}
-                    aria-label={`Tùy chọn ${c.name}`}
-                    className="grid h-8 w-8 place-items-center rounded-lg bg-white/90 text-slate-600 shadow-sm transition hover:bg-white"
-                  >
-                    <MoreVertical className="h-4 w-4" />
-                  </button>
-                  {openMenuId === c.id && (
-                    <span className="absolute right-0 top-[calc(100%+6px)] z-20 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 text-left shadow-xl">
-                      <button onClick={() => { setOpenMenuId(null); setViewing(c); }} className="flex w-full items-center gap-2 px-3.5 py-2 text-[13px] text-slate-600 hover:bg-slate-50">
-                        <Eye className="h-4 w-4" /> Xem chi tiết
-                      </button>
-                      <button onClick={() => { setOpenMenuId(null); setEditing(c); setCreateOpen(true); }} className="flex w-full items-center gap-2 px-3.5 py-2 text-[13px] text-slate-600 hover:bg-slate-50">
-                        <Pencil className="h-4 w-4" /> Chỉnh sửa
-                      </button>
-                      <button onClick={() => archiveClass(c)} className="flex w-full items-center gap-2 px-3.5 py-2 text-[13px] text-slate-600 hover:bg-slate-50">
-                        <Archive className="h-4 w-4" /> Lưu trữ
-                      </button>
-                      <button onClick={() => { setOpenMenuId(null); setDeleting(c); }} className="flex w-full items-center gap-2 px-3.5 py-2 text-[13px] text-red-600 hover:bg-red-50">
-                        <Trash2 className="h-4 w-4" /> Xóa lớp
-                      </button>
+        {!loading && (
+          <div className="mt-5 grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
+            {filtered.map((c) => (
+              <article key={c.id} className="overflow-hidden rounded-xl border border-slate-200/70 transition hover:shadow-lg hover:shadow-slate-200">
+                <div className={`relative grid h-[168px] place-items-center bg-gradient-to-br text-6xl ${c.coverGradient}`}>
+                  <span aria-hidden>{c.coverEmoji}</span>
+                  <span className="absolute left-3 top-3">
+                    <StatusBadge status={c.status} />
+                  </span>
+                  <span className="absolute right-3 top-3">
+                    <button
+                      onClick={() => setOpenMenuId(openMenuId === c.id ? null : c.id)}
+                      aria-label={`Tùy chọn ${c.name}`}
+                      className="grid h-8 w-8 place-items-center rounded-lg bg-white/90 text-slate-600 shadow-sm transition hover:bg-white"
+                    >
+                      <MoreVertical className="h-4 w-4" />
+                    </button>
+                    {openMenuId === c.id && (
+                      <span className="absolute right-0 top-[calc(100%+6px)] z-20 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 text-left shadow-xl">
+                        <button
+                          onClick={() => {
+                            setOpenMenuId(null);
+                            setViewing(c);
+                          }}
+                          className="flex w-full items-center gap-2 px-3.5 py-2 text-[13px] text-slate-600 hover:bg-slate-50"
+                        >
+                          <Eye className="h-4 w-4" /> Xem chi tiết
+                        </button>
+
+                        {c.status !== "archived" && (
+                          <button
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              setEditing(c);
+                              setCreateOpen(true);
+                            }}
+                            className="flex w-full items-center gap-2 px-3.5 py-2 text-[13px] text-slate-600 hover:bg-slate-50"
+                          >
+                            <Pencil className="h-4 w-4" /> Chỉnh sửa
+                          </button>
+                        )}
+
+                        {c.status === "active" && (
+                          <button
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              setStatusConfirm({ classInfo: c, targetStatus: "closed" });
+                            }}
+                            className="flex w-full items-center gap-2 px-3.5 py-2 text-[13px] text-amber-600 hover:bg-amber-50"
+                          >
+                            <Lock className="h-4 w-4" /> Đóng lớp
+                          </button>
+                        )}
+
+                        {c.status === "closed" && (
+                          <button
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              setStatusConfirm({ classInfo: c, targetStatus: "active" });
+                            }}
+                            className="flex w-full items-center gap-2 px-3.5 py-2 text-[13px] text-blue-600 hover:bg-blue-50"
+                          >
+                            <RotateCcw className="h-4 w-4" /> Mở lại lớp
+                          </button>
+                        )}
+
+                        {c.status !== "archived" && (
+                          <button
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              setStatusConfirm({ classInfo: c, targetStatus: "archived" });
+                            }}
+                            className="flex w-full items-center gap-2 px-3.5 py-2 text-[13px] text-slate-600 hover:bg-slate-50"
+                          >
+                            <Archive className="h-4 w-4" /> Lưu trữ
+                          </button>
+                        )}
+
+                        {c.status === "archived" && (
+                          <button
+                            onClick={() => {
+                              setOpenMenuId(null);
+                              setStatusConfirm({ classInfo: c, targetStatus: "active" });
+                            }}
+                            className="flex w-full items-center gap-2 px-3.5 py-2 text-[13px] text-blue-600 hover:bg-blue-50"
+                          >
+                            <RotateCcw className="h-4 w-4" /> Khôi phục lớp
+                          </button>
+                        )}
+                      </span>
+                    )}
+                  </span>
+                </div>
+
+                <div className="p-4">
+                  <h3 className="text-[16px] font-bold">{c.name}</h3>
+                  <p className="mt-1 flex items-center gap-1.5 text-[13px] text-slate-500">
+                    Mã lớp: <span className="font-mono font-semibold text-slate-700">{c.code}</span>
+                    <button
+                      onClick={() => copyCode(c.code)}
+                      aria-label={`Sao chép mã ${c.code}`}
+                      className="grid h-6 w-6 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-blue-600"
+                    >
+                      {copied === c.code ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
+                    </button>
+                  </p>
+                  <p className="mt-1.5 line-clamp-2 min-h-[40px] text-[13px] leading-relaxed text-slate-500">
+                    {c.description || "Chưa có mô tả cho lớp học."}
+                  </p>
+
+                  <div className="mt-3 grid grid-cols-3 gap-2">
+                    <span className="rounded-lg bg-blue-50/70 px-2 py-2 text-center">
+                      <span className="flex items-center justify-center gap-1 text-[13px] font-bold">
+                        <Users className="h-3.5 w-3.5 text-blue-500" /> {c.studentCount}
+                      </span>
+                      <span className="text-[11.5px] text-slate-500">Sinh viên</span>
                     </span>
-                  )}
-                </span>
-              </div>
-
-              <div className="p-4">
-                <h3 className="text-[16px] font-bold">{c.name}</h3>
-                <p className="mt-1 flex items-center gap-1.5 text-[13px] text-slate-500">
-                  Mã lớp: {c.code}
-                  <button onClick={() => copyCode(c.code)} aria-label={`Sao chép mã ${c.code}`} className="grid h-6 w-6 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-blue-600">
-                    {copied === c.code ? <Check className="h-3.5 w-3.5 text-green-600" /> : <Copy className="h-3.5 w-3.5" />}
-                  </button>
-                </p>
-                <p className="mt-1.5 line-clamp-2 min-h-[40px] text-[13px] leading-relaxed text-slate-500">
-                  {c.description}
-                </p>
-
-                <div className="mt-3 grid grid-cols-3 gap-2">
-                  <span className="rounded-lg bg-blue-50/70 px-2 py-2 text-center">
-                    <span className="flex items-center justify-center gap-1 text-[13px] font-bold"><Users className="h-3.5 w-3.5 text-blue-500" /> {c.studentCount}</span>
-                    <span className="text-[11.5px] text-slate-500">Sinh viên</span>
-                  </span>
-                  <span className="rounded-lg bg-purple-50/70 px-2 py-2 text-center">
-                    <span className="flex items-center justify-center gap-1 text-[13px] font-bold"><FileText className="h-3.5 w-3.5 text-purple-500" /> {c.assignmentCount ?? c.courseCount}</span>
-                    <span className="text-[11.5px] text-slate-500">Bài tập</span>
-                  </span>
-                  <span className="rounded-lg bg-orange-50/70 px-2 py-2 text-center">
-                    <span className="flex items-center justify-center gap-1 text-[13px] font-bold"><FileText className="h-3.5 w-3.5 text-orange-500" /> {c.quizCount ?? 0}</span>
-                    <span className="text-[11.5px] text-slate-500">Kiểm tra</span>
-                  </span>
-                </div>
-
-                <p className="mt-3 flex items-center gap-1.5 text-[13px] text-slate-500">
-                  <CalendarDays className="h-4 w-4 text-slate-400" /> {c.dateRange ?? c.updatedAt}
-                </p>
-
-                <div className="mt-2 flex items-center">
-                  {demoAvatars.map((src) => (
-                    <span key={src} className="-ml-2 h-7 w-7 overflow-hidden rounded-full border-2 border-white bg-slate-200 first:ml-0">
-                      <Image src={src} alt="Sinh viên" width={28} height={28} className="h-full w-full object-cover" unoptimized />
+                    <span className="rounded-lg bg-purple-50/70 px-2 py-2 text-center">
+                      <span className="flex items-center justify-center gap-1 text-[13px] font-bold">
+                        <FileText className="h-3.5 w-3.5 text-purple-500" /> {c.assignmentCount ?? c.courseCount}
+                      </span>
+                      <span className="text-[11.5px] text-slate-500">Bài tập</span>
                     </span>
-                  ))}
-                  <span className="-ml-2 grid h-7 place-items-center rounded-full border-2 border-white bg-slate-100 px-1.5 text-[11px] font-medium text-slate-500">
-                    +{Math.max(c.studentCount - 4, 0)}
-                  </span>
-                </div>
+                    <span className="rounded-lg bg-orange-50/70 px-2 py-2 text-center">
+                      <span className="flex items-center justify-center gap-1 text-[13px] font-bold">
+                        <FileText className="h-3.5 w-3.5 text-orange-500" /> {c.quizCount ?? 0}
+                      </span>
+                      <span className="text-[11.5px] text-slate-500">Kiểm tra</span>
+                    </span>
+                  </div>
 
-                <div className="mt-3 grid grid-cols-2 gap-2">
-                  {c.status === "closed" ? (
-                    <>
-                      <button onClick={() => setViewing(c)} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-blue-200 px-3 py-2 text-[13px] font-semibold text-blue-600 hover:bg-blue-50">
-                        <BarChart3 className="h-4 w-4" /> Xem chi tiết
-                      </button>
-                      <button disabled className="rounded-lg bg-slate-100 px-3 py-2 text-[13px] font-medium text-slate-400">
-                        Lớp đã đóng
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button onClick={() => showToast(`Mở quản lý lớp ${c.code} (demo)`)} className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-blue-200 px-3 py-2 text-[13px] font-semibold text-blue-600 hover:bg-blue-50">
-                        <Settings className="h-4 w-4" /> Quản lý lớp học
-                      </button>
-                      <button onClick={() => setViewing(c)} className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-[13px] font-semibold text-white hover:bg-blue-700">
-                        <BarChart3 className="h-4 w-4" /> Xem chi tiết
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            </article>
-          ))}
-        </div>
+                  <p className="mt-3 flex items-center gap-1.5 text-[13px] text-slate-500">
+                    <CalendarDays className="h-4 w-4 text-slate-400" /> Cập nhật: {c.updatedAt}
+                  </p>
 
-        {filtered.length === 0 && (
+                  <div className="mt-2 flex items-center">
+                    {demoAvatars.slice(0, Math.min(c.studentCount, 4)).map((src) => (
+                      <span key={src} className="-ml-2 h-7 w-7 overflow-hidden rounded-full border-2 border-white bg-slate-200 first:ml-0">
+                        <Image src={src} alt="Sinh viên" width={28} height={28} className="h-full w-full object-cover" unoptimized />
+                      </span>
+                    ))}
+                    <span className="-ml-2 grid h-7 place-items-center rounded-full border-2 border-white bg-slate-100 px-1.5 text-[11px] font-medium text-slate-500">
+                      +{Math.max(c.studentCount - 4, 0)}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    {c.status === "archived" ? (
+                      <>
+                        <button
+                          onClick={() => setViewing(c)}
+                          className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                          <Eye className="h-4 w-4" /> Chi tiết
+                        </button>
+                        <button
+                          onClick={() => setStatusConfirm({ classInfo: c, targetStatus: "active" })}
+                          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-[13px] font-semibold text-white hover:bg-blue-700"
+                        >
+                          <RotateCcw className="h-4 w-4" /> Khôi phục
+                        </button>
+                      </>
+                    ) : c.status === "closed" ? (
+                      <>
+                        <button
+                          onClick={() => setViewing(c)}
+                          className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-blue-200 px-3 py-2 text-[13px] font-semibold text-blue-600 hover:bg-blue-50"
+                        >
+                          <BarChart3 className="h-4 w-4" /> Xem chi tiết
+                        </button>
+                        <button
+                          onClick={() => setStatusConfirm({ classInfo: c, targetStatus: "active" })}
+                          className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-100"
+                        >
+                          <RotateCcw className="h-4 w-4" /> Mở lại lớp
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => showToast(`Mở quản lý lớp ${c.code}`)}
+                          className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-blue-200 px-3 py-2 text-[13px] font-semibold text-blue-600 hover:bg-blue-50"
+                        >
+                          <Settings className="h-4 w-4" /> Quản lý
+                        </button>
+                        <button
+                          onClick={() => setViewing(c)}
+                          className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-3 py-2 text-[13px] font-semibold text-white hover:bg-blue-700"
+                        >
+                          <BarChart3 className="h-4 w-4" /> Xem chi tiết
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+
+        {!loading && filtered.length === 0 && (
           <p className="mt-5 rounded-xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
             Không có lớp học nào trong mục này.
           </p>
@@ -349,9 +525,22 @@ export default function TeacherClassesPage() {
         </div>
       </div>
 
-      <CreateClassModal open={createOpen} initial={editing} onClose={() => { setCreateOpen(false); setEditing(null); }} onSubmit={handleCreate} />
+      <CreateClassModal
+        open={createOpen}
+        initial={editing}
+        onClose={() => {
+          setCreateOpen(false);
+          setEditing(null);
+        }}
+        onSubmit={handleSaveClass}
+      />
       <ClassDetailModal classInfo={viewing} onClose={() => setViewing(null)} />
-      <ConfirmDeleteModal classInfo={deleting} onClose={() => setDeleting(null)} onConfirm={() => { if (deleting) { setClasses((p) => p.filter((x) => x.id !== deleting.id)); showToast(`Đã xóa lớp ${deleting.code}`); } setDeleting(null); }} />
+      <ConfirmStatusChangeModal
+        classInfo={statusConfirm?.classInfo ?? null}
+        targetStatus={statusConfirm?.targetStatus ?? null}
+        onClose={() => setStatusConfirm(null)}
+        onConfirm={handleConfirmStatusChange}
+      />
       <Toast message={toast} />
     </TeacherShell>
   );

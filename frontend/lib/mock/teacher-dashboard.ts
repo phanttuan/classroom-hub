@@ -64,41 +64,7 @@ export const dashboardStats: DashboardStat[] = [
   },
 ];
 
-export const teacherClasses: TeacherClass[] = [
-  {
-    id: "cls-web301",
-    code: "WEB301",
-    name: "Lập trình Web nâng cao",
-    studentCount: 42,
-    courseCount: 3,
-    updatedAt: "12/09/2026",
-    status: "active",
-    coverGradient: "from-amber-100 via-orange-100 to-stone-200",
-    coverEmoji: "💻",
-  },
-  {
-    id: "cls-py101",
-    code: "PY101",
-    name: "Lập trình Python cơ bản",
-    studentCount: 56,
-    courseCount: 4,
-    updatedAt: "10/09/2026",
-    status: "active",
-    coverGradient: "from-slate-900 via-blue-950 to-slate-800",
-    coverEmoji: "🐍",
-  },
-  {
-    id: "cls-cs201",
-    code: "CS201",
-    name: "Cấu trúc dữ liệu và giải thuật",
-    studentCount: 30,
-    courseCount: 2,
-    updatedAt: "05/09/2026",
-    status: "closed",
-    coverGradient: "from-sky-950 via-blue-900 to-cyan-800",
-    coverEmoji: "📈",
-  },
-];
+export const teacherClasses: TeacherClass[] = [];
 
 export const pendingAssignments: PendingAssignment[] = [
   {
