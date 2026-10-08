@@ -13,29 +13,27 @@ import {
   Check,
 } from "lucide-react";
 import StudentShell, { Toast } from "../components/StudentShell";
-import Modal from "../../teacher/components/Modal";
-import JoinClassModal from "../components/JoinClassModal";
+import JoinCourseModal from "../components/JoinCourseModal";
 import { TONE_BOX } from "../components/student-shared";
 import { daySchedule24, studentNotifs } from "@/lib/mock/student";
 import type { StudentClass } from "@/lib/types/student";
-import { fetchStudentClasses } from "@/lib/api/class-api";
+import { fetchStudentCourses } from "@/lib/api/course-api";
 import {
-  mapClassroomDtoToStudentClass,
-  type ClassroomDto,
-} from "@/lib/types/class";
+  mapCourseDtoToStudentClass,
+  type CourseDto,
+} from "@/lib/types/course";
 
 type Tab = "all" | "ongoing" | "finished";
 
-export default function StudentClassesPage() {
+export default function StudentCoursesPage() {
   const router = useRouter();
   const [topSearch, setTopSearch] = useState("");
   const [tab, setTab] = useState<Tab>("all");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("Mới nhất");
   const [copied, setCopied] = useState("");
-  const [guideOpen, setGuideOpen] = useState(false);
   const [joinModalOpen, setJoinModalOpen] = useState(false);
-  const [classes, setClasses] = useState<StudentClass[]>([]);
+  const [courses, setCourses] = useState<StudentClass[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState("");
 
@@ -51,83 +49,93 @@ export default function StudentClassesPage() {
       /* clipboard fallback */
     }
     setCopied(code);
-    showToast(`Đã sao chép mã lớp ${code}`);
+    showToast(`Đã sao chép mã môn học ${code}`);
     window.setTimeout(() => setCopied(""), 1500);
   };
 
-  const loadClasses = useCallback(async () => {
+  const loadCourses = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await fetchStudentClasses();
-      const mapped = (res.items || []).map(mapClassroomDtoToStudentClass);
-      setClasses(mapped);
-    } catch (err: any) {
-      showToast(err?.message || "Không thể tải danh sách lớp học");
+      const res = await fetchStudentCourses();
+      const mapped = (res.items || []).map(mapCourseDtoToStudentClass);
+      setCourses(mapped);
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      showToast(error?.message || "Không thể tải danh sách môn học");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadClasses();
-  }, [loadClasses]);
+    loadCourses();
+  }, [loadCourses]);
 
-  const handleJoinSuccess = (joinedDto: ClassroomDto, message: string) => {
-    const newClass = mapClassroomDtoToStudentClass(joinedDto);
-    setClasses((prev) => {
-      const idx = prev.findIndex((c) => c.id === newClass.id);
+  const handleJoinSuccess = (joinedDto: CourseDto, message: string) => {
+    const newCourse = mapCourseDtoToStudentClass(joinedDto);
+    setCourses((prev) => {
+      const idx = prev.findIndex((c) => c.id === newCourse.id);
       if (idx >= 0) {
         const next = [...prev];
-        next[idx] = newClass;
+        next[idx] = newCourse;
         return next;
       }
-      return [newClass, ...prev];
+      return [newCourse, ...prev];
     });
     showToast(message);
   };
 
   const counts = useMemo(
     () => ({
-      all: classes.length,
-      ongoing: classes.filter((c) => c.status === "studying").length,
-      finished: classes.filter((c) => c.status === "finished").length,
+      all: courses.length,
+      ongoing: courses.filter((c) => c.status === "studying").length,
+      finished: courses.filter((c) => c.status === "finished").length,
     }),
-    [classes],
+    [courses],
   );
 
   const filtered = useMemo(() => {
     const q = (query || topSearch).trim().toLowerCase();
-    let list = classes;
+    let list = courses;
     if (tab === "ongoing") list = list.filter((c) => c.status === "studying");
     if (tab === "finished") list = list.filter((c) => c.status === "finished");
     if (q) list = list.filter((c) => `${c.name} ${c.code} ${c.teacher}`.toLowerCase().includes(q));
     if (sort === "Tên A-Z") list = [...list].sort((a, b) => a.name.localeCompare(b.name, "vi"));
     if (sort === "Sĩ số nhiều nhất") list = [...list].sort((a, b) => (b.memberCount ?? 0) - (a.memberCount ?? 0));
     return list;
-  }, [classes, tab, query, topSearch, sort]);
+  }, [courses, tab, query, topSearch, sort]);
 
   return (
-    <StudentShell activeId="classes" searchPlaceholder="Tìm kiếm khóa học, bài học, tài liệu, bài tập..." searchValue={topSearch} onSearchChange={setTopSearch}>
+    <StudentShell
+      activeId="classes"
+      searchPlaceholder="Tìm kiếm môn học, bài học, tài liệu, bài tập..."
+      searchValue={topSearch}
+      onSearchChange={setTopSearch}
+    >
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_330px]">
         <div className="min-w-0">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-[26px] font-extrabold tracking-tight">Lớp học của tôi</h1>
-              <p className="mt-0.5 text-[14px] text-slate-500">Danh sách các lớp học bạn đang tham gia</p>
+              <h1 className="text-[26px] font-extrabold tracking-tight">Môn học của tôi</h1>
+              <p className="mt-0.5 text-[14px] text-slate-500">Danh sách các môn học bạn đang tham gia</p>
             </div>
             <button
               onClick={() => setJoinModalOpen(true)}
               className="inline-flex items-center gap-2 self-start rounded-xl bg-blue-600 px-4 py-2.5 text-[13.5px] font-semibold text-white shadow-sm transition hover:bg-blue-700 sm:self-auto"
             >
               <Plus className="h-4 w-4" />
-              Tham gia lớp học
+              Tham gia môn học
             </button>
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
             <div className="flex gap-1 border-b border-slate-200">
-              {([["all", `Tất cả lớp học (${counts.all})`], ["ongoing", `Đang diễn ra (${counts.ongoing})`], ["finished", `Đã kết thúc (${counts.finished})`]] as [Tab, string][]).map(([id, label]) => (
-                <button key={id} onClick={() => setTab(id)} className={`relative px-3 pb-2.5 pt-1 text-[13.5px] font-medium ${tab === id ? "text-blue-600" : "text-slate-500 hover:text-slate-700"}`}>
+              {([["all", `Tất cả môn học (${counts.all})`], ["ongoing", `Đang diễn ra (${counts.ongoing})`], ["finished", `Đã kết thúc (${counts.finished})`]] as [Tab, string][]).map(([id, label]) => (
+                <button
+                  key={id}
+                  onClick={() => setTab(id)}
+                  className={`relative px-3 pb-2.5 pt-1 text-[13.5px] font-medium ${tab === id ? "text-blue-600" : "text-slate-500 hover:text-slate-700"}`}
+                >
                   {label}
                   {tab === id && <span className="absolute inset-x-2 -bottom-px h-[2.5px] rounded-full bg-blue-600" />}
                 </button>
@@ -135,8 +143,12 @@ export default function StudentClassesPage() {
             </div>
             <span className="relative ml-auto">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm kiếm lớp học..."
-                className="h-10 w-[220px] rounded-lg bg-white pl-9 pr-3 text-[13px] outline-none ring-1 ring-slate-200 placeholder:text-slate-400 focus:ring-4 focus:ring-blue-100" />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Tìm kiếm môn học..."
+                className="h-10 w-[220px] rounded-lg bg-white pl-9 pr-3 text-[13px] outline-none ring-1 ring-slate-200 placeholder:text-slate-400 focus:ring-4 focus:ring-blue-100"
+              />
             </span>
             <select
               value={sort}
@@ -154,26 +166,26 @@ export default function StudentClassesPage() {
             {loading ? (
               <div className="flex flex-col items-center justify-center rounded-xl border border-slate-200/70 bg-white py-16">
                 <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
-                <p className="mt-3 text-[13.5px] font-medium text-slate-500">Đang tải danh sách lớp học...</p>
+                <p className="mt-3 text-[13.5px] font-medium text-slate-500">Đang tải danh sách môn học...</p>
               </div>
             ) : filtered.length === 0 ? (
               <div className="rounded-xl border border-slate-200/70 bg-white px-4 py-14 text-center">
                 <BookOpen className="mx-auto h-12 w-12 text-slate-300" />
                 <h3 className="mt-3 text-[16px] font-bold text-slate-800">
-                  {classes.length === 0 ? "Chưa tham gia lớp học nào" : "Không tìm thấy lớp học phù hợp"}
+                  {courses.length === 0 ? "Chưa tham gia môn học nào" : "Không tìm thấy môn học phù hợp"}
                 </h3>
                 <p className="mx-auto mt-1 max-w-sm text-[13px] text-slate-500">
-                  {classes.length === 0
-                    ? "Nhập mã lớp học do giảng viên cung cấp để tham gia vào lớp và bắt đầu học tập."
+                  {courses.length === 0
+                    ? "Nhập mã môn học do giảng viên cung cấp để tham gia vào môn và bắt đầu học tập."
                     : "Thử thay đổi từ khóa tìm kiếm hoặc kiểm tra lại bộ lọc trạng thái."}
                 </p>
-                {classes.length === 0 && (
+                {courses.length === 0 && (
                   <button
                     onClick={() => setJoinModalOpen(true)}
                     className="mt-4 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-4 py-2.5 text-[13px] font-semibold text-white shadow-sm transition hover:bg-blue-700"
                   >
                     <Plus className="h-4 w-4" />
-                    Tham gia lớp học ngay
+                    Tham gia môn học ngay
                   </button>
                 )}
               </div>
@@ -228,7 +240,7 @@ export default function StudentClassesPage() {
 
                     {/* Thân thẻ: 4 thông tin còn lại */}
                     <div className="flex flex-1 flex-col p-4">
-                      {/* 3. Tên lớp */}
+                      {/* 3. Tên môn */}
                       <h2
                         className="text-[16px] font-extrabold text-slate-800 line-clamp-1 transition group-hover:text-blue-600 cursor-pointer"
                         onClick={() => router.push("/student/content")}
@@ -237,15 +249,15 @@ export default function StudentClassesPage() {
                         {c.name}
                       </h2>
 
-                      {/* 4. Mã lớp */}
+                      {/* 4. Mã môn */}
                       <div className="mt-2 flex items-center gap-1.5">
                         <span className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-0.5 text-[11.5px] font-mono font-bold text-blue-700">
-                          Mã lớp: {c.code}
+                          Mã môn: {c.code}
                         </span>
                         <button
                           onClick={() => copyCode(c.code)}
                           aria-label={`Sao chép mã ${c.code}`}
-                          title="Sao chép mã lớp"
+                          title="Sao chép mã môn học"
                           className="grid h-6 w-6 place-items-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-blue-600"
                         >
                           {copied === c.code ? (
@@ -282,13 +294,13 @@ export default function StudentClassesPage() {
                         </div>
                       </div>
 
-                      {/* Nút hành động Vào lớp */}
+                      {/* Nút hành động Vào môn học */}
                       <div className="mt-4 pt-1">
                         <button
                           onClick={() => router.push("/student/content")}
                           className="w-full rounded-xl bg-slate-50 py-2 text-center text-[12.5px] font-semibold text-slate-700 transition hover:bg-blue-600 hover:text-white cursor-pointer"
                         >
-                          Vào lớp học
+                          Vào môn học
                         </button>
                       </div>
                     </div>
@@ -318,11 +330,10 @@ export default function StudentClassesPage() {
                   <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${TONE_BOX[e.tone as string] ?? "bg-blue-50 text-blue-600"}`}>
                     <FileText className="h-4 w-4" />
                   </span>
-                  <span className="min-w-0">
-                    <b className="block truncate text-[12.5px]">{e.title}</b>
-                    <span className="block text-[11px] text-slate-400">🕐 {e.time}</span>
-                    <span className="block truncate text-[11px] text-slate-400">{e.meta}</span>
-                  </span>
+                  <div className="min-w-0 flex-1">
+                    <h4 className="truncate text-[13px] font-bold text-slate-800">{e.title}</h4>
+                    <span className="text-[11.5px] text-slate-400">{e.time}</span>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -330,53 +341,28 @@ export default function StudentClassesPage() {
 
           <section className="rounded-xl border border-slate-200/70 bg-white p-4">
             <div className="mb-3 flex items-center justify-between">
-              <h2 className="text-[15px] font-extrabold">📢 Thông báo mới</h2>
+              <h2 className="text-[15px] font-extrabold">🔔 Thông báo</h2>
               <button onClick={() => router.push("/student/notifications")} className="text-[12.5px] font-medium text-blue-600">Xem tất cả →</button>
             </div>
             <ul className="space-y-3">
-              {studentNotifs.map((n) => (
-                <li key={n.id} className="flex gap-2.5">
-                  <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ${TONE_BOX[n.tone]}`}><FileText className="h-4 w-4" /></span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-start justify-between gap-2"><b className="text-[12.5px]">{n.title}</b><span className="shrink-0 text-[10.5px] text-slate-400">{n.timeAgo}</span></span>
-                    <span className="line-clamp-2 text-[11.5px] text-slate-500">{n.desc}</span>
-                  </span>
+              {studentNotifs.slice(0, 3).map((n) => (
+                <li key={n.id} className="text-[12.5px] text-slate-600">
+                  <p className="font-semibold text-slate-800">{n.title}</p>
+                  <p className="text-[11.5px] text-slate-400">{n.timeAgo}</p>
                 </li>
               ))}
             </ul>
           </section>
-
-          <section className="overflow-hidden rounded-xl border border-blue-100 bg-gradient-to-br from-blue-50 to-indigo-50 p-4 text-center">
-            <span className="text-5xl" aria-hidden>🧑‍💻</span>
-            <h2 className="mt-1 text-[15px] font-extrabold">Cần hỗ trợ?</h2>
-            <p className="mt-1 text-[12px] leading-relaxed text-slate-500">Liên hệ giảng viên hoặc xem hướng dẫn sử dụng nếu bạn gặp khó khăn.</p>
-            <button onClick={() => setGuideOpen(true)} className="mt-2.5 rounded-lg border border-blue-300 bg-white px-4 py-2 text-[12.5px] font-semibold text-blue-600 hover:bg-blue-50">
-              Xem hướng dẫn ⬈
-            </button>
-          </section>
         </div>
       </div>
 
-      <JoinClassModal
+      <JoinCourseModal
         open={joinModalOpen}
         onClose={() => setJoinModalOpen(false)}
         onSuccess={handleJoinSuccess}
       />
-
-
-
-      <Modal open={guideOpen} onClose={() => setGuideOpen(false)} title="Hướng dẫn sử dụng">
-        <ol className="list-decimal space-y-2 pl-5 text-[13.5px] leading-relaxed text-slate-600">
-          <li>Nhấn &ldquo;Tham gia lớp học&rdquo; và nhập mã mời từ giảng viên.</li>
-          <li>Vào lớp học để xem bài học, tài liệu và tiến độ.</li>
-          <li>Nộp bài tập trước hạn trong mục Bài tập.</li>
-          <li>Làm bài kiểm tra đúng khung giờ quy định.</li>
-          <li>Theo dõi điểm số trong mục Sổ điểm.</li>
-          <li>Liên hệ giảng viên qua email khi cần hỗ trợ.</li>
-        </ol>
-      </Modal>
-
       <Toast message={toast} />
     </StudentShell>
   );
 }
+

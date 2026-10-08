@@ -9,8 +9,8 @@ import type {
   TeacherNotification,
 } from "@/lib/types/teacher";
 
-/* ---------- Tạo / Sửa lớp học ---------- */
-function CreateClassForm({
+/* ---------- Tạo / Sửa môn học ---------- */
+function CreateCourseForm({
   initial,
   onSubmit,
   onClose,
@@ -26,15 +26,15 @@ function CreateClassForm({
 
   const submit = () => {
     if (name.trim().length < 1) {
-      setError("Tên lớp học không được để trống.");
+      setError("Tên môn học không được để trống.");
       return;
     }
     if (name.trim().length > 255) {
-      setError("Tên lớp học không được vượt quá 255 ký tự.");
+      setError("Tên môn học không được vượt quá 255 ký tự.");
       return;
     }
     if (description.length > 2000) {
-      setError("Mô tả lớp học không được vượt quá 2000 ký tự.");
+      setError("Mô tả môn học không được vượt quá 2000 ký tự.");
       return;
     }
     onSubmit({
@@ -49,13 +49,13 @@ function CreateClassForm({
     <div className="space-y-3.5">
       {isArchived && (
         <div className="rounded-lg bg-amber-50 p-3 text-[13px] text-amber-700">
-          Lớp học này đã lưu trữ (chỉ đọc). Bạn không thể chỉnh sửa thông tin cho đến khi khôi phục lớp.
+          Môn học này đã lưu trữ (chỉ đọc). Bạn không thể chỉnh sửa thông tin cho đến khi khôi phục môn học.
         </div>
       )}
 
       <div>
         <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
-          Tên lớp học *
+          Tên môn học *
         </label>
         <input
           disabled={isArchived}
@@ -71,7 +71,7 @@ function CreateClassForm({
 
       <div>
         <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
-          Mô tả lớp học
+          Mô tả môn học
         </label>
         <textarea
           disabled={isArchived}
@@ -81,20 +81,20 @@ function CreateClassForm({
             if (error) setError("");
           }}
           rows={3}
-          placeholder="Giới thiệu mục tiêu môn học, tài liệu hoặc ghi chú cho sinh viên..."
+          placeholder="Giới thiệu mục tiêu môn học, đề cương hoặc ghi chú cho sinh viên..."
           className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-500"
         />
       </div>
 
       {initial ? (
         <div className="rounded-lg bg-slate-50 p-3 text-[13px] text-slate-600">
-          <span className="font-semibold text-slate-700">Mã lớp:</span>{" "}
+          <span className="font-semibold text-slate-700">Mã môn học:</span>{" "}
           <span className="font-mono font-bold text-blue-600">{initial.code}</span>{" "}
           <span className="text-xs text-slate-400">(Mã do hệ thống cấp phát cố định)</span>
         </div>
       ) : (
         <p className="text-xs text-slate-500">
-          * Mã lớp học (8 ký tự duy nhất) sẽ được hệ thống sinh tự động sau khi tạo.
+          * Mã môn học (8 ký tự duy nhất) sẽ được hệ thống sinh tự động sau khi tạo.
         </p>
       )}
 
@@ -116,14 +116,14 @@ function CreateClassForm({
           onClick={submit}
           className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/30 transition hover:bg-blue-700 disabled:opacity-50"
         >
-          {initial ? "Lưu thay đổi" : "Tạo lớp"}
+          {initial ? "Lưu thay đổi" : "Tạo môn học"}
         </button>
       </div>
     </div>
   );
 }
 
-export function CreateClassModal({
+export function CreateCourseModal({
   open,
   initial,
   onClose,
@@ -138,10 +138,9 @@ export function CreateClassModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={initial ? "Chỉnh sửa lớp học" : "Tạo lớp học mới"}
+      title={initial ? "Chỉnh sửa môn học" : "Tạo môn học mới"}
     >
-      {/* key để reset form mỗi lần mở / đổi lớp sửa — tránh setState trong effect */}
-      <CreateClassForm
+      <CreateCourseForm
         key={initial ? `edit-${initial.id}` : `create-${String(open)}`}
         initial={initial}
         onClose={onClose}
@@ -151,8 +150,8 @@ export function CreateClassModal({
   );
 }
 
-/* ---------- Chi tiết lớp ---------- */
-export function ClassDetailModal({
+/* ---------- Chi tiết môn học ---------- */
+export function CourseDetailModal({
   classInfo,
   onClose,
 }: {
@@ -160,7 +159,7 @@ export function ClassDetailModal({
   onClose: () => void;
 }) {
   return (
-    <Modal open={!!classInfo} onClose={onClose} title="Chi tiết lớp học">
+    <Modal open={!!classInfo} onClose={onClose} title="Chi tiết môn học">
       {classInfo && (
         <div className="space-y-3">
           <div className={`grid place-items-center rounded-xl bg-gradient-to-br py-8 text-5xl ${classInfo.coverGradient}`}>
@@ -172,7 +171,7 @@ export function ClassDetailModal({
           )}
           <dl className="grid grid-cols-2 gap-2 text-sm">
             <div className="rounded-lg bg-slate-50 p-3">
-              <dt className="text-xs text-slate-500">Mã lớp</dt>
+              <dt className="text-xs text-slate-500">Mã môn học</dt>
               <dd className="font-bold text-slate-900">{classInfo.code}</dd>
             </div>
             <div className="rounded-lg bg-slate-50 p-3">

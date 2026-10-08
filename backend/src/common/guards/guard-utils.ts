@@ -1,8 +1,9 @@
-export function extractClassId(req: any): bigint | null {
+export function extractCourseId(req: any): bigint | null {
   const rawId =
-    req?.params?.classId ??
-    req?.body?.classId ??
-    req?.query?.classId;
+    req?.params?.courseId ??
+    req?.params?.id ??
+    req?.body?.courseId ??
+    req?.query?.courseId;
 
   if (rawId === undefined || rawId === null || rawId === '') {
     return null;

@@ -1,25 +1,25 @@
 import { describe, it, expect } from 'vitest';
 import { validate } from 'class-validator';
 import { plainToInstance } from 'class-transformer';
-import { CreateClassDto } from './create-class.dto.js';
-import { UpdateClassDto } from './update-class.dto.js';
-import { UpdateClassStatusDto } from './update-class-status.dto.js';
-import { JoinClassDto } from './join-class.dto.js';
-import { ClassStatus } from '../../../generated/prisma/enums.js';
+import { CreateCourseDto } from './create-course.dto.js';
+import { UpdateCourseDto } from './update-course.dto.js';
+import { UpdateCourseStatusDto } from './update-course-status.dto.js';
+import { JoinCourseDto } from './join-course.dto.js';
+import { CourseStatus } from '../../../generated/prisma/enums.js';
 
-describe('Class DTOs Validation', () => {
-  describe('CreateClassDto', () => {
+describe('Course DTOs Validation', () => {
+  describe('CreateCourseDto', () => {
     it('should pass with valid name and optional description', async () => {
-      const dto = plainToInstance(CreateClassDto, {
+      const dto = plainToInstance(CreateCourseDto, {
         name: 'Lập trình Web nâng cao',
-        description: 'Mô tả lớp học',
+        description: 'Mô tả môn học',
       });
       const errors = await validate(dto);
       expect(errors.length).toBe(0);
     });
 
     it('should fail when name is empty', async () => {
-      const dto = plainToInstance(CreateClassDto, {
+      const dto = plainToInstance(CreateCourseDto, {
         name: '   ',
       });
       const errors = await validate(dto);
@@ -27,7 +27,7 @@ describe('Class DTOs Validation', () => {
     });
 
     it('should fail when name exceeds 255 characters', async () => {
-      const dto = plainToInstance(CreateClassDto, {
+      const dto = plainToInstance(CreateCourseDto, {
         name: 'A'.repeat(256),
       });
       const errors = await validate(dto);
@@ -35,7 +35,7 @@ describe('Class DTOs Validation', () => {
     });
 
     it('should fail when description exceeds 2000 characters', async () => {
-      const dto = plainToInstance(CreateClassDto, {
+      const dto = plainToInstance(CreateCourseDto, {
         name: 'Toán học',
         description: 'B'.repeat(2001),
       });
@@ -44,9 +44,9 @@ describe('Class DTOs Validation', () => {
     });
   });
 
-  describe('UpdateClassDto', () => {
+  describe('UpdateCourseDto', () => {
     it('should pass when updating only description', async () => {
-      const dto = plainToInstance(UpdateClassDto, {
+      const dto = plainToInstance(UpdateCourseDto, {
         description: 'Mô tả mới',
       });
       const errors = await validate(dto);
@@ -54,8 +54,8 @@ describe('Class DTOs Validation', () => {
     });
 
     it('should pass when updating both name and description', async () => {
-      const dto = plainToInstance(UpdateClassDto, {
-        name: 'Tên lớp mới',
+      const dto = plainToInstance(UpdateCourseDto, {
+        name: 'Tên môn mới',
         description: 'Mô tả mới',
       });
       const errors = await validate(dto);
@@ -63,7 +63,7 @@ describe('Class DTOs Validation', () => {
     });
 
     it('should fail when name is empty string', async () => {
-      const dto = plainToInstance(UpdateClassDto, {
+      const dto = plainToInstance(UpdateCourseDto, {
         name: '   ',
       });
       const errors = await validate(dto);
@@ -71,62 +71,54 @@ describe('Class DTOs Validation', () => {
     });
   });
 
-  describe('UpdateClassStatusDto', () => {
-    it('should pass with valid ClassStatus enum value', async () => {
-      const dto = plainToInstance(UpdateClassStatusDto, {
-        status: ClassStatus.CLOSED,
+  describe('UpdateCourseStatusDto', () => {
+    it('should pass with valid CourseStatus enum', async () => {
+      const dto = plainToInstance(UpdateCourseStatusDto, {
+        status: CourseStatus.CLOSED,
       });
       const errors = await validate(dto);
       expect(errors.length).toBe(0);
     });
 
-    it('should fail with invalid status value', async () => {
-      const dto = plainToInstance(UpdateClassStatusDto, {
-        status: 'INVALID_STATUS',
+    it('should fail with invalid CourseStatus', async () => {
+      const dto = plainToInstance(UpdateCourseStatusDto, {
+        status: 'UNKNOWN_STATUS',
       });
       const errors = await validate(dto);
       expect(errors.length).toBeGreaterThan(0);
     });
   });
 
-  describe('JoinClassDto', () => {
-    it('should pass with valid 8-character uppercase class code', async () => {
-      const dto = plainToInstance(JoinClassDto, {
-        classCode: 'ABCDEF12',
+  describe('JoinCourseDto', () => {
+    it('should pass with valid 8-character uppercase course code', async () => {
+      const dto = plainToInstance(JoinCourseDto, {
+        courseCode: 'ABCDEFGH',
       });
       const errors = await validate(dto);
       expect(errors.length).toBe(0);
-      expect(dto.classCode).toBe('ABCDEF12');
+      expect(dto.courseCode).toBe('ABCDEFGH');
     });
 
-    it('should trim and uppercase class code automatically', async () => {
-      const dto = plainToInstance(JoinClassDto, {
-        classCode: '  abcdef12  ',
+    it('should automatically trim and uppercase input course code', async () => {
+      const dto = plainToInstance(JoinCourseDto, {
+        courseCode: '  abcdefgh  ',
       });
       const errors = await validate(dto);
       expect(errors.length).toBe(0);
-      expect(dto.classCode).toBe('ABCDEF12');
+      expect(dto.courseCode).toBe('ABCDEFGH');
     });
 
-    it('should fail when class code is empty', async () => {
-      const dto = plainToInstance(JoinClassDto, {
-        classCode: '   ',
+    it('should fail when code is shorter than 6 characters', async () => {
+      const dto = plainToInstance(JoinCourseDto, {
+        courseCode: 'ABC',
       });
       const errors = await validate(dto);
       expect(errors.length).toBeGreaterThan(0);
     });
 
-    it('should fail when class code contains invalid characters like dashes or symbols', async () => {
-      const dto = plainToInstance(JoinClassDto, {
-        classCode: 'ABC-1234',
-      });
-      const errors = await validate(dto);
-      expect(errors.length).toBeGreaterThan(0);
-    });
-
-    it('should fail when class code is too short (less than 6 chars)', async () => {
-      const dto = plainToInstance(JoinClassDto, {
-        classCode: 'ABC12',
+    it('should fail when code contains special characters', async () => {
+      const dto = plainToInstance(JoinCourseDto, {
+        courseCode: 'ABC@#123',
       });
       const errors = await validate(dto);
       expect(errors.length).toBeGreaterThan(0);

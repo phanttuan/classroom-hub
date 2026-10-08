@@ -22,7 +22,7 @@ type NavIcon = "home" | "classes" | "content" | "assignment" | "quiz" | "gradebo
 
 const NAV: { id: string; label: string; icon: NavIcon; href: string }[] = [
   { id: "home", label: "Tổng quan", icon: "home", href: "/student" },
-  { id: "classes", label: "Lớp học", icon: "classes", href: "/student/classes" },
+  { id: "classes", label: "Môn học", icon: "classes", href: "/student/courses" },
   { id: "content", label: "Nội dung học tập", icon: "content", href: "/student/content" },
   { id: "assignments", label: "Bài tập", icon: "assignment", href: "/student/assignments" },
   { id: "quizzes", label: "Kiểm tra trắc nghiệm", icon: "quiz", href: "/student/quizzes" },
