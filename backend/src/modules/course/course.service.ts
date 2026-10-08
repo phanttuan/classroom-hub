@@ -22,8 +22,6 @@ export interface CourseListFilter {
   limit?: number;
 }
 
-export type ClassListFilter = CourseListFilter;
-
 @Injectable()
 export class CourseService {
   private readonly logger = new Logger(CourseService.name);
@@ -437,19 +435,29 @@ export class CourseService {
     }
 
     // Tạo mới enrollment
-    const newEnrollment = await this.prisma.enrollment.create({
-      data: {
-        courseId: course.id,
-        studentId,
-        status: EnrollmentStatus.ACTIVE,
-      },
-    });
+    try {
+      const newEnrollment = await this.prisma.enrollment.create({
+        data: {
+          courseId: course.id,
+          studentId,
+          status: EnrollmentStatus.ACTIVE,
+        },
+      });
 
-    return {
-      course,
-      enrollment: newEnrollment,
-      isReactivated: false,
-    };
+      return {
+        course,
+        enrollment: newEnrollment,
+        isReactivated: false,
+      };
+    } catch (error) {
+      if (
+        error instanceof Prisma.PrismaClientKnownRequestError &&
+        error.code === 'P2002'
+      ) {
+        throw new ConflictException('Bạn đã là thành viên của môn học này');
+      }
+      throw error;
+    }
   }
 }
 

@@ -492,6 +492,32 @@ describe('CourseService', () => {
       expect(result.course).toEqual(mockCourse);
       expect(result.enrollment).toEqual(newEnrollment);
     });
+
+    it('should throw ConflictException if concurrent requests hit P2002 unique constraint race', async () => {
+      const mockCourse = {
+        id: 1n,
+        courseCode: 'CODE1234',
+        status: CourseStatus.ACTIVE,
+      };
+
+      prisma.course.findUnique.mockResolvedValue(mockCourse);
+      prisma.enrollment.findUnique.mockResolvedValue(null);
+      const p2002Error = new Prisma.PrismaClientKnownRequestError(
+        'Unique constraint failed',
+        {
+          code: 'P2002',
+          clientVersion: '7.10.0',
+        },
+      );
+      prisma.enrollment.create.mockRejectedValue(p2002Error);
+
+      await expect(service.joinCourse(studentId, courseCode)).rejects.toThrow(
+        ConflictException,
+      );
+      await expect(service.joinCourse(studentId, courseCode)).rejects.toThrow(
+        'Bạn đã là thành viên của môn học này',
+      );
+    });
   });
 });
 
