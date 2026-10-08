@@ -144,7 +144,7 @@ export default function TeacherSidebar({
 
         <nav className={`flex-1 overflow-y-auto pb-4 pt-3 ${collapsed ? "px-2" : "px-3"}`}>
           <ul className="space-y-1.5">
-            {teacherSidebarNav.slice(0, 8).map((item) => {
+            {teacherSidebarNav.filter((item) => item.id !== "profile").map((item) => {
               const Icon = ICON_MAP[item.icon] ?? FileText;
               const isOpen = expanded.includes(item.id);
 

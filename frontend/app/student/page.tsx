@@ -25,8 +25,9 @@ import {
   studentProfile,
   studentRecentScores,
 } from "@/lib/mock/student";
-import { fetchStudentClasses } from "@/lib/api/class-api";
-import { mapClassroomDtoToStudentClass } from "@/lib/types/class";
+import { fetchStudentCourses } from "@/lib/api/course-api";
+import { mapCourseDtoToStudentClass, type CourseDto } from "@/lib/types/course";
+import JoinCourseModal from "./components/JoinCourseModal";
 import type { StudentClass } from "@/lib/types/student";
 
 const WD = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
@@ -71,6 +72,7 @@ export default function StudentDashboardPage() {
   const [calDay, setCalDay] = useState(24);
   const [toast, setToast] = useState("");
   const [classList, setClassList] = useState<StudentClass[]>([]);
+  const [joinOpen, setJoinOpen] = useState(false);
   const [loading, setLoading] = useState(true);
 
   const showToast = (m: string) => {
@@ -80,10 +82,10 @@ export default function StudentDashboardPage() {
 
   useEffect(() => {
     let active = true;
-    fetchStudentClasses()
+    fetchStudentCourses()
       .then((res) => {
         if (!active) return;
-        const mapped = (res.items || []).map(mapClassroomDtoToStudentClass);
+        const mapped = (res.items || []).map(mapCourseDtoToStudentClass);
         setClassList(mapped);
       })
       .catch(() => {})
@@ -102,7 +104,7 @@ export default function StudentDashboardPage() {
   }, [search, classList]);
 
   return (
-    <StudentShell activeId="home" searchPlaceholder="Tìm kiếm khóa học, bài học, tài liệu..." searchValue={search} onSearchChange={setSearch}>
+    <StudentShell activeId="home" searchPlaceholder="Tìm kiếm lớp học, bài học, tài liệu..." searchValue={search} onSearchChange={setSearch}>
       {/* Banner chào (dùng chung 3 role) */}
       <GreetingHeader
         name={studentProfile.fullName}
@@ -122,7 +124,7 @@ export default function StudentDashboardPage() {
         {/* Cột trái */}
         <div className="min-w-0 space-y-5">
           <section className="rounded-xl border border-slate-200/70 bg-white p-4 sm:p-5">
-            <SectionHead title="Lớp học của tôi" onAction={() => router.push("/student/classes")} />
+            <SectionHead title="Lớp học của tôi" onAction={() => router.push("/student/content")} />
             {loading ? (
               <div className="flex flex-col items-center justify-center py-12">
                 <Loader2 className="h-7 w-7 animate-spin text-blue-600" />
@@ -134,7 +136,7 @@ export default function StudentDashboardPage() {
                 <p className="mt-2 text-[14px] font-semibold text-slate-700">Chưa tham gia lớp học nào</p>
                 <p className="mt-0.5 text-[12.5px] text-slate-400">Tham gia lớp học bằng mã mời để bắt đầu học tập</p>
                 <button
-                  onClick={() => router.push("/student/classes")}
+                  onClick={() => setJoinOpen(true)}
                   className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-2 text-[12.5px] font-semibold text-white hover:bg-blue-700"
                 >
                   <Plus className="h-3.5 w-3.5" />
@@ -160,7 +162,7 @@ export default function StudentDashboardPage() {
                             <>
                               <button aria-label="Đóng" onClick={() => setMenuId(null)} className="fixed inset-0 z-10 cursor-default" />
                               <span className="absolute right-0 top-full z-20 w-40 overflow-hidden rounded-xl border bg-white py-1 text-left shadow-xl">
-                                <button onClick={() => { setMenuId(null); router.push("/student/classes"); }} className="block w-full px-3.5 py-2 text-[12.5px] text-slate-600 hover:bg-slate-50">Xem lớp học</button>
+                                <button onClick={() => { setMenuId(null); router.push(`/student/content/courses/${c.id}`); }} className="block w-full px-3.5 py-2 text-[12.5px] text-slate-600 hover:bg-slate-50">Vào lớp học</button>
                                 <button onClick={() => { setMenuId(null); showToast(`Đã ghim ${c.code} lên đầu`); }} className="block w-full px-3.5 py-2 text-[12.5px] text-slate-600 hover:bg-slate-50">Ghim lớp học</button>
                               </span>
                             </>
@@ -172,12 +174,12 @@ export default function StudentDashboardPage() {
                         <span className="grid h-6 w-6 place-items-center rounded-full bg-gradient-to-br from-slate-300 to-slate-400 text-[10px] font-bold text-white">
                           {c.teacher.charAt(0)}
                         </span>
-                        <span>{c.teacher}<br /><span className="text-[11px] text-slate-400">Giáo viên</span></span>
+                        <span>{c.teacher}<br /><span className="text-[11px] text-slate-400">Giảng viên</span></span>
                       </p>
                       <div className="mt-2.5 flex items-center justify-between border-t border-slate-100 pt-2 text-[12px] text-slate-500">
                         <span>Sĩ số: <b className="text-slate-700">{c.memberCount ?? 0}</b></span>
                         <button
-                          onClick={() => router.push("/student/classes")}
+                          onClick={() => router.push(`/student/content/courses/${c.id}`)}
                           className="font-medium text-blue-600 hover:underline cursor-pointer"
                         >
                           Vào lớp →
@@ -312,6 +314,16 @@ export default function StudentDashboardPage() {
       </div>
 
       <Toast message={toast} />
+      <JoinCourseModal
+        open={joinOpen}
+        onClose={() => setJoinOpen(false)}
+        onSuccess={(joined: CourseDto, message: string) => {
+          setJoinOpen(false);
+          const added = mapCourseDtoToStudentClass(joined);
+          setClassList((prev) => [added, ...prev.filter((c) => c.id !== added.id)]);
+          showToast(message);
+        }}
+      />
     </StudentShell>
   );
 }

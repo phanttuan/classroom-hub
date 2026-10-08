@@ -36,7 +36,7 @@ export const dashboardStats: DashboardStat[] = [
     value: 3,
     tone: "blue",
     icon: "classes",
-    detailHref: "/teacher/classes",
+    detailHref: "/teacher/content/courses",
   },
   {
     id: "stat-students",
@@ -188,20 +188,12 @@ export const teacherNotifications: TeacherNotification[] = [
 
 export const teacherSidebarNav: SidebarItem[] = [
   { id: "home", label: "Tổng quan", icon: "home", href: "/teacher" },
-  { id: "classes", label: "Lớp học", icon: "classes", href: "/teacher/classes" },
   {
     id: "content",
-    label: "Khóa học",
+    label: "Lớp học",
     icon: "content",
     href: "/teacher/content/courses",
   },
-  {
-    id: "assignments",
-    label: "Bài tập",
-    icon: "assignment",
-    href: "/teacher/assignments",
-  },
-  { id: "quizzes", label: "Kiểm tra trắc nghiệm", icon: "quiz", href: "/teacher/quizzes" },
   { id: "grades", label: "Sổ điểm", icon: "gradebook", href: "/teacher/grades" },
   { id: "notifs", label: "Thông báo", icon: "bell", href: "/teacher/notifications" },
   { id: "schedule", label: "Lịch", icon: "calendar", href: "/teacher/schedule" },

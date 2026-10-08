@@ -13,10 +13,13 @@ import { useSidebar } from "@/lib/context/sidebar-context";
  * Shell dùng chung cho mọi trang /student/*.
  * Tái dùng Topbar + Modal của teacher để đồng nhất trải nghiệm.
  */
+/** Hồ sơ người dùng đã tải, giữ giữa các lần chuyển trang (chỉ tồn tại phía client) */
+let cachedStudentProfile: TeacherProfile | null = null;
+
 export default function StudentShell({
   activeId,
   activeHref,
-  searchPlaceholder = "Tìm kiếm khóa học, bài học, tài liệu...",
+  searchPlaceholder = "Tìm kiếm lớp học, bài học, tài liệu...",
   searchValue,
   onSearchChange,
   userProfile,
@@ -39,7 +42,11 @@ export default function StudentShell({
   const [selectedNoti, setSelectedNoti] = useState<TeacherNotification | null | undefined>(
     undefined,
   );
-  const [loadedUser, setLoadedUser] = useState<TeacherProfile | null>(null);
+  // Khởi tạo từ hồ sơ đã tải ở trang trước → tên / avatar không nháy về mặc định khi chuyển trang
+  const [loadedUser, setLoadedUser] = useState<TeacherProfile | null>(() => cachedStudentProfile);
+  useEffect(() => {
+    if (loadedUser) cachedStudentProfile = loadedUser;
+  }, [loadedUser]);
 
   useEffect(() => {
     try {
@@ -145,7 +152,7 @@ export default function StudentShell({
             { label: "Đăng xuất", href: "/login" },
           ]}
         />
-        <main className="mx-auto w-full max-w-[1280px] flex-1 px-4 py-5 sm:px-6">
+        <main className="page-enter mx-auto w-full max-w-[1280px] flex-1 px-4 py-5 sm:px-6">
           {children}
         </main>
       </div>

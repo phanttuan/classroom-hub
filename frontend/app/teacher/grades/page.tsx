@@ -110,7 +110,7 @@ export default function TeacherGradesPage() {
   const filtered = useMemo(() => {
     const q = (query || topSearch).trim().toLowerCase();
     let list = classStudents;
-    if (courseFilter !== "Tất cả khóa học") list = list.filter((s) => s.courseName === courseFilter);
+    if (courseFilter !== "Tất cả lớp học") list = list.filter((s) => s.courseName === courseFilter);
     if (statusFilter === "Đã có điểm") list = list.filter((s) => total10(s, weights) !== null);
     if (statusFilter === "Chưa có điểm") list = list.filter((s) => total10(s, weights) === null);
     if (q) list = list.filter((s) => `${s.name} ${s.mssv}`.toLowerCase().includes(q));
@@ -230,6 +230,18 @@ export default function TeacherGradesPage() {
             <ChevronDown className="h-4 w-4 text-slate-400" />
           </button>
           {classOpen && (
+            <button
+              type="button"
+              aria-label="Đóng menu"
+              tabIndex={-1}
+              onClick={(e) => {
+                e.stopPropagation();
+                setClassOpen(false);
+              }}
+              className="fixed inset-0 z-10 cursor-default"
+            />
+          )}
+          {classOpen && (
             <span className="absolute left-0 top-[calc(100%+6px)] z-20 w-80 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
               {gradeClasses.map((c) => (
                 <button key={c.code} onClick={() => { setClassCode(c.code); setClassOpen(false); setPage(1); setChecked([]); }} className={`block w-full px-4 py-2.5 text-left hover:bg-slate-50 ${c.code === classCode ? "bg-blue-50/60" : ""}`}>
@@ -241,7 +253,7 @@ export default function TeacherGradesPage() {
           )}
         </span>
         <label className="ml-auto block min-w-[220px] text-[12px] text-slate-500">
-          <span className="mb-1 block">Lọc theo khóa học</span>
+          <span className="mb-1 block">Lọc theo lớp học</span>
           <select value={courseFilter} onChange={(e) => { setCourseFilter(e.target.value); setPage(1); }} className="h-10 w-full rounded-lg border border-slate-200 bg-white px-3 text-[13px] text-slate-700 outline-none">
             {gradeCourseOptions.map((o) => (<option key={o}>{o}</option>))}
           </select>

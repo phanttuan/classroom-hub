@@ -32,10 +32,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { id: "home", label: "Tổng quan", icon: "home", href: "/student" },
-  { id: "classes", label: "Lớp học", icon: "classes", href: "/student/classes" },
-  { id: "content", label: "Khóa học", icon: "content", href: "/student/content" },
-  { id: "assignments", label: "Bài tập", icon: "assignment", href: "/student/assignments" },
-  { id: "quizzes", label: "Kiểm tra trắc nghiệm", icon: "quiz", href: "/student/quizzes" },
+  { id: "content", label: "Lớp học", icon: "content", href: "/student/content" },
   { id: "grades", label: "Sổ điểm", icon: "gradebook", href: "/student/grades" },
   { id: "notifs", label: "Thông báo", icon: "bell", href: "/student/notifications" },
   { id: "schedule", label: "Lịch", icon: "calendar", href: "/student/schedule" },

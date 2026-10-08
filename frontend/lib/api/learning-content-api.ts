@@ -1,5 +1,12 @@
 import { apiFetch } from './http-client';
-import type { CourseDto, LessonDto, ModuleDto } from '../types/learning-content';
+import type {
+  CourseContentDto,
+  LessonDto,
+  LessonPayload,
+  LessonTypeKey,
+  ModuleDto,
+  ResourceDto,
+} from '../types/learning-content';
 
 interface ApiEnvelope<T> {
   success: boolean;
@@ -16,47 +23,12 @@ function unwrap<T>(res: ApiEnvelope<T> | T): T {
 }
 
 // =========================================================================
-// COURSE APIS
+// COURSE CONTENT API
+// (Tạo / sửa / đổi trạng thái môn học dùng course-api.ts)
 // =========================================================================
 
-export async function fetchCoursesByClass(classId: string): Promise<CourseDto[]> {
-  const res = await apiFetch<ApiEnvelope<CourseDto[]> | CourseDto[]>(`/classes/${classId}/courses`);
-  return unwrap(res);
-}
-
-export async function fetchCourseDetail(courseId: string): Promise<CourseDto> {
-  const res = await apiFetch<ApiEnvelope<CourseDto> | CourseDto>(`/courses/${courseId}`);
-  return unwrap(res);
-}
-
-export async function createCourse(classId: string, title: string): Promise<CourseDto> {
-  const res = await apiFetch<ApiEnvelope<CourseDto> | CourseDto>(`/classes/${classId}/courses`, {
-    method: 'POST',
-    body: JSON.stringify({ title }),
-  });
-  return unwrap(res);
-}
-
-export async function updateCourse(courseId: string, title: string): Promise<CourseDto> {
-  const res = await apiFetch<ApiEnvelope<CourseDto> | CourseDto>(`/courses/${courseId}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ title }),
-  });
-  return unwrap(res);
-}
-
-export async function deleteCourse(courseId: string): Promise<{ message: string }> {
-  const res = await apiFetch<ApiEnvelope<{ message: string }> | { message: string }>(`/courses/${courseId}`, {
-    method: 'DELETE',
-  });
-  return unwrap(res);
-}
-
-export async function reorderCourses(classId: string, itemIds: string[]): Promise<{ message: string }> {
-  const res = await apiFetch<ApiEnvelope<{ message: string }> | { message: string }>(`/classes/${classId}/courses/reorder`, {
-    method: 'PATCH',
-    body: JSON.stringify({ itemIds }),
-  });
+export async function fetchCourseContent(courseId: string): Promise<CourseContentDto> {
+  const res = await apiFetch<ApiEnvelope<CourseContentDto> | CourseContentDto>(`/courses/${courseId}/content`);
   return unwrap(res);
 }
 
@@ -101,7 +73,7 @@ export async function reorderModules(courseId: string, itemIds: string[]): Promi
 
 export async function createLesson(
   moduleId: string,
-  payload: { title: string; content?: string; status?: string }
+  payload: LessonPayload & { type: LessonTypeKey }
 ): Promise<LessonDto> {
   const res = await apiFetch<ApiEnvelope<LessonDto> | LessonDto>(`/modules/${moduleId}/lessons`, {
     method: 'POST',
@@ -115,10 +87,7 @@ export async function fetchLessonDetail(lessonId: string): Promise<LessonDto> {
   return unwrap(res);
 }
 
-export async function updateLesson(
-  lessonId: string,
-  payload: { title?: string; content?: string; status?: string }
-): Promise<LessonDto> {
+export async function updateLesson(lessonId: string, payload: LessonPayload): Promise<LessonDto> {
   const res = await apiFetch<ApiEnvelope<LessonDto> | LessonDto>(`/lessons/${lessonId}`, {
     method: 'PATCH',
     body: JSON.stringify(payload),
@@ -157,4 +126,37 @@ export async function toggleLessonProgress(
     }
   );
   return unwrap(res);
+}
+
+// =========================================================================
+// UPLOAD TÀI LIỆU (FILE / FOLDER) & ẢNH TRONG NỘI DUNG
+// =========================================================================
+
+/** Tải tệp lên bài học FILE (thay thế tệp cũ) hoặc FOLDER (thêm vào thư mục) */
+export async function uploadLessonFiles(lessonId: string, files: File[]): Promise<ResourceDto[]> {
+  const form = new FormData();
+  files.forEach((file) => form.append('files', file));
+  const res = await apiFetch<ApiEnvelope<ResourceDto[]>>(`/lessons/${lessonId}/resources`, {
+    method: 'POST',
+    body: form,
+  });
+  return unwrap(res);
+}
+
+export async function deleteResource(resourceId: string): Promise<{ message: string }> {
+  const res = await apiFetch<ApiEnvelope<{ message: string }> | { message: string }>(`/resources/${resourceId}`, {
+    method: 'DELETE',
+  });
+  return unwrap(res);
+}
+
+/** Ảnh chèn trong trình soạn thảo — trả về URL công khai */
+export async function uploadContentImage(courseId: string, file: File): Promise<string> {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await apiFetch<ApiEnvelope<{ url: string }>>(`/courses/${courseId}/content-images`, {
+    method: 'POST',
+    body: form,
+  });
+  return unwrap(res).url;
 }

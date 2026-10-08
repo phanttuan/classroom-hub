@@ -9,8 +9,8 @@ import type {
   TeacherNotification,
 } from "@/lib/types/teacher";
 
-/* ---------- Tạo / Sửa lớp học ---------- */
-function CreateClassForm({
+/* ---------- Tạo / Sửa môn học ---------- */
+function CreateCourseForm({
   initial,
   onSubmit,
   onClose,
@@ -49,7 +49,7 @@ function CreateClassForm({
     <div className="space-y-3.5">
       {isArchived && (
         <div className="rounded-lg bg-amber-50 p-3 text-[13px] text-amber-700">
-          Lớp học này đã lưu trữ (chỉ đọc). Bạn không thể chỉnh sửa thông tin cho đến khi khôi phục lớp.
+          Lớp học này đã lưu trữ (chỉ đọc). Bạn không thể chỉnh sửa thông tin cho đến khi khôi phục lớp học.
         </div>
       )}
 
@@ -81,14 +81,14 @@ function CreateClassForm({
             if (error) setError("");
           }}
           rows={3}
-          placeholder="Giới thiệu mục tiêu môn học, tài liệu hoặc ghi chú cho sinh viên..."
+          placeholder="Giới thiệu mục tiêu lớp học, đề cương hoặc ghi chú cho sinh viên..."
           className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-500"
         />
       </div>
 
       {initial ? (
         <div className="rounded-lg bg-slate-50 p-3 text-[13px] text-slate-600">
-          <span className="font-semibold text-slate-700">Mã lớp:</span>{" "}
+          <span className="font-semibold text-slate-700">Mã lớp học:</span>{" "}
           <span className="font-mono font-bold text-blue-600">{initial.code}</span>{" "}
           <span className="text-xs text-slate-400">(Mã do hệ thống cấp phát cố định)</span>
         </div>
@@ -116,14 +116,14 @@ function CreateClassForm({
           onClick={submit}
           className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/30 transition hover:bg-blue-700 disabled:opacity-50"
         >
-          {initial ? "Lưu thay đổi" : "Tạo lớp"}
+          {initial ? "Lưu thay đổi" : "Tạo lớp học"}
         </button>
       </div>
     </div>
   );
 }
 
-export function CreateClassModal({
+export function CreateCourseModal({
   open,
   initial,
   onClose,
@@ -140,8 +140,7 @@ export function CreateClassModal({
       onClose={onClose}
       title={initial ? "Chỉnh sửa lớp học" : "Tạo lớp học mới"}
     >
-      {/* key để reset form mỗi lần mở / đổi lớp sửa — tránh setState trong effect */}
-      <CreateClassForm
+      <CreateCourseForm
         key={initial ? `edit-${initial.id}` : `create-${String(open)}`}
         initial={initial}
         onClose={onClose}
@@ -151,8 +150,8 @@ export function CreateClassModal({
   );
 }
 
-/* ---------- Chi tiết lớp ---------- */
-export function ClassDetailModal({
+/* ---------- Chi tiết môn học ---------- */
+export function CourseDetailModal({
   classInfo,
   onClose,
 }: {
@@ -172,7 +171,7 @@ export function ClassDetailModal({
           )}
           <dl className="grid grid-cols-2 gap-2 text-sm">
             <div className="rounded-lg bg-slate-50 p-3">
-              <dt className="text-xs text-slate-500">Mã lớp</dt>
+              <dt className="text-xs text-slate-500">Mã lớp học</dt>
               <dd className="font-bold text-slate-900">{classInfo.code}</dd>
             </div>
             <div className="rounded-lg bg-slate-50 p-3">
@@ -206,7 +205,7 @@ export function ClassDetailModal({
   );
 }
 
-/* ---------- Modal Chuyển trạng thái lớp học (Đóng / Lưu trữ / Khôi phục) ---------- */
+/* ---------- Modal Chuyển trạng thái môn học (Đóng / Lưu trữ / Khôi phục) ---------- */
 export function ConfirmStatusChangeModal({
   classInfo,
   targetStatus,
@@ -223,14 +222,14 @@ export function ConfirmStatusChangeModal({
   const config = {
     closed: {
       title: "Đóng lớp học?",
-      message: `Bạn có chắc muốn đóng lớp "${classInfo.name}" (${classInfo.code})? Lớp sẽ ngừng tiếp nhận học sinh mới và không tạo thêm hoạt động mới.`,
-      btnText: "Đóng lớp",
+      message: `Bạn có chắc muốn đóng lớp "${classInfo.name}" (${classInfo.code})? Lớp học sẽ ngừng tiếp nhận học sinh mới và không tạo thêm hoạt động mới.`,
+      btnText: "Đóng lớp học",
       btnClass: "bg-amber-600 hover:bg-amber-700 text-white",
     },
     archived: {
       title: "Lưu trữ lớp học?",
       message: `Bạn có chắc muốn lưu trữ lớp "${classInfo.name}" (${classInfo.code})? Lớp học sẽ chuyển sang chế độ chỉ đọc. Toàn bộ tài liệu và kết quả học tập sẽ được bảo toàn.`,
-      btnText: "Lưu trữ lớp",
+      btnText: "Lưu trữ lớp học",
       btnClass: "bg-slate-700 hover:bg-slate-800 text-white",
     },
     active: {

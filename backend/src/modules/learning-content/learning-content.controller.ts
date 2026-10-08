@@ -12,8 +12,6 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { LearningContentService } from './learning-content.service.js';
-import { CreateCourseDto } from './dto/create-course.dto.js';
-import { UpdateCourseDto } from './dto/update-course.dto.js';
 import { CreateModuleDto } from './dto/create-module.dto.js';
 import { UpdateModuleDto } from './dto/update-module.dto.js';
 import { CreateLessonDto } from './dto/create-lesson.dto.js';
@@ -32,112 +30,24 @@ export class LearningContentController {
   constructor(private readonly learningContentService: LearningContentService) {}
 
   // =========================================================================
-  // COURSE ENDPOINTS
+  // COURSE CONTENT ENDPOINT
+  // (Tạo / sửa / đổi trạng thái môn học nằm ở CourseController: /courses)
   // =========================================================================
 
-  @Post('classes/:classId/courses')
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.TEACHER, UserRole.ADMIN)
-  @HttpCode(HttpStatus.CREATED)
-  async createCourse(
-    @Req() req: RequestWithUser,
-    @Param('classId') classIdStr: string,
-    @Body() dto: CreateCourseDto,
-  ) {
-    const course = await this.learningContentService.createCourse(
-      BigInt(req.user!.id),
-      req.user!.role as UserRole,
-      BigInt(classIdStr),
-      dto,
-    );
-    return {
-      message: 'Tạo khóa học thành công',
-      data: course,
-    };
-  }
-
-  @Get('classes/:classId/courses')
-  async getCoursesByClass(
-    @Req() req: RequestWithUser,
-    @Param('classId') classIdStr: string,
-  ) {
-    const courses = await this.learningContentService.getCoursesByClass(
-      BigInt(req.user!.id),
-      req.user!.role as UserRole,
-      BigInt(classIdStr),
-    );
-    return {
-      message: 'Lấy danh sách khóa học thành công',
-      data: courses,
-    };
-  }
-
-  @Get('courses/:courseId')
-  async getCourseDetail(
+  @Get('courses/:courseId/content')
+  async getCourseContent(
     @Req() req: RequestWithUser,
     @Param('courseId') courseIdStr: string,
   ) {
-    const course = await this.learningContentService.getCourseDetail(
+    const course = await this.learningContentService.getCourseContent(
       BigInt(req.user!.id),
       req.user!.role as UserRole,
       BigInt(courseIdStr),
     );
     return {
-      message: 'Lấy chi tiết khóa học thành công',
+      message: 'Lấy nội dung lớp học thành công',
       data: course,
     };
-  }
-
-  @Patch('courses/:courseId')
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.TEACHER, UserRole.ADMIN)
-  async updateCourse(
-    @Req() req: RequestWithUser,
-    @Param('courseId') courseIdStr: string,
-    @Body() dto: UpdateCourseDto,
-  ) {
-    const course = await this.learningContentService.updateCourse(
-      BigInt(req.user!.id),
-      req.user!.role as UserRole,
-      BigInt(courseIdStr),
-      dto,
-    );
-    return {
-      message: 'Cập nhật khóa học thành công',
-      data: course,
-    };
-  }
-
-  @Delete('courses/:courseId')
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.TEACHER, UserRole.ADMIN)
-  async deleteCourse(
-    @Req() req: RequestWithUser,
-    @Param('courseId') courseIdStr: string,
-  ) {
-    const result = await this.learningContentService.deleteCourse(
-      BigInt(req.user!.id),
-      req.user!.role as UserRole,
-      BigInt(courseIdStr),
-    );
-    return result;
-  }
-
-  @Patch('classes/:classId/courses/reorder')
-  @UseGuards(RolesGuard)
-  @Roles(UserRole.TEACHER, UserRole.ADMIN)
-  async reorderCourses(
-    @Req() req: RequestWithUser,
-    @Param('classId') classIdStr: string,
-    @Body() dto: ReorderDto,
-  ) {
-    const result = await this.learningContentService.reorderCourses(
-      BigInt(req.user!.id),
-      req.user!.role as UserRole,
-      BigInt(classIdStr),
-      dto.itemIds,
-    );
-    return result;
   }
 
   // =========================================================================
@@ -160,7 +70,7 @@ export class LearningContentController {
       dto,
     );
     return {
-      message: 'Tạo module thành công',
+      message: 'Tạo topic thành công',
       data: module,
     };
   }
@@ -180,7 +90,7 @@ export class LearningContentController {
       dto,
     );
     return {
-      message: 'Cập nhật module thành công',
+      message: 'Cập nhật topic thành công',
       data: module,
     };
   }

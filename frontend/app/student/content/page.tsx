@@ -7,12 +7,16 @@ import {
   CheckCircle2,
   LayoutGrid,
   List,
+  Plus,
   Search,
 } from "lucide-react";
 import StudentShell from "../components/StudentShell";
-import type { CourseDto } from "@/lib/types/learning-content";
-import { fetchStudentClasses } from "@/lib/api/class-api";
-import { fetchCoursesByClass } from "@/lib/api/learning-content-api";
+import type { CourseContentDto } from "@/lib/types/learning-content";
+import { fetchStudentCourses } from "@/lib/api/course-api";
+import { fetchCourseContent } from "@/lib/api/learning-content-api";
+import JoinCourseModal from "../components/JoinCourseModal";
+import { toast } from "@/app/components/common/Toast";
+import type { CourseDto } from "@/lib/types/course";
 
 const GRADIENTS = [
   "from-blue-600 via-indigo-600 to-sky-700",
@@ -26,10 +30,23 @@ export default function StudentContentPage() {
   const [topSearch, setTopSearch] = useState("");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
-  const [sort, setSort] = useState("Sort by course name");
+  const [sort, setSort] = useState<"name" | "progress">("name");
   const [view, setView] = useState<"grid" | "list">("grid");
-  const [courses, setCourses] = useState<CourseDto[]>([]);
+  const [courses, setCourses] = useState<CourseContentDto[]>([]);
   const [loading, setLoading] = useState(true);
+  const [joinOpen, setJoinOpen] = useState(false);
+
+  // Tham gia lớp bằng mã → tải nội dung lớp vừa vào và đưa lên đầu danh sách
+  const handleJoinSuccess = async (joined: CourseDto, message: string) => {
+    setJoinOpen(false);
+    toast.success("Tham gia lớp học thành công", message);
+    try {
+      const content = await fetchCourseContent(String(joined.id));
+      setCourses((prev) => [content, ...prev.filter((c) => c.id !== content.id)]);
+    } catch {
+      // Lớp đã tham gia nhưng chưa tải được nội dung — lần tải trang sau sẽ hiện
+    }
+  };
 
   useEffect(() => {
     let isActive = true;
@@ -37,35 +54,19 @@ export default function StudentContentPage() {
     async function loadData() {
       setLoading(true);
       try {
-        const classRes = await fetchStudentClasses({ limit: 50 });
+        const courseRes = await fetchStudentCourses({ limit: 50 });
         if (!isActive) return;
 
-        if (classRes?.items && classRes.items.length > 0) {
-          const allCourses: CourseDto[] = [];
-          for (const c of classRes.items) {
-            try {
-              const list = await fetchCoursesByClass(String(c.id));
-              if (Array.isArray(list) && list.length > 0) {
-                allCourses.push(
-                  ...list.map((item) => ({
-                    ...item,
-                    classroom: {
-                      id: String(c.id),
-                      name: c.name,
-                      classCode: c.classCode,
-                      status: c.status,
-                    },
-                  }))
-                );
-              }
-            } catch {}
-          }
-
-          if (!isActive) return;
-          setCourses(allCourses);
-        } else {
-          setCourses([]);
-        }
+        // Mỗi môn học đã ghi danh → lấy cây nội dung kèm tiến độ học tập
+        const results = await Promise.allSettled(
+          (courseRes?.items ?? []).map((c) => fetchCourseContent(String(c.id)))
+        );
+        if (!isActive) return;
+        setCourses(
+          results
+            .filter((r): r is PromiseFulfilledResult<CourseContentDto> => r.status === "fulfilled")
+            .map((r) => r.value)
+        );
       } catch {
         if (!isActive) return;
         setCourses([]);
@@ -94,14 +95,14 @@ export default function StudentContentPage() {
     if (q) {
       list = list.filter(
         (c) =>
-          c.title.toLowerCase().includes(q) ||
-          c.classroom?.name?.toLowerCase().includes(q) ||
-          c.classroom?.classCode?.toLowerCase().includes(q)
+          c.name.toLowerCase().includes(q) ||
+          c.courseCode.toLowerCase().includes(q) ||
+          c.owner?.fullName?.toLowerCase().includes(q)
       );
     }
-    if (sort === "Sort by course name") {
-      list.sort((a, b) => a.title.localeCompare(b.title, "vi"));
-    } else if (sort === "Tiến độ cao nhất") {
+    if (sort === "name") {
+      list.sort((a, b) => a.name.localeCompare(b.name, "vi"));
+    } else if (sort === "progress") {
       list.sort((a, b) => (b.progressPercent || 0) - (a.progressPercent || 0));
     }
     return list;
@@ -111,7 +112,7 @@ export default function StudentContentPage() {
     <StudentShell
       activeId="content"
       activeHref="/student/content"
-      searchPlaceholder="Tìm kiếm khóa học..."
+      searchPlaceholder="Tìm kiếm lớp học..."
       searchValue={topSearch}
       onSearchChange={setTopSearch}
     >
@@ -120,22 +121,28 @@ export default function StudentContentPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-[26px] font-black tracking-tight text-slate-900">
-              Các khoá học của tôi
+              Lớp học của tôi
             </h1>
             <p className="mt-0.5 text-[14px] text-slate-500">
-              Theo dõi và hoàn thành bài học trong các khóa học bạn đang tham gia
+              Theo dõi và hoàn thành bài học trong các lớp học bạn đang tham gia
             </p>
           </div>
+          <button
+            onClick={() => setJoinOpen(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-5 py-2.5 text-[14px] font-bold text-white shadow-md shadow-blue-600/20 transition hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4" /> Tham gia lớp học
+          </button>
         </div>
 
         {/* Bảng điều khiển bộ lọc (Ảnh 1) */}
         <div className="mt-6 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-[16px] font-bold text-slate-800">
-              Tổng quan về khóa học
+              Tổng quan về lớp học
             </h2>
             <div className="text-[12px] text-slate-500">
-              Bạn có <span className="font-bold text-slate-800">{filtered.length}</span> khóa học
+              Bạn có <span className="font-bold text-slate-800">{filtered.length}</span> lớp học
             </div>
           </div>
 
@@ -146,9 +153,9 @@ export default function StudentContentPage() {
               onChange={(e) => setStatusFilter(e.target.value)}
               className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-[13px] font-semibold text-slate-700 outline-none focus:border-blue-500"
             >
-              <option value="all">All (Tất cả khóa học)</option>
-              <option value="in-progress">Đang học (Chưa hoàn thành)</option>
-              <option value="completed">Đã hoàn thành 100%</option>
+              <option value="all">Tất cả lớp học</option>
+              <option value="in-progress">Đang học</option>
+              <option value="completed">Đã hoàn thành</option>
             </select>
 
             {/* Ô tìm kiếm */}
@@ -165,36 +172,36 @@ export default function StudentContentPage() {
             {/* Sắp xếp */}
             <select
               value={sort}
-              onChange={(e) => setSort(e.target.value)}
+              onChange={(e) => setSort(e.target.value as "name" | "progress")}
               className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-[13px] text-slate-700 outline-none focus:border-blue-500"
             >
-              <option value="Sort by course name">Sort by course name</option>
-              <option value="Tiến độ cao nhất">Tiến độ cao nhất</option>
+              <option value="name">Tên lớp (A → Z)</option>
+              <option value="progress">Tiến độ cao nhất</option>
             </select>
 
             {/* Chuyển dạng View */}
             <div className="flex overflow-hidden rounded-lg border border-slate-300">
               <button
                 onClick={() => setView("grid")}
-                title="Dạng Card"
+                title="Hiển thị dạng lưới"
                 className={`flex h-10 items-center gap-1.5 px-3 text-[13px] font-semibold ${
                   view === "grid"
                     ? "bg-blue-600 text-white"
                     : "bg-white text-slate-600 hover:bg-slate-50"
                 }`}
               >
-                <LayoutGrid className="h-4 w-4" /> Card
+                <LayoutGrid className="h-4 w-4" /> Lưới
               </button>
               <button
                 onClick={() => setView("list")}
-                title="Dạng Danh sách"
+                title="Hiển thị dạng danh sách"
                 className={`flex h-10 items-center gap-1.5 px-3 text-[13px] font-semibold ${
                   view === "list"
                     ? "bg-blue-600 text-white"
                     : "bg-white text-slate-600 hover:bg-slate-50"
                 }`}
               >
-                <List className="h-4 w-4" /> List
+                <List className="h-4 w-4" /> Danh sách
               </button>
             </div>
           </div>
@@ -204,25 +211,25 @@ export default function StudentContentPage() {
         {loading ? (
           <div className="mt-12 flex flex-col items-center justify-center py-12 text-center">
             <div className="h-9 w-9 animate-spin rounded-full border-3 border-blue-600 border-t-transparent" />
-            <p className="mt-3 text-sm font-medium text-slate-500">Đang tải danh sách khóa học...</p>
+            <p className="mt-3 text-sm font-medium text-slate-500">Đang tải danh sách lớp học...</p>
           </div>
         ) : filtered.length === 0 ? (
           <div className="mt-8 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-white py-16 text-center">
             <div className="grid h-16 w-16 place-items-center rounded-2xl bg-blue-50 text-3xl">
               🎓
             </div>
-            <h3 className="mt-4 text-lg font-bold text-slate-800">Không có khóa học nào</h3>
+            <h3 className="mt-4 text-lg font-bold text-slate-800">Không có lớp học nào</h3>
             <p className="mt-1 max-w-sm text-sm text-slate-500">
               {query || statusFilter !== "all"
-                ? "Không tìm thấy khóa học phù hợp với bộ lọc hiện tại."
-                : "Bạn chưa được ghi danh vào lớp học nào có khóa học đang hoạt động."}
+                ? "Không tìm thấy lớp học phù hợp với bộ lọc hiện tại."
+                : "Bạn chưa tham gia lớp học nào. Nhập mã lớp do giảng viên cung cấp để bắt đầu."}
             </p>
-            <Link
-              href="/student/classes"
+            <button
+              onClick={() => setJoinOpen(true)}
               className="mt-5 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-500/20 hover:bg-blue-700"
             >
-              Xem danh sách lớp học
-            </Link>
+              <Plus className="h-4 w-4" /> Tham gia lớp học bằng mã
+            </button>
           </div>
         ) : view === "grid" ? (
           <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -249,7 +256,7 @@ export default function StudentContentPage() {
                     <div className="relative z-10 flex h-full flex-col justify-between">
                       <div className="flex items-start justify-between">
                         <span className="rounded-md bg-white/20 px-2.5 py-1 text-[11px] font-bold backdrop-blur-md">
-                          {course.classroom?.classCode || "LỚP HỌC"}
+                          {course.courseCode}
                         </span>
                         {pct === 100 ? (
                           <span className="flex items-center gap-1 rounded-full bg-emerald-500/90 px-2.5 py-0.5 text-[11px] font-bold text-white shadow-xs">
@@ -275,10 +282,10 @@ export default function StudentContentPage() {
                         href={`/student/content/courses/${course.id}`}
                         className="block text-[15.5px] font-black text-slate-900 transition hover:text-blue-600 line-clamp-2"
                       >
-                        {course.title}
+                        {course.name}
                       </Link>
                       <p className="mt-1 text-[12.5px] text-slate-500 line-clamp-1">
-                        {course.classroom?.name}
+                        {course.owner?.fullName || "Giảng viên"}
                       </p>
                     </div>
 
@@ -329,10 +336,10 @@ export default function StudentContentPage() {
                       href={`/student/content/courses/${course.id}`}
                       className="text-[15px] font-bold text-slate-900 hover:text-blue-600"
                     >
-                      {course.title}
+                      {course.name}
                     </Link>
                     <p className="text-[12.5px] text-slate-500">
-                      {course.classroom?.name} ({course.classroom?.classCode}) • Tiến độ:{" "}
+                      {course.courseCode} • {course.owner?.fullName || "Giảng viên"} • Tiến độ:{" "}
                       {course.progressPercent}%
                     </p>
                   </div>
@@ -348,6 +355,7 @@ export default function StudentContentPage() {
           </div>
         )}
       </div>
+      <JoinCourseModal open={joinOpen} onClose={() => setJoinOpen(false)} onSuccess={handleJoinSuccess} />
     </StudentShell>
   );
 }

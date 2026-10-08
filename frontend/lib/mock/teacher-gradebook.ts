@@ -14,7 +14,7 @@ export const gradeClasses = [
 ];
 
 export const gradeCourseOptions = [
-  "Tất cả khóa học",
+  "Tất cả lớp học",
   "Lập trình Web nâng cao",
   "Lập trình Python cơ bản",
 ];

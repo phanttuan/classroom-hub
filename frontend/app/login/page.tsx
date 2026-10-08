@@ -416,6 +416,16 @@ function LoginFormContent() {
       {/* Modal Quên mật khẩu */}
       {showForgotModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
+          <button
+            type="button"
+            aria-label="Đóng"
+            tabIndex={-1}
+            onClick={() => {
+              setShowForgotModal(false);
+              setForgotSubmitted(false);
+            }}
+            className="absolute inset-0 cursor-default"
+          />
           <div className="w-full max-w-md bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-100 relative">
             <button
               onClick={() => {

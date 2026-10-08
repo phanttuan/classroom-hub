@@ -14,6 +14,9 @@ import { useSidebar } from "@/lib/context/sidebar-context";
  * Giữ sidebar + topbar + popup thông báo đồng nhất,
  * trang con chỉ cần truyền nội dung + placeholder search.
  */
+/** Hồ sơ người dùng đã tải, giữ giữa các lần chuyển trang (chỉ tồn tại phía client) */
+let cachedTeacherProfile: TeacherProfile | null = null;
+
 export default function TeacherShell({
   activeId,
   activeHref,
@@ -40,7 +43,11 @@ export default function TeacherShell({
   const [selectedNoti, setSelectedNoti] = useState<TeacherNotification | null | undefined>(
     undefined,
   );
-  const [loadedUser, setLoadedUser] = useState<TeacherProfile>(teacherProfile);
+  // Khởi tạo từ hồ sơ đã tải ở trang trước → tên / avatar không nháy về mặc định khi chuyển trang
+  const [loadedUser, setLoadedUser] = useState<TeacherProfile>(() => cachedTeacherProfile ?? teacherProfile);
+  useEffect(() => {
+    cachedTeacherProfile = loadedUser;
+  }, [loadedUser]);
 
   useEffect(() => {
     try {
@@ -121,7 +128,7 @@ export default function TeacherShell({
           onOpenNotifications={() => setSelectedNoti(null)}
           placeholder={searchPlaceholder}
         />
-        <main className="mx-auto w-full max-w-[1280px] flex-1 px-4 py-5 sm:px-6">
+        <main className="page-enter mx-auto w-full max-w-[1280px] flex-1 px-4 py-5 sm:px-6">
           {children}
         </main>
       </div>

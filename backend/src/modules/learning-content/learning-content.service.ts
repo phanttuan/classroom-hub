@@ -1,190 +1,116 @@
 import {
   Injectable,
+  BadRequestException,
   NotFoundException,
   ForbiddenException,
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service.js';
-import { UserRole, LessonStatus, MembershipStatus } from '../../generated/prisma/enums.js';
-import { CreateCourseDto } from './dto/create-course.dto.js';
-import { UpdateCourseDto } from './dto/update-course.dto.js';
+import { UserRole, LessonStatus, EnrollmentStatus, CourseStatus } from '../../generated/prisma/enums.js';
+import { Prisma } from '../../generated/prisma/client.js';
+import { CloudinaryService } from '../resource/cloudinary.service.js';
+import { buildLessonFields } from './utils/lesson-fields.js';
 import { CreateModuleDto } from './dto/create-module.dto.js';
 import { UpdateModuleDto } from './dto/update-module.dto.js';
 import { CreateLessonDto } from './dto/create-lesson.dto.js';
 import { UpdateLessonDto } from './dto/update-lesson.dto.js';
+import { DEFAULT_MODULE_TITLE } from './learning-content.constants.js';
 
+/**
+ * Quản lý nội dung học tập theo mô hình Course (Môn học) → Module → Lesson.
+ * Việc tạo / sửa / đổi trạng thái Course do CourseModule đảm nhiệm.
+ */
 @Injectable()
 export class LearningContentService {
   private readonly logger = new Logger(LearningContentService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly cloudinary: CloudinaryService,
+  ) {}
 
   // =========================================================================
   // HELPER PERMISSION CHECKS
   // =========================================================================
 
-  private async verifyClassTeacherAccess(classId: bigint, userId: bigint, role: UserRole) {
+  private async verifyCourseTeacherAccess(courseId: bigint, userId: bigint, role: UserRole) {
     if (role === UserRole.ADMIN) return;
-    const classroom = await this.prisma.classroom.findUnique({
-      where: { id: classId },
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+      select: { ownerId: true, status: true },
     });
-    if (!classroom) {
+    if (!course) {
       throw new NotFoundException('Lớp học không tồn tại');
     }
-    if (classroom.ownerId !== userId) {
-      throw new ForbiddenException('Bạn không phải giáo viên quản lý lớp học này');
+    if (course.ownerId !== userId) {
+      throw new ForbiddenException('Bạn không phải giáo viên phụ trách lớp học này');
+    }
+    if (course.status === CourseStatus.ARCHIVED) {
+      throw new BadRequestException('Lớp học đã lưu trữ (chỉ đọc), không thể chỉnh sửa nội dung');
     }
   }
 
-  private async verifyClassMemberOrTeacherAccess(classId: bigint, userId: bigint, role: UserRole) {
+  /** Lấy storageKey các tệp đính kèm để dọn trên Cloudinary sau khi xóa trong DB */
+  private async collectStorageKeys(where: Prisma.ResourceWhereInput) {
+    const resources = await this.prisma.resource.findMany({ where, select: { storageKey: true } });
+    return resources.map((r) => r.storageKey);
+  }
+
+  private async verifyCourseMemberOrTeacherAccess(courseId: bigint, userId: bigint, role: UserRole) {
     if (role === UserRole.ADMIN) return;
-    const classroom = await this.prisma.classroom.findUnique({
-      where: { id: classId },
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+      select: { ownerId: true },
     });
-    if (!classroom) {
+    if (!course) {
       throw new NotFoundException('Lớp học không tồn tại');
     }
     if (role === UserRole.TEACHER) {
-      if (classroom.ownerId !== userId) {
+      if (course.ownerId !== userId) {
         throw new ForbiddenException('Bạn không có quyền truy cập lớp học này');
       }
       return;
     }
     // Student
-    const membership = await this.prisma.classMembership.findUnique({
+    const enrollment = await this.prisma.enrollment.findUnique({
       where: {
-        uk_class_memberships_class_student: {
-          classId,
+        uk_enrollments_course_student: {
+          courseId,
           studentId: userId,
         },
       },
     });
-    if (!membership || membership.status !== MembershipStatus.ACTIVE) {
+    if (!enrollment || enrollment.status !== EnrollmentStatus.ACTIVE) {
       throw new ForbiddenException('Bạn không phải thành viên hoạt động của lớp học này');
     }
   }
 
   // =========================================================================
-  // 1. COURSE APIS
+  // 1. COURSE CONTENT API (Môn học kèm Module / Lesson / tiến độ)
   // =========================================================================
 
-  async createCourse(userId: bigint, role: UserRole, classId: bigint, dto: CreateCourseDto) {
-    await this.verifyClassTeacherAccess(classId, userId, role);
-
-    const maxOrder = await this.prisma.course.findFirst({
-      where: { classId },
-      orderBy: { orderIndex: 'desc' },
-      select: { orderIndex: true },
-    });
-
-    const nextOrder = (maxOrder?.orderIndex ?? 0) + 1;
-
-    return this.prisma.course.create({
-      data: {
-        classId,
-        title: dto.title.trim(),
-        orderIndex: nextOrder,
-      },
-      include: {
-        modules: true,
-      },
-    });
-  }
-
-  async getCoursesByClass(userId: bigint, role: UserRole, classId: bigint) {
-    await this.verifyClassMemberOrTeacherAccess(classId, userId, role);
+  async getCourseContent(userId: bigint, role: UserRole, courseId: bigint) {
+    await this.verifyCourseMemberOrTeacherAccess(courseId, userId, role);
 
     const isStudent = role === UserRole.STUDENT;
 
-    const courses = await this.prisma.course.findMany({
-      where: { classId },
-      orderBy: { orderIndex: 'asc' },
-      include: {
-        modules: {
-          orderBy: { orderIndex: 'asc' },
-          include: {
-            lessons: {
-              where: isStudent ? { status: LessonStatus.PUBLISHED } : undefined,
-              orderBy: { orderIndex: 'asc' },
-              include: isStudent
-                ? {
-                    progresses: {
-                      where: { studentId: userId },
-                    },
-                    resources: true,
-                  }
-                : {
-                    resources: true,
-                  },
-            },
-          },
-        },
-      },
-    });
-
-    // Tính toán tiến độ nếu là Student
-    return courses.map((course) => {
-      let totalPublished = 0;
-      let completedCount = 0;
-
-      const formattedModules = course.modules.map((m) => {
-        const formattedLessons = m.lessons.map((l) => {
-          totalPublished++;
-          const progress = (l as any).progresses?.[0];
-          const isCompleted = progress?.isCompleted ?? false;
-          if (isCompleted) completedCount++;
-
-          return {
-            ...l,
-            isCompleted,
-            completedAt: progress?.completedAt ?? null,
-          };
-        });
-
-        return {
-          ...m,
-          lessons: formattedLessons,
-          lessonCount: formattedLessons.length,
-        };
-      });
-
-      const progressPercent =
-        totalPublished > 0 ? Math.round((completedCount / totalPublished) * 100) : 0;
-
-      return {
-        ...course,
-        modules: formattedModules,
-        moduleCount: formattedModules.length,
-        totalLessons: totalPublished,
-        completedLessons: completedCount,
-        progressPercent,
-      };
-    });
-  }
-
-  async getCourseDetail(userId: bigint, role: UserRole, courseId: bigint) {
     const course = await this.prisma.course.findUnique({
       where: { id: courseId },
-      include: { classroom: true },
-    });
-
-    if (!course) {
-      throw new NotFoundException('Khóa học không tồn tại');
-    }
-
-    await this.verifyClassMemberOrTeacherAccess(course.classId, userId, role);
-
-    const isStudent = role === UserRole.STUDENT;
-
-    const fullCourse = await this.prisma.course.findUnique({
-      where: { id: courseId },
-      include: {
-        classroom: {
+      select: {
+        id: true,
+        ownerId: true,
+        courseCode: true,
+        name: true,
+        description: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+        owner: {
           select: {
             id: true,
-            name: true,
-            classCode: true,
-            status: true,
+            fullName: true,
+            email: true,
+            avatarUrl: true,
           },
         },
         modules: {
@@ -209,20 +135,23 @@ export class LearningContentService {
       },
     });
 
-    if (!fullCourse) throw new NotFoundException('Khóa học không tồn tại');
+    if (!course) throw new NotFoundException('Lớp học không tồn tại');
 
     let totalPublished = 0;
     let completedCount = 0;
 
-    const formattedModules = fullCourse.modules.map((m) => {
+    const formattedModules = course.modules.map((m) => {
       const formattedLessons = m.lessons.map((l) => {
         totalPublished++;
-        const progress = (l as any).progresses?.[0];
+        const { progresses, ...lesson } = l as typeof l & {
+          progresses?: { isCompleted: boolean; completedAt: Date | null }[];
+        };
+        const progress = progresses?.[0];
         const isCompleted = progress?.isCompleted ?? false;
         if (isCompleted) completedCount++;
 
         return {
-          ...l,
+          ...lesson,
           isCompleted,
           completedAt: progress?.completedAt ?? null,
         };
@@ -239,7 +168,7 @@ export class LearningContentService {
       totalPublished > 0 ? Math.round((completedCount / totalPublished) * 100) : 0;
 
     return {
-      ...fullCourse,
+      ...course,
       modules: formattedModules,
       moduleCount: formattedModules.length,
       totalLessons: totalPublished,
@@ -248,74 +177,12 @@ export class LearningContentService {
     };
   }
 
-  async updateCourse(userId: bigint, role: UserRole, courseId: bigint, dto: UpdateCourseDto) {
-    const course = await this.prisma.course.findUnique({
-      where: { id: courseId },
-    });
-    if (!course) throw new NotFoundException('Khóa học không tồn tại');
-
-    await this.verifyClassTeacherAccess(course.classId, userId, role);
-
-    return this.prisma.course.update({
-      where: { id: courseId },
-      data: {
-        title: dto.title.trim(),
-      },
-    });
-  }
-
-  async deleteCourse(userId: bigint, role: UserRole, courseId: bigint) {
-    const course = await this.prisma.course.findUnique({
-      where: { id: courseId },
-    });
-    if (!course) throw new NotFoundException('Khóa học không tồn tại');
-
-    await this.verifyClassTeacherAccess(course.classId, userId, role);
-
-    await this.prisma.course.delete({
-      where: { id: courseId },
-    });
-
-    return { message: 'Đã xóa khóa học thành công' };
-  }
-
-  async reorderCourses(userId: bigint, role: UserRole, classId: bigint, courseIds: (string | number)[]) {
-    await this.verifyClassTeacherAccess(classId, userId, role);
-
-    const parsedIds = courseIds.map((id) => BigInt(id));
-
-    // Thực hiện trong transaction tránh vi phạm unique constraint
-    await this.prisma.$transaction(async (tx) => {
-      // Bước 1: chuyển tạm sang số âm
-      for (let i = 0; i < parsedIds.length; i++) {
-        await tx.course.update({
-          where: { id: parsedIds[i] },
-          data: { orderIndex: -(i + 1) },
-        });
-      }
-      // Bước 2: gán vị trí mới dương (1-based)
-      for (let i = 0; i < parsedIds.length; i++) {
-        await tx.course.update({
-          where: { id: parsedIds[i] },
-          data: { orderIndex: i + 1 },
-        });
-      }
-    });
-
-    return { message: 'Đã cập nhật thứ tự khóa học thành công' };
-  }
-
   // =========================================================================
   // 2. MODULE APIS
   // =========================================================================
 
   async createModule(userId: bigint, role: UserRole, courseId: bigint, dto: CreateModuleDto) {
-    const course = await this.prisma.course.findUnique({
-      where: { id: courseId },
-    });
-    if (!course) throw new NotFoundException('Khóa học không tồn tại');
-
-    await this.verifyClassTeacherAccess(course.classId, userId, role);
+    await this.verifyCourseTeacherAccess(courseId, userId, role);
 
     const maxOrder = await this.prisma.module.findFirst({
       where: { courseId },
@@ -340,11 +207,15 @@ export class LearningContentService {
   async updateModule(userId: bigint, role: UserRole, moduleId: bigint, dto: UpdateModuleDto) {
     const module = await this.prisma.module.findUnique({
       where: { id: moduleId },
-      include: { course: true },
+      select: { courseId: true, isDefault: true },
     });
-    if (!module) throw new NotFoundException('Module không tồn tại');
+    if (!module) throw new NotFoundException('Topic không tồn tại');
 
-    await this.verifyClassTeacherAccess(module.course.classId, userId, role);
+    await this.verifyCourseTeacherAccess(module.courseId, userId, role);
+
+    if (module.isDefault) {
+      throw new BadRequestException(`Không thể đổi tên topic mặc định "${DEFAULT_MODULE_TITLE}"`);
+    }
 
     return this.prisma.module.update({
       where: { id: moduleId },
@@ -357,28 +228,43 @@ export class LearningContentService {
   async deleteModule(userId: bigint, role: UserRole, moduleId: bigint) {
     const module = await this.prisma.module.findUnique({
       where: { id: moduleId },
-      include: { course: true },
+      select: { courseId: true, isDefault: true },
     });
-    if (!module) throw new NotFoundException('Module không tồn tại');
+    if (!module) throw new NotFoundException('Topic không tồn tại');
 
-    await this.verifyClassTeacherAccess(module.course.classId, userId, role);
+    await this.verifyCourseTeacherAccess(module.courseId, userId, role);
 
+    if (module.isDefault) {
+      throw new BadRequestException(`Không thể xóa topic mặc định "${DEFAULT_MODULE_TITLE}"`);
+    }
+
+    const storageKeys = await this.collectStorageKeys({ lesson: { moduleId } });
     await this.prisma.module.delete({
       where: { id: moduleId },
     });
+    await this.cloudinary.destroyMany(storageKeys);
 
-    return { message: 'Đã xóa module thành công' };
+    return { message: 'Đã xóa topic thành công' };
   }
 
   async reorderModules(userId: bigint, role: UserRole, courseId: bigint, moduleIds: (string | number)[]) {
-    const course = await this.prisma.course.findUnique({
-      where: { id: courseId },
+    await this.verifyCourseTeacherAccess(courseId, userId, role);
+
+    // Module mặc định luôn đứng đầu, bất kể thứ tự client gửi lên
+    const defaultModule = await this.prisma.module.findFirst({
+      where: { courseId, isDefault: true },
+      select: { id: true },
     });
-    if (!course) throw new NotFoundException('Khóa học không tồn tại');
-
-    await this.verifyClassTeacherAccess(course.classId, userId, role);
-
-    const parsedIds = moduleIds.map((id) => BigInt(id));
+    let parsedIds = moduleIds.map((id) => BigInt(id));
+    if (defaultModule) {
+      parsedIds = [defaultModule.id, ...parsedIds.filter((id) => id !== defaultModule.id)];
+    }
+    const ownedCount = await this.prisma.module.count({
+      where: { id: { in: parsedIds }, courseId },
+    });
+    if (ownedCount !== parsedIds.length) {
+      throw new BadRequestException('Danh sách topic không hợp lệ hoặc không thuộc lớp học này');
+    }
 
     await this.prisma.$transaction(async (tx) => {
       // Bước 1: chuyển tạm sang âm
@@ -397,7 +283,7 @@ export class LearningContentService {
       }
     });
 
-    return { message: 'Đã cập nhật thứ tự module thành công' };
+    return { message: 'Đã cập nhật thứ tự topic thành công' };
   }
 
   // =========================================================================
@@ -407,11 +293,11 @@ export class LearningContentService {
   async createLesson(userId: bigint, role: UserRole, moduleId: bigint, dto: CreateLessonDto) {
     const module = await this.prisma.module.findUnique({
       where: { id: moduleId },
-      include: { course: true },
+      select: { courseId: true },
     });
-    if (!module) throw new NotFoundException('Module không tồn tại');
+    if (!module) throw new NotFoundException('Topic không tồn tại');
 
-    await this.verifyClassTeacherAccess(module.course.classId, userId, role);
+    await this.verifyCourseTeacherAccess(module.courseId, userId, role);
 
     const maxOrder = await this.prisma.lesson.findFirst({
       where: { moduleId },
@@ -421,16 +307,19 @@ export class LearningContentService {
 
     const nextOrder = (maxOrder?.orderIndex ?? 0) + 1;
     const initialStatus = dto.status ?? LessonStatus.DRAFT;
+    const fields = buildLessonFields(dto.type, dto);
 
     return this.prisma.lesson.create({
       data: {
         moduleId,
-        title: dto.title.trim(),
-        content: dto.content ?? '',
+        type: dto.type,
+        ...fields,
+        settings: fields.settings as Prisma.InputJsonValue,
         status: initialStatus,
         publishedAt: initialStatus === LessonStatus.PUBLISHED ? new Date() : null,
         orderIndex: nextOrder,
       },
+      include: { resources: true },
     });
   }
 
@@ -439,17 +328,14 @@ export class LearningContentService {
       where: { id: lessonId },
       include: {
         module: {
-          include: {
-            course: true,
-          },
+          select: { courseId: true },
         },
         resources: true,
       },
     });
     if (!lesson) throw new NotFoundException('Bài học không tồn tại');
 
-    const classId = lesson.module.course.classId;
-    await this.verifyClassMemberOrTeacherAccess(classId, userId, role);
+    await this.verifyCourseMemberOrTeacherAccess(lesson.module.courseId, userId, role);
 
     if (role === UserRole.STUDENT) {
       if (lesson.status !== LessonStatus.PUBLISHED) {
@@ -478,15 +364,25 @@ export class LearningContentService {
   async updateLesson(userId: bigint, role: UserRole, lessonId: bigint, dto: UpdateLessonDto) {
     const lesson = await this.prisma.lesson.findUnique({
       where: { id: lessonId },
-      include: { module: { include: { course: true } } },
+      include: { module: { select: { courseId: true } } },
     });
     if (!lesson) throw new NotFoundException('Bài học không tồn tại');
 
-    await this.verifyClassTeacherAccess(lesson.module.course.classId, userId, role);
+    await this.verifyCourseTeacherAccess(lesson.module.courseId, userId, role);
 
-    const updateData: any = {};
-    if (dto.title !== undefined) updateData.title = dto.title.trim();
-    if (dto.content !== undefined) updateData.content = dto.content;
+    // Gộp giá trị cũ với giá trị mới rồi kiểm tra lại theo loại bài
+    const fields = buildLessonFields(lesson.type, {
+      title: dto.title ?? lesson.title,
+      description: dto.description ?? lesson.description,
+      content: dto.content ?? lesson.content,
+      externalUrl: dto.externalUrl ?? lesson.externalUrl,
+      settings: { ...(lesson.settings as Record<string, unknown> | null), ...dto.settings },
+    });
+
+    const updateData: Prisma.LessonUpdateInput = {
+      ...fields,
+      settings: fields.settings as Prisma.InputJsonValue,
+    };
     if (dto.status !== undefined) {
       updateData.status = dto.status;
       if (dto.status === LessonStatus.PUBLISHED && lesson.status !== LessonStatus.PUBLISHED) {
@@ -497,21 +393,24 @@ export class LearningContentService {
     return this.prisma.lesson.update({
       where: { id: lessonId },
       data: updateData,
+      include: { resources: true },
     });
   }
 
   async deleteLesson(userId: bigint, role: UserRole, lessonId: bigint) {
     const lesson = await this.prisma.lesson.findUnique({
       where: { id: lessonId },
-      include: { module: { include: { course: true } } },
+      include: { module: { select: { courseId: true } } },
     });
     if (!lesson) throw new NotFoundException('Bài học không tồn tại');
 
-    await this.verifyClassTeacherAccess(lesson.module.course.classId, userId, role);
+    await this.verifyCourseTeacherAccess(lesson.module.courseId, userId, role);
 
+    const storageKeys = await this.collectStorageKeys({ lessonId });
     await this.prisma.lesson.delete({
       where: { id: lessonId },
     });
+    await this.cloudinary.destroyMany(storageKeys);
 
     return { message: 'Đã xóa bài học thành công' };
   }
@@ -519,13 +418,19 @@ export class LearningContentService {
   async reorderLessons(userId: bigint, role: UserRole, moduleId: bigint, lessonIds: (string | number)[]) {
     const module = await this.prisma.module.findUnique({
       where: { id: moduleId },
-      include: { course: true },
+      select: { courseId: true },
     });
-    if (!module) throw new NotFoundException('Module không tồn tại');
+    if (!module) throw new NotFoundException('Topic không tồn tại');
 
-    await this.verifyClassTeacherAccess(module.course.classId, userId, role);
+    await this.verifyCourseTeacherAccess(module.courseId, userId, role);
 
     const parsedIds = lessonIds.map((id) => BigInt(id));
+    const ownedCount = await this.prisma.lesson.count({
+      where: { id: { in: parsedIds }, moduleId },
+    });
+    if (ownedCount !== parsedIds.length) {
+      throw new BadRequestException('Danh sách bài học không hợp lệ hoặc không thuộc topic này');
+    }
 
     await this.prisma.$transaction(async (tx) => {
       // Bước 1: chuyển tạm sang âm
@@ -554,7 +459,7 @@ export class LearningContentService {
   async toggleLessonProgress(studentId: bigint, lessonId: bigint, forcedState?: boolean) {
     const lesson = await this.prisma.lesson.findUnique({
       where: { id: lessonId },
-      include: { module: { include: { course: true } } },
+      include: { module: { select: { courseId: true } } },
     });
     if (!lesson) throw new NotFoundException('Bài học không tồn tại');
 
@@ -562,8 +467,7 @@ export class LearningContentService {
       throw new ForbiddenException('Chỉ có thể đánh dấu bài học đã xuất bản');
     }
 
-    const classId = lesson.module.course.classId;
-    await this.verifyClassMemberOrTeacherAccess(classId, studentId, UserRole.STUDENT);
+    await this.verifyCourseMemberOrTeacherAccess(lesson.module.courseId, studentId, UserRole.STUDENT);
 
     const existing = await this.prisma.lessonProgress.findUnique({
       where: {

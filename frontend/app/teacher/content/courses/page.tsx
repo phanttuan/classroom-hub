@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  ChevronLeft,
   Eye,
   LayoutGrid,
   List,
@@ -12,22 +11,20 @@ import {
   Pencil,
   Plus,
   Search,
-  Trash2,
+  Archive,
   AlertCircle,
   Loader2,
   X,
 } from "lucide-react";
 import TeacherShell from "../../components/TeacherShell";
-import { fetchTeacherClasses } from "@/lib/api/class-api";
 import {
-  fetchCoursesByClass,
+  fetchTeacherCourses,
   createCourse,
   updateCourse,
-  deleteCourse,
-} from "@/lib/api/learning-content-api";
-import type { TeacherClass } from "@/lib/types/teacher";
-import type { CourseDto } from "@/lib/types/learning-content";
-import { mapClassroomDtoToTeacherClass } from "@/lib/types/class";
+  updateCourseStatus,
+} from "@/lib/api/course-api";
+import type { BackendCourseStatus, CourseDto } from "@/lib/types/course";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 const GRADIENTS = [
   "from-blue-600 via-indigo-600 to-sky-700",
@@ -36,15 +33,21 @@ const GRADIENTS = [
   "from-amber-600 via-orange-600 to-rose-700",
 ];
 
+const STATUS_LABEL: Record<BackendCourseStatus, string> = {
+  ACTIVE: "Đang hoạt động",
+  CLOSED: "Đã đóng",
+  ARCHIVED: "Đã lưu trữ",
+};
+
 export default function TeacherCoursesPage() {
   const router = useRouter();
+  const confirm = useConfirm();
   const [topSearch, setTopSearch] = useState("");
   const [query, setQuery] = useState("");
-  const [selectedClassId, setSelectedClassId] = useState<string>("all");
-  const [sort, setSort] = useState("Sort by course name");
+  const [statusFilter, setStatusFilter] = useState<"all" | BackendCourseStatus>("all");
+  const [sort, setSort] = useState<"name" | "newest">("name");
   const [view, setView] = useState<"grid" | "list">("grid");
 
-  const [classes, setClasses] = useState<TeacherClass[]>([]);
   const [courses, setCourses] = useState<CourseDto[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -52,7 +55,7 @@ export default function TeacherCoursesPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<CourseDto | null>(null);
   const [courseTitleInput, setCourseTitleInput] = useState("");
-  const [targetClassInput, setTargetClassInput] = useState("");
+  const [courseDescInput, setCourseDescInput] = useState("");
   const [modalError, setModalError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -67,69 +70,38 @@ export default function TeacherCoursesPage() {
   const handleOpenCreateModal = () => {
     setEditing(null);
     setCourseTitleInput("");
-    setTargetClassInput(classes[0]?.id ? String(classes[0].id) : "");
+    setCourseDescInput("");
     setModalError(null);
     setCreateOpen(true);
   };
 
   const handleOpenEditModal = (course: CourseDto) => {
     setEditing(course);
-    setCourseTitleInput(course.title);
-    setTargetClassInput(String(course.classId));
+    setCourseTitleInput(course.name);
+    setCourseDescInput(course.description ?? "");
     setModalError(null);
     setCreateOpen(true);
   };
 
-  // Tải danh sách lớp học và khóa học thật từ Backend
+  // Tải danh sách môn học (Course) của giáo viên từ Backend
+  const loadCourses = async () => {
+    const res = await fetchTeacherCourses({ limit: 50 });
+    return res?.items ?? [];
+  };
+
   useEffect(() => {
     let isActive = true;
 
-    async function fetchData() {
-      setLoading(true);
-      try {
-        const classRes = await fetchTeacherClasses({ limit: 50 });
-        if (!isActive) return;
-        if (classRes?.items && classRes.items.length > 0) {
-          const mapped = classRes.items.map(mapClassroomDtoToTeacherClass);
-          setClasses(mapped);
-
-          const allFetchedCourses: CourseDto[] = [];
-          for (const c of mapped) {
-            try {
-              const list = await fetchCoursesByClass(c.id);
-              if (Array.isArray(list) && list.length > 0) {
-                allFetchedCourses.push(
-                  ...list.map((item) => ({
-                    ...item,
-                    classroom: {
-                      id: c.id,
-                      name: c.name,
-                      classCode: c.code,
-                      status: c.status,
-                    },
-                  }))
-                );
-              }
-            } catch {}
-          }
-
-          if (!isActive) return;
-          setCourses(allFetchedCourses);
-        } else {
-          setClasses([]);
-          setCourses([]);
-        }
-      } catch {
-        if (!isActive) return;
-        setCourses([]);
-      } finally {
-        if (isActive) {
-          setLoading(false);
-        }
-      }
-    }
-
-    fetchData();
+    loadCourses()
+      .then((items) => {
+        if (isActive) setCourses(items);
+      })
+      .catch(() => {
+        if (isActive) setCourses([]);
+      })
+      .finally(() => {
+        if (isActive) setLoading(false);
+      });
 
     return () => {
       isActive = false;
@@ -138,38 +110,9 @@ export default function TeacherCoursesPage() {
 
   const refreshData = async () => {
     try {
-      const classRes = await fetchTeacherClasses({ limit: 50 });
-      if (classRes?.items && classRes.items.length > 0) {
-        const mapped = classRes.items.map(mapClassroomDtoToTeacherClass);
-        setClasses(mapped);
-
-        const allFetchedCourses: CourseDto[] = [];
-        for (const c of mapped) {
-          try {
-            const list = await fetchCoursesByClass(c.id);
-            if (Array.isArray(list) && list.length > 0) {
-              allFetchedCourses.push(
-                ...list.map((item) => ({
-                  ...item,
-                  classroom: {
-                    id: c.id,
-                    name: c.name,
-                    classCode: c.code,
-                    status: c.status,
-                  },
-                }))
-              );
-            }
-          } catch {}
-        }
-
-        setCourses(allFetchedCourses);
-      } else {
-        setClasses([]);
-        setCourses([]);
-      }
+      setCourses(await loadCourses());
     } catch {
-      showToast("Không thể tải lại danh sách khóa học");
+      showToast("Không thể tải lại danh sách lớp học");
     }
   };
 
@@ -177,69 +120,77 @@ export default function TeacherCoursesPage() {
   const filtered = useMemo(() => {
     const q = (query || topSearch).trim().toLowerCase();
     let list = [...courses];
-    if (selectedClassId !== "all") {
-      list = list.filter((c) => String(c.classId) === selectedClassId);
+    if (statusFilter !== "all") {
+      list = list.filter((c) => c.status === statusFilter);
     }
     if (q) {
       list = list.filter(
         (c) =>
-          c.title.toLowerCase().includes(q) ||
-          c.classroom?.name?.toLowerCase().includes(q) ||
-          c.classroom?.classCode?.toLowerCase().includes(q)
+          c.name.toLowerCase().includes(q) ||
+          c.courseCode.toLowerCase().includes(q) ||
+          c.description?.toLowerCase().includes(q)
       );
     }
-    if (sort === "Sort by course name") {
-      list.sort((a, b) => a.title.localeCompare(b.title, "vi"));
-    } else if (sort === "Mới nhất") {
+    if (sort === "name") {
+      list.sort((a, b) => a.name.localeCompare(b.name, "vi"));
+    } else if (sort === "newest") {
       list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
     }
     return list;
-  }, [courses, query, topSearch, selectedClassId, sort]);
+  }, [courses, query, topSearch, statusFilter, sort]);
 
   // Lưu tạo mới hoặc chỉnh sửa khóa học
   const handleSaveCourse = async () => {
-    const title = courseTitleInput.trim();
-    if (!title) {
-      setModalError("Vui lòng nhập tên khóa học");
+    const name = courseTitleInput.trim();
+    if (!name) {
+      setModalError("Vui lòng nhập tên lớp học");
       return;
     }
-
-    const classId = targetClassInput || (classes[0]?.id ? String(classes[0].id) : "");
-    if (!editing && !classId) {
-      setModalError("Vui lòng chọn lớp học tương ứng cho khóa học");
-      return;
-    }
+    const description = courseDescInput.trim() || undefined;
 
     setIsSaving(true);
     setModalError(null);
     try {
       if (editing) {
-        await updateCourse(editing.id, title);
-        showToast("Đã cập nhật khóa học");
+        await updateCourse(editing.id, { name, description });
+        showToast("Đã cập nhật lớp học");
       } else {
-        await createCourse(classId, title);
-        showToast("Đã tạo khóa học mới thành công!");
+        await createCourse({ name, description });
+        showToast("Đã tạo lớp học mới thành công!");
       }
       setCreateOpen(false);
       setEditing(null);
       await refreshData();
     } catch (err: unknown) {
       const error = err as { message?: string };
-      const msg = error?.message || (editing ? "Cập nhật khóa học thất bại" : "Tạo khóa học mới thất bại");
+      const msg = error?.message || (editing ? "Cập nhật lớp học thất bại" : "Tạo lớp học mới thất bại");
       setModalError(msg);
     } finally {
       setIsSaving(false);
     }
   };
 
-  const handleDeleteCourse = async (courseId: string) => {
-    if (!confirm("Bạn có chắc chắn muốn xóa khóa học này cùng toàn bộ bài học bên trong?")) return;
+  // Môn học không bị xóa cứng (giữ dữ liệu điểm, bài nộp) — chỉ chuyển sang lưu trữ
+  const handleArchiveCourse = async (course: CourseDto) => {
+    const ok = await confirm({
+      tone: "warning",
+      title: "Lưu trữ lớp học?",
+      message: (
+        <>
+          <strong className="text-slate-800">{course.name}</strong> sẽ chuyển sang chế độ chỉ đọc. Toàn bộ nội dung,
+          bài nộp và điểm số vẫn được giữ nguyên.
+        </>
+      ),
+      confirmText: "Lưu trữ",
+    });
+    if (!ok) return;
     try {
-      await deleteCourse(courseId);
-      showToast("Đã xóa khóa học");
+      await updateCourseStatus(course.id, "ARCHIVED");
+      showToast("Đã lưu trữ lớp học");
       await refreshData();
-    } catch {
-      showToast("Xóa khóa học thất bại");
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      showToast(error?.message || "Lưu trữ lớp học thất bại");
     }
   };
 
@@ -247,7 +198,7 @@ export default function TeacherCoursesPage() {
     <TeacherShell
       activeId="content"
       activeHref="/teacher/content/courses"
-      searchPlaceholder="Tìm kiếm khóa học..."
+      searchPlaceholder="Tìm kiếm lớp học..."
       searchValue={topSearch}
       onSearchChange={setTopSearch}
     >
@@ -258,27 +209,21 @@ export default function TeacherCoursesPage() {
           </div>
         )}
 
-        {/* Breadcrumb & Tiêu đề */}
-        <p className="text-[13px] text-slate-500">
-          <ChevronLeft className="inline h-3.5 w-3.5" /> Nội dung học tập{" "}
-          <span className="mx-1">›</span>{" "}
-          <span className="font-medium text-slate-700">Khóa học</span>
-        </p>
-
-        <div className="mt-1 flex flex-wrap items-center justify-between gap-3">
+        {/* Tiêu đề */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-[26px] font-black tracking-tight text-slate-900">
-              Các khoá học của tôi
+              Các lớp học của tôi
             </h1>
             <p className="mt-0.5 text-[14px] text-slate-500">
-              Tổng quan về các khóa học bạn đang phụ trách và giảng dạy
+              Tổng quan về các lớp học bạn đang phụ trách và giảng dạy
             </p>
           </div>
           <button
             onClick={handleOpenCreateModal}
             className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-5 py-2.5 text-[14px] font-bold text-white shadow-md shadow-blue-600/20 transition hover:bg-blue-700"
           >
-            <Plus className="h-4 w-4" /> Tạo khoá học mới
+            <Plus className="h-4 w-4" /> Tạo lớp học mới
           </button>
         </div>
 
@@ -286,24 +231,24 @@ export default function TeacherCoursesPage() {
         <div className="mt-6 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-[16px] font-bold text-slate-800">
-              Tổng quan về khóa học
+              Tổng quan về lớp học
             </h2>
             <div className="text-[12px] text-slate-500">
-              Hiển thị <span className="font-bold text-slate-800">{filtered.length}</span> khóa học
+              Hiển thị <span className="font-bold text-slate-800">{filtered.length}</span> lớp học
             </div>
           </div>
 
           <div className="mt-3 flex flex-wrap items-center gap-3">
-            {/* Filter Lớp học */}
+            {/* Filter trạng thái môn học */}
             <select
-              value={selectedClassId}
-              onChange={(e) => setSelectedClassId(e.target.value)}
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as "all" | BackendCourseStatus)}
               className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-[13px] font-semibold text-slate-700 outline-none focus:border-blue-500"
             >
-              <option value="all">All (Tất cả lớp)</option>
-              {classes.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name} ({c.code})
+              <option value="all">Tất cả trạng thái</option>
+              {(Object.keys(STATUS_LABEL) as BackendCourseStatus[]).map((st) => (
+                <option key={st} value={st}>
+                  {STATUS_LABEL[st]}
                 </option>
               ))}
             </select>
@@ -322,36 +267,36 @@ export default function TeacherCoursesPage() {
             {/* Sắp xếp */}
             <select
               value={sort}
-              onChange={(e) => setSort(e.target.value)}
+              onChange={(e) => setSort(e.target.value as "name" | "newest")}
               className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-[13px] text-slate-700 outline-none focus:border-blue-500"
             >
-              <option value="Sort by course name">Sort by course name</option>
-              <option value="Mới nhất">Mới nhất</option>
+              <option value="name">Tên lớp (A → Z)</option>
+              <option value="newest">Mới tạo gần đây</option>
             </select>
 
             {/* Dạng hiển thị Card / List */}
             <div className="flex overflow-hidden rounded-lg border border-slate-300">
               <button
                 onClick={() => setView("grid")}
-                title="Dạng Card"
+                title="Hiển thị dạng lưới"
                 className={`flex h-10 items-center gap-1.5 px-3 text-[13px] font-semibold ${
                   view === "grid"
                     ? "bg-blue-600 text-white"
                     : "bg-white text-slate-600 hover:bg-slate-50"
                 }`}
               >
-                <LayoutGrid className="h-4 w-4" /> Card
+                <LayoutGrid className="h-4 w-4" /> Lưới
               </button>
               <button
                 onClick={() => setView("list")}
-                title="Dạng Danh sách"
+                title="Hiển thị dạng danh sách"
                 className={`flex h-10 items-center gap-1.5 px-3 text-[13px] font-semibold ${
                   view === "list"
                     ? "bg-blue-600 text-white"
                     : "bg-white text-slate-600 hover:bg-slate-50"
                 }`}
               >
-                <List className="h-4 w-4" /> List
+                <List className="h-4 w-4" /> Danh sách
               </button>
             </div>
           </div>
@@ -361,24 +306,24 @@ export default function TeacherCoursesPage() {
         {loading ? (
           <div className="mt-12 flex flex-col items-center justify-center py-12 text-center">
             <div className="h-9 w-9 animate-spin rounded-full border-3 border-blue-600 border-t-transparent" />
-            <p className="mt-3 text-sm font-medium text-slate-500">Đang tải danh sách khóa học...</p>
+            <p className="mt-3 text-sm font-medium text-slate-500">Đang tải danh sách lớp học...</p>
           </div>
         ) : filtered.length === 0 ? (
           <div className="mt-8 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-white py-16 text-center">
             <div className="grid h-16 w-16 place-items-center rounded-2xl bg-blue-50 text-3xl">
               📚
             </div>
-            <h3 className="mt-4 text-lg font-bold text-slate-800">Không có khóa học nào</h3>
+            <h3 className="mt-4 text-lg font-bold text-slate-800">Không có lớp học nào</h3>
             <p className="mt-1 max-w-sm text-sm text-slate-500">
-              {query || selectedClassId !== "all"
-                ? "Không tìm thấy khóa học phù hợp với bộ lọc hiện tại."
-                : "Chưa có khóa học nào được tạo. Hãy tạo khóa học đầu tiên để bắt đầu xây dựng bài học."}
+              {query || statusFilter !== "all"
+                ? "Không tìm thấy lớp học phù hợp với bộ lọc hiện tại."
+                : "Chưa có lớp học nào được tạo. Hãy tạo lớp học đầu tiên để bắt đầu xây dựng bài học."}
             </p>
             <button
               onClick={handleOpenCreateModal}
               className="mt-5 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-500/20 hover:bg-blue-700"
             >
-              <Plus className="h-4 w-4" /> Tạo khóa học mới
+              <Plus className="h-4 w-4" /> Tạo lớp học mới
             </button>
           </div>
         ) : view === "grid" ? (
@@ -405,7 +350,7 @@ export default function TeacherCoursesPage() {
                     <div className="relative z-10 flex h-full flex-col justify-between">
                       <div className="flex items-start justify-between">
                         <span className="rounded-md bg-white/20 px-2.5 py-1 text-[11px] font-bold backdrop-blur-md">
-                          {course.classroom?.classCode || "LỚP HỌC"}
+                          {course.courseCode}
                         </span>
 
                         {/* Nút 3 chấm menu */}
@@ -423,6 +368,18 @@ export default function TeacherCoursesPage() {
                           </button>
 
                           {openMenuId === course.id && (
+                            <button
+                              type="button"
+                              aria-label="Đóng menu"
+                              tabIndex={-1}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenMenuId(null);
+                              }}
+                              className="fixed inset-0 z-10 cursor-default"
+                            />
+                          )}
+                          {openMenuId === course.id && (
                             <div className="absolute right-0 top-full z-30 mt-1 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 text-slate-700 shadow-2xl">
                               <button
                                 onClick={() => {
@@ -431,7 +388,7 @@ export default function TeacherCoursesPage() {
                                 }}
                                 className="flex w-full items-center gap-2 px-3.5 py-2 text-[13px] hover:bg-slate-50"
                               >
-                                <Eye className="h-4 w-4 text-blue-600" /> Vào khóa học
+                                <Eye className="h-4 w-4 text-blue-600" /> Vào lớp học
                               </button>
                               <button
                                 onClick={() => {
@@ -440,16 +397,16 @@ export default function TeacherCoursesPage() {
                                 }}
                                 className="flex w-full items-center gap-2 px-3.5 py-2 text-[13px] hover:bg-slate-50"
                               >
-                                <Pencil className="h-4 w-4 text-slate-600" /> Đổi tên
+                                <Pencil className="h-4 w-4 text-slate-600" /> Chỉnh sửa
                               </button>
                               <button
                                 onClick={() => {
                                   setOpenMenuId(null);
-                                  handleDeleteCourse(course.id);
+                                  handleArchiveCourse(course);
                                 }}
-                                className="flex w-full items-center gap-2 px-3.5 py-2 text-[13px] text-red-600 hover:bg-red-50"
+                                className="flex w-full items-center gap-2 px-3.5 py-2 text-[13px] text-amber-700 hover:bg-amber-50"
                               >
-                                <Trash2 className="h-4 w-4" /> Xóa
+                                <Archive className="h-4 w-4" /> Lưu trữ
                               </button>
                             </div>
                           )}
@@ -457,7 +414,7 @@ export default function TeacherCoursesPage() {
                       </div>
 
                       <div className="text-right text-xs opacity-70">
-                        {course.moduleCount || course.modules?.length || 0} module
+                        {course._count?.modules ?? 0} topic
                       </div>
                     </div>
                   </div>
@@ -469,16 +426,16 @@ export default function TeacherCoursesPage() {
                         href={`/teacher/content/courses/${course.id}`}
                         className="block text-[15.5px] font-black text-slate-900 transition hover:text-blue-600 line-clamp-2"
                       >
-                        {course.title}
+                        {course.name}
                       </Link>
                       <p className="mt-1 text-[12.5px] text-slate-500 line-clamp-1">
-                        {course.classroom?.name || "Lớp học"}
+                        {course.description || STATUS_LABEL[course.status]}
                       </p>
                     </div>
 
                     <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
                       <span className="text-[12px] text-slate-400">
-                        {course.totalLessons || 0} bài học
+                        {course._count?.enrollments ?? 0} sinh viên
                       </span>
                       <Link
                         href={`/teacher/content/courses/${course.id}`}
@@ -509,10 +466,10 @@ export default function TeacherCoursesPage() {
                       href={`/teacher/content/courses/${course.id}`}
                       className="text-[15px] font-bold text-slate-900 hover:text-blue-600"
                     >
-                      {course.title}
+                      {course.name}
                     </Link>
                     <p className="text-[12.5px] text-slate-500">
-                      {course.classroom?.name} ({course.classroom?.classCode})
+                      {course.courseCode} · {STATUS_LABEL[course.status]}
                     </p>
                   </div>
                 </div>
@@ -520,7 +477,7 @@ export default function TeacherCoursesPage() {
                   href={`/teacher/content/courses/${course.id}`}
                   className="rounded-lg bg-blue-50 px-3.5 py-1.5 text-[13px] font-semibold text-blue-600 hover:bg-blue-100"
                 >
-                  Vào khóa học
+                  Vào lớp học
                 </Link>
               </div>
             ))}
@@ -530,10 +487,21 @@ export default function TeacherCoursesPage() {
         {/* Modal tạo / sửa khóa học */}
         {createOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs">
-            <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <button
+              type="button"
+              aria-label="Đóng"
+              tabIndex={-1}
+              onClick={() => {
+              if (isSaving) return;
+              setCreateOpen(false);
+              setModalError(null);
+            }}
+              className="absolute inset-0 cursor-default"
+            />
+            <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
               <div className="flex items-center justify-between">
                 <h3 className="text-[18px] font-bold text-slate-900">
-                  {editing ? "Đổi tên khóa học" : "Tạo khóa học mới"}
+                  {editing ? "Chỉnh sửa lớp học" : "Tạo lớp học mới"}
                 </h3>
                 <button
                   type="button"
@@ -558,7 +526,7 @@ export default function TeacherCoursesPage() {
               <div className="mt-4 space-y-3.5">
                 <div>
                   <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
-                    Tên khóa học *
+                    Tên lớp học *
                   </label>
                   <input
                     type="text"
@@ -572,27 +540,19 @@ export default function TeacherCoursesPage() {
                   />
                 </div>
 
-                {!editing && (
-                  <div>
-                    <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
-                      Thuộc lớp học
-                    </label>
-                    <select
-                      value={targetClassInput}
-                      onChange={(e) => {
-                        setTargetClassInput(e.target.value);
-                        if (modalError) setModalError(null);
-                      }}
-                      className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-blue-500"
-                    >
-                      {classes.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name} ({c.code})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                )}
+                <div>
+                  <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
+                    Mô tả
+                  </label>
+                  <textarea
+                    value={courseDescInput}
+                    onChange={(e) => setCourseDescInput(e.target.value)}
+                    rows={3}
+                    maxLength={2000}
+                    placeholder="Giới thiệu ngắn về lớp học (không bắt buộc)"
+                    className="w-full rounded-lg border border-slate-300 px-3.5 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
+                  />
+                </div>
               </div>
 
               <div className="mt-6 flex justify-end gap-2.5">
