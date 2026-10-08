@@ -102,9 +102,9 @@ function QuizForm({
         </div>
       </div>
       <div>
-        <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">Khóa học</label>
+        <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">Lớp học</label>
         <select value={courseName} onChange={(e) => setCourseName(e.target.value)} className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none">
-          {assignmentCourseOptions.filter((o) => o !== "Tất cả khóa học").map((o) => (<option key={o}>{o}</option>))}
+          {assignmentCourseOptions.filter((o) => o !== "Tất cả lớp học").map((o) => (<option key={o}>{o}</option>))}
         </select>
       </div>
       {error && <p className="rounded-lg bg-red-50 px-3 py-2 text-[13px] text-red-600">{error}</p>}
@@ -162,7 +162,7 @@ export default function TeacherQuizzesPage() {
     const q = (query || topSearch).trim().toLowerCase();
     let list = [...items];
     if (classFilter !== "Tất cả lớp học") list = list.filter((i) => i.classCode === classFilter);
-    if (courseFilter !== "Tất cả khóa học") list = list.filter((i) => i.courseName === courseFilter);
+    if (courseFilter !== "Tất cả lớp học") list = list.filter((i) => i.courseName === courseFilter);
     if (kindFilter !== "Tất cả loại") list = list.filter((i) => i.kind === KIND_MAP[kindFilter]);
     if (statusFilter !== "Tất cả trạng thái") list = list.filter((i) => i.status === STATUS_MAP[statusFilter]);
     if (q) list = list.filter((i) => `${i.title} ${i.description} ${i.classCode}`.toLowerCase().includes(q));
@@ -190,7 +190,7 @@ export default function TeacherQuizzesPage() {
   ];
 
   return (
-    <TeacherShell activeId="quizzes" searchPlaceholder="Tìm kiếm lớp học, khóa học, bài tập, kiểm tra..." searchValue={topSearch} onSearchChange={(v) => { setTopSearch(v); resetPage(); }}>
+    <TeacherShell activeId="quizzes" searchPlaceholder="Tìm kiếm lớp học, lớp học, bài tập, kiểm tra..." searchValue={topSearch} onSearchChange={(v) => { setTopSearch(v); resetPage(); }}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-[26px] font-extrabold tracking-tight">Kiểm tra trắc nghiệm</h1>
@@ -214,7 +214,7 @@ export default function TeacherQuizzesPage() {
       <div className="mt-4 rounded-xl border border-slate-200/70 bg-white p-4">
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-[1fr_1fr_1fr_1fr_1.5fr_auto]">
           <FilterSelect label="Lớp học" value={classFilter} onChange={(v) => { setClassFilter(v); resetPage(); }} options={assignmentClassOptions} />
-          <FilterSelect label="Khóa học" value={courseFilter} onChange={(v) => { setCourseFilter(v); resetPage(); }} options={assignmentCourseOptions} />
+          <FilterSelect label="Lớp học" value={courseFilter} onChange={(v) => { setCourseFilter(v); resetPage(); }} options={assignmentCourseOptions} />
           <FilterSelect label="Loại kiểm tra" value={kindFilter} onChange={(v) => { setKindFilter(v); resetPage(); }} options={quizKindOptions} />
           <FilterSelect label="Trạng thái" value={statusFilter} onChange={(v) => { setStatusFilter(v); resetPage(); }} options={quizStatusOptions} />
           <label className="col-span-2 block text-[12.5px] text-slate-500 xl:col-span-1">
@@ -244,7 +244,7 @@ export default function TeacherQuizzesPage() {
                 <span className="mt-0.5 line-clamp-1 block text-[12.5px] text-slate-500">{it.description}</span>
                 <span className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[12.5px] text-slate-500">
                   <span>Lớp: {it.classCode}</span>
-                  <span>Khóa học: {it.courseName}</span>
+                  <span>Lớp học: {it.courseName}</span>
                 </span>
               </span>
               <span className="flex shrink-0 items-center gap-2 whitespace-nowrap text-[13px] sm:w-[150px]">

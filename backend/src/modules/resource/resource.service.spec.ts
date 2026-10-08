@@ -19,7 +19,7 @@ describe('ResourceService', () => {
     id: 10n,
     ownerId: 100n, // Teacher ID
     courseCode: 'CS101',
-    name: 'Nhập môn lập trình',
+    name: 'Nhập lớp lập trình',
   };
 
   const mockModule = {
@@ -108,7 +108,7 @@ describe('ResourceService', () => {
   });
 
   describe('getLessonResources', () => {
-    it('Giáo viên phụ trách môn học xem được danh sách tài liệu', async () => {
+    it('Giáo viên phụ trách lớp học xem được danh sách tài liệu', async () => {
       prisma.lesson.findUnique.mockResolvedValue(mockPublishedLesson);
       prisma.resource.findMany.mockResolvedValue([mockResource]);
 
@@ -126,7 +126,7 @@ describe('ResourceService', () => {
       expect(result[0].fileName).toBe('nhap.pdf');
     });
 
-    it('Giáo viên không phụ trách môn học bị chặn 403', async () => {
+    it('Giáo viên không phụ trách lớp học bị chặn 403', async () => {
       prisma.lesson.findUnique.mockResolvedValue(mockPublishedLesson);
 
       await expect(
@@ -166,7 +166,7 @@ describe('ResourceService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('Học sinh bị gỡ (REMOVED) khỏi môn học bị chặn 403', async () => {
+    it('Học sinh bị gỡ (REMOVED) khỏi lớp học bị chặn 403', async () => {
       prisma.lesson.findUnique.mockResolvedValue(mockPublishedLesson);
       prisma.enrollment.findUnique.mockResolvedValue({
         id: 1n,
@@ -204,8 +204,8 @@ describe('ResourceService', () => {
       expect(result.expiresIn).toBe(600);
       expect(result.mimeType).toBe('application/pdf');
       expect(result.fileName).toBe('de-cuong.pdf');
-      expect(result.url).toContain('https://res.cloudinary.com/test-cloud/raw/authenticated/');
-      expect(result.url).not.toContain('fl_attachment');
+      expect(result.url).toContain('https://api.cloudinary.com/v1_1/test-cloud/raw/download?');
+      expect(result.url).not.toContain('attachment=true');
       expect(result.url).toMatch(/(?:exp|expires_at)=(\d+)/);
     });
 
@@ -235,7 +235,7 @@ describe('ResourceService', () => {
   });
 
   describe('getDownloadUrl', () => {
-    it('Trả về URL có kèm cờ fl_attachment để tải về máy', async () => {
+    it('Trả về URL có kèm cờ attachment để tải về máy', async () => {
       prisma.resource.findUnique.mockResolvedValue(mockResource);
       prisma.enrollment.findUnique.mockResolvedValue({
         id: 1n,
@@ -247,7 +247,7 @@ describe('ResourceService', () => {
       const result = await service.getDownloadUrl(studentUser, 40n);
 
       expect(result.expiresIn).toBe(600);
-      expect(result.url).toContain('fl_attachment');
+      expect(result.url).toContain('attachment=true');
       expect(result.fileName).toBe('de-cuong.pdf');
     });
 

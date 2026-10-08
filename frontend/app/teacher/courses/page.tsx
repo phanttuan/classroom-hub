@@ -62,19 +62,25 @@ const TABS: { id: CourseTab; label: (counts: Record<CourseTab, number>) => strin
 function StatusBadge({ status }: { status: TeacherClass["status"] }) {
   if (status === "active")
     return (
-      <span className="whitespace-nowrap rounded-full bg-green-100/90 px-3 py-1 text-[12px] font-medium text-green-700">
-        Đang hoạt động
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1 text-[11.5px] font-semibold text-emerald-700 shadow-xs backdrop-blur-md border border-emerald-200/80 transition-all hover:bg-white">
+        <span className="relative flex h-2 w-2">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+          <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+        </span>
+        <span>Đang hoạt động</span>
       </span>
     );
   if (status === "closed")
     return (
-      <span className="whitespace-nowrap rounded-full bg-amber-100/90 px-3 py-1 text-[12px] font-medium text-amber-700">
-        Đã đóng
+      <span className="inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1 text-[11.5px] font-semibold text-slate-600 shadow-xs backdrop-blur-md border border-slate-200/80 transition-all hover:bg-white">
+        <span className="h-2 w-2 rounded-full bg-slate-400" />
+        <span>Đã đóng</span>
       </span>
     );
   return (
-    <span className="whitespace-nowrap rounded-full bg-slate-200/90 px-3 py-1 text-[12px] font-medium text-slate-700">
-      Đã lưu trữ
+    <span className="inline-flex items-center gap-1.5 rounded-full bg-white/95 px-3 py-1 text-[11.5px] font-semibold text-amber-700 shadow-xs backdrop-blur-md border border-amber-200/80 transition-all hover:bg-white">
+      <span className="h-2 w-2 rounded-full bg-amber-500" />
+      <span>Đã lưu trữ</span>
     </span>
   );
 }
@@ -320,17 +326,29 @@ export default function TeacherCoursesPage() {
               <article key={c.id} className="overflow-hidden rounded-xl border border-slate-200/70 transition hover:shadow-lg hover:shadow-slate-200">
                 <div className={`relative grid h-[168px] place-items-center bg-gradient-to-br text-6xl ${c.coverGradient}`}>
                   <span aria-hidden>{c.coverEmoji}</span>
-                  <span className="absolute left-3 top-3">
+                  <span className="absolute left-3.5 top-3.5 z-10">
                     <StatusBadge status={c.status} />
                   </span>
-                  <span className="absolute right-3 top-3">
+                  <span className="absolute right-3.5 top-3.5 z-10">
                     <button
                       onClick={() => setOpenMenuId(openMenuId === c.id ? null : c.id)}
                       aria-label={`Tùy chọn ${c.name}`}
-                      className="grid h-8 w-8 place-items-center rounded-lg bg-white/90 text-slate-600 shadow-sm transition hover:bg-white"
+                      className="grid h-8 w-8 place-items-center rounded-lg bg-white/95 text-slate-600 shadow-xs backdrop-blur-md border border-white/80 transition hover:bg-white hover:text-slate-900 cursor-pointer"
                     >
                       <MoreVertical className="h-4 w-4" />
                     </button>
+                    {openMenuId === c.id && (
+                      <button
+                        type="button"
+                        aria-label="Đóng menu"
+                        tabIndex={-1}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOpenMenuId(null);
+                        }}
+                        className="fixed inset-0 z-10 cursor-default"
+                      />
+                    )}
                     {openMenuId === c.id && (
                       <span className="absolute right-0 top-[calc(100%+6px)] z-20 w-48 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 text-left shadow-xl">
                         <button

@@ -38,6 +38,15 @@ enum CourseStatus {
   ARCHIVED
 }
 
+// Loại hoạt động / tài nguyên theo Moodle (Page, File, Folder, URL, Text and media area)
+enum LessonType {
+  PAGE
+  FILE
+  FOLDER
+  URL
+  LABEL
+}
+
 enum LessonStatus {
   DRAFT
   PUBLISHED
@@ -199,6 +208,8 @@ model Module {
   courseId   BigInt   @map("course_id")
   title      String   @db.VarChar(255)
   orderIndex Int      @map("order_index")
+  // Module "Chung" tạo tự động cùng môn học: luôn đứng đầu, không xóa / đổi tên được
+  isDefault  Boolean  @default(false) @map("is_default")
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -213,7 +224,15 @@ model Lesson {
   id          BigInt       @id @default(autoincrement())
   moduleId    BigInt       @map("module_id")
   title       String       @db.VarChar(255)
+  type        LessonType   @default(PAGE)
+  // Mô tả ngắn (HTML), tùy chọn hiển thị trên trang khóa học
+  description String?      @db.Text
+  // Nội dung chính (HTML) của PAGE / LABEL
   content     String       @db.Text
+  // Đường dẫn ngoài của URL
+  externalUrl String?      @map("external_url") @db.VarChar(2048)
+  // Tùy chọn hiển thị theo loại: { display, showDescription, ... }
+  settings    Json?
   orderIndex  Int          @map("order_index")
   status      LessonStatus @default(DRAFT)
   publishedAt DateTime?    @map("published_at") @db.Timestamptz(6)

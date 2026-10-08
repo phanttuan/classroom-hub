@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import Image from "next/image";
 import { Bell, ChevronDown, Menu, Search } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -20,16 +21,22 @@ export default function TeacherTopbar({
   onOpenNotifications,
   placeholder = "Tìm kiếm lớp học, bài học, sinh viên...",
   menuItems = DEFAULT_MENU,
+  showLogo = false,
+  logoHref = "/",
+  actionRight,
 }: {
   profile: TeacherProfile;
   notifications: TeacherNotification[];
   searchQuery: string;
   onSearchChange: (v: string) => void;
-  onMenu: () => void;
+  onMenu?: () => void;
   onOpenNotifications: () => void;
   placeholder?: string;
   /** Menu dropdown avatar — cho phép tùy biến theo role (student dùng chung topbar này) */
   menuItems?: { label: string; href: string }[];
+  showLogo?: boolean;
+  logoHref?: string;
+  actionRight?: React.ReactNode;
 }) {
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
@@ -53,15 +60,34 @@ export default function TeacherTopbar({
   }, []);
 
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200/70 bg-white/90 backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white backdrop-blur">
       <div className="flex h-[68px] items-center gap-3 px-4 sm:px-6">
-        <button
-          onClick={onMenu}
-          aria-label="Mở menu"
-          className="grid h-10 w-10 place-items-center rounded-lg text-slate-600 hover:bg-slate-100 lg:hidden"
-        >
-          <Menu className="h-5 w-5" />
-        </button>
+        {showLogo && (
+          <Link
+            href={logoHref}
+            className="flex items-center gap-2 pr-3 sm:pr-4 mr-1 sm:mr-2 border-r border-slate-200 shrink-0 hover:opacity-90 transition"
+            title="Về danh sách lớp học"
+          >
+            <Image
+              src="/images/logo.webp"
+              alt="EduHub"
+              width={140}
+              height={38}
+              priority
+              className="h-8 sm:h-9 w-auto object-contain"
+            />
+          </Link>
+        )}
+
+        {onMenu && (
+          <button
+            onClick={onMenu}
+            aria-label="Mở menu"
+            className="grid h-10 w-10 place-items-center rounded-lg text-slate-600 hover:bg-slate-100 lg:hidden shrink-0"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        )}
 
         {/* Search */}
         <div className="relative w-full max-w-[560px]">
@@ -75,6 +101,8 @@ export default function TeacherTopbar({
         </div>
 
         <div className="ml-auto flex items-center gap-2 sm:gap-4">
+          {actionRight}
+
           {/* Bell */}
           <button
             onClick={onOpenNotifications}

@@ -91,7 +91,7 @@ export default function StudentGradesPage() {
             </label>
             <span className="relative block self-end">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm kiếm môn học..."
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm kiếm lớp học..."
                 className="h-10 w-full rounded-lg bg-white pl-9 pr-3 text-[13px] outline-none ring-1 ring-slate-200 placeholder:text-slate-400" />
             </span>
           </div>
@@ -100,19 +100,19 @@ export default function StudentGradesPage() {
             <>
               <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
                 <StatCard icon={<BarChart3 className="h-6 w-6" />} iconCls="bg-blue-50 text-blue-600" value={avg.toFixed(2)} label="Điểm trung bình học kỳ" />
-                <StatCard icon={<CheckCircle2 className="h-6 w-6" />} iconCls="bg-green-50 text-green-600" value="5 / 6" label="Đã hoàn thành môn" />
+                <StatCard icon={<CheckCircle2 className="h-6 w-6" />} iconCls="bg-green-50 text-green-600" value="5 / 6" label="Lớp đã hoàn thành" />
                 <StatCard icon={<Clock className="h-6 w-6" />} iconCls="bg-orange-50 text-orange-500" value="1" label="Đang học" />
                 <StatCard icon={<FileText className="h-6 w-6" />} iconCls="bg-red-50 text-red-500" value="0" label="Môn chưa đạt" />
               </div>
 
               <section className="mt-4 overflow-hidden rounded-xl border border-slate-200/70 bg-white">
-                <h2 className="px-4 pt-4 text-[15px] font-extrabold">Danh sách môn học</h2>
+                <h2 className="px-4 pt-4 text-[15px] font-extrabold">Danh sách lớp học</h2>
                 <div className="overflow-x-auto">
                   <table className="mt-1 w-full min-w-[760px] text-left text-[13px]">
                     <thead>
                       <tr className="text-[12px] text-slate-400">
                         <th className="px-4 py-2.5 font-medium">#</th>
-                        <th className="font-medium">Môn học</th>
+                        <th className="font-medium">Lớp học</th>
                         <th className="font-medium">Mã lớp</th>
                         <th className="text-center font-medium">Số tín chỉ</th>
                         <th className="text-center font-medium">Điểm quá trình (40%)</th>
@@ -146,13 +146,13 @@ export default function StudentGradesPage() {
                     </tbody>
                   </table>
                 </div>
-                {rows.length === 0 && <p className="px-4 py-8 text-center text-sm text-slate-500">Không tìm thấy môn học nào.</p>}
+                {rows.length === 0 && <p className="px-4 py-8 text-center text-sm text-slate-500">Không tìm thấy lớp học nào.</p>}
               </section>
 
               <section className="mt-4 rounded-xl border border-slate-200/70 bg-white p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="text-[15px] font-extrabold">🔷 Chi tiết điểm môn học</h2>
-                  <select value={detailCode} onChange={(e) => setDetailCode(e.target.value)} className="h-10 rounded-lg bg-white px-3 text-[13px] outline-none ring-1 ring-slate-200" aria-label="Chọn môn">
+                  <h2 className="text-[15px] font-extrabold">🔷 Chi tiết điểm lớp học</h2>
+                  <select value={detailCode} onChange={(e) => setDetailCode(e.target.value)} className="h-10 rounded-lg bg-white px-3 text-[13px] outline-none ring-1 ring-slate-200" aria-label="Chọn lớp">
                     {gradeRows.map((r) => (<option key={r.code} value={r.code}>{r.name} ({r.code})</option>))}
                   </select>
                 </div>
@@ -217,7 +217,7 @@ export default function StudentGradesPage() {
               </div>
               <div className="rounded-xl border border-slate-100 p-2.5 text-center">
                 <p className="text-[16px] font-extrabold">3</p>
-                <p className="text-[11px] text-slate-400">Số môn học</p>
+                <p className="text-[11px] text-slate-400">Số lớp học</p>
               </div>
             </div>
           </section>

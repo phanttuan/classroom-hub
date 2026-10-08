@@ -9,8 +9,7 @@ import {
   IsString,
   Max,
   Min,
-  validateSync,
-} from 'class-validator';
+  validateSync, IsNumberString } from 'class-validator';
 
 export enum Environment {
   Development = 'development',
@@ -174,6 +173,11 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   CLOUDINARY_API_SECRET?: string;
+
+  // Dung lượng tối đa mỗi tệp tải lên (MB), mặc định 20
+  @IsNumberString({}, { message: 'UPLOAD_MAX_FILE_MB phải là số' })
+  @IsOptional()
+  UPLOAD_MAX_FILE_MB?: string;
 }
 
 export function validateEnvironment(

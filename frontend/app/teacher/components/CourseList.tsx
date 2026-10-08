@@ -35,16 +35,16 @@ export default function CourseList({
   return (
     <section className="rounded-xl border border-slate-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.05)]">
       <div className="mb-4 flex items-center justify-between gap-3">
-        <h2 className="text-[17px] font-bold text-slate-900">Môn học của tôi</h2>
+        <h2 className="text-[17px] font-bold text-slate-900">Lớp học của tôi</h2>
         <div className="flex items-center gap-4">
-          <a href="/teacher/courses" className="text-[13px] font-medium text-blue-600 hover:text-blue-700">
+          <a href="/teacher/content/courses" className="text-[13px] font-medium text-blue-600 hover:text-blue-700">
             Xem tất cả <ArrowRight className="inline h-3.5 w-3.5" />
           </a>
           <button
             onClick={onCreate}
             className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-2 text-[13px] font-semibold text-white shadow-sm shadow-blue-600/30 transition hover:bg-blue-700"
           >
-            <Plus className="h-4 w-4" /> Tạo môn học
+            <Plus className="h-4 w-4" /> Tạo lớp học
           </button>
         </div>
       </div>
@@ -52,15 +52,15 @@ export default function CourseList({
       <div ref={wrapRef} className="space-y-3">
         {classes.length === 0 && (
           <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 py-10 text-center">
-            <p className="text-[14px] font-semibold text-slate-700">Chưa có môn học nào</p>
+            <p className="text-[14px] font-semibold text-slate-700">Chưa có lớp học nào</p>
             <p className="mt-1 max-w-[360px] text-[13px] text-slate-400">
-              Hãy bấm nút &quot;Tạo môn học&quot; để bắt đầu giảng dạy và chia sẻ mã môn cho sinh viên.
+              Hãy bấm nút &quot;Tạo lớp học&quot; để bắt đầu giảng dạy và chia sẻ mã lớp cho sinh viên.
             </p>
             <button
               onClick={onCreate}
               className="mt-4 inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-4 py-2 text-[13px] font-semibold text-white shadow-sm transition hover:bg-blue-700"
             >
-              <Plus className="h-4 w-4" /> Tạo môn học ngay
+              <Plus className="h-4 w-4" /> Tạo lớp học ngay
             </button>
           </div>
         )}
@@ -79,23 +79,32 @@ export default function CourseList({
 
             <div className="min-w-0 flex-1">
               <p className="truncate text-[15px] font-bold text-slate-900">{c.name}</p>
-              <p className="mt-0.5 text-[13px] text-slate-500">Mã môn: {c.code}</p>
+              <p className="mt-0.5 text-[13px] text-slate-500">Mã lớp: {c.code}</p>
               <p className="mt-1 truncate text-[13px] text-slate-500">
                 {c.studentCount} sinh viên <span className="mx-1 text-slate-300">|</span>{" "}
-                {c.courseCount} module <span className="mx-1 text-slate-300">|</span> Cập
+                {c.courseCount} topic <span className="mx-1 text-slate-300">|</span> Cập
                 nhật: {c.updatedAt}
               </p>
             </div>
 
             <span
-              className={`hidden shrink-0 whitespace-nowrap rounded-full px-3.5 py-1.5 text-[12px] font-medium sm:inline-block ${
+              className={`hidden shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-[11.5px] font-semibold sm:inline-flex items-center gap-1.5 border shadow-xs ${
                 c.status === "active"
-                  ? "bg-green-100/80 text-green-700"
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200"
                   : c.status === "closed"
-                  ? "bg-slate-100 text-slate-600"
-                  : "bg-slate-200 text-slate-600"
+                  ? "bg-slate-50 text-slate-600 border-slate-200"
+                  : "bg-amber-50 text-amber-700 border-amber-200"
               }`}
             >
+              <span
+                className={`h-1.5 w-1.5 rounded-full ${
+                  c.status === "active"
+                    ? "bg-emerald-500 animate-pulse"
+                    : c.status === "closed"
+                    ? "bg-slate-400"
+                    : "bg-amber-500"
+                }`}
+              />
               {c.status === "active"
                 ? "Đang hoạt động"
                 : c.status === "closed"
@@ -107,7 +116,7 @@ export default function CourseList({
             <div className="relative shrink-0">
               <button
                 onClick={() => setOpenMenuId(openMenuId === c.id ? null : c.id)}
-                aria-label={`Tùy chọn môn ${c.name}`}
+                aria-label={`Tùy chọn lớp ${c.name}`}
                 className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
               >
                 <MoreVertical className="h-5 w-5" />
@@ -142,7 +151,7 @@ export default function CourseList({
                       }}
                       className="flex w-full items-center gap-2 px-3.5 py-2 text-left text-[13px] text-amber-600 hover:bg-amber-50"
                     >
-                      <Lock className="h-4 w-4" /> Đóng môn học
+                      <Lock className="h-4 w-4" /> Đóng lớp học
                     </button>
                   )}
                   {c.status === "closed" && (
@@ -153,7 +162,7 @@ export default function CourseList({
                       }}
                       className="flex w-full items-center gap-2 px-3.5 py-2 text-left text-[13px] text-blue-600 hover:bg-blue-50"
                     >
-                      <RotateCcw className="h-4 w-4" /> Mở lại môn học
+                      <RotateCcw className="h-4 w-4" /> Mở lại lớp học
                     </button>
                   )}
                   {c.status !== "archived" && (
@@ -165,7 +174,7 @@ export default function CourseList({
                       }}
                       className="flex w-full items-center gap-2 px-3.5 py-2 text-left text-[13px] text-slate-600 hover:bg-slate-50"
                     >
-                      <Archive className="h-4 w-4" /> Lưu trữ môn học
+                      <Archive className="h-4 w-4" /> Lưu trữ lớp học
                     </button>
                   )}
                   {c.status === "archived" && (
@@ -176,7 +185,7 @@ export default function CourseList({
                       }}
                       className="flex w-full items-center gap-2 px-3.5 py-2 text-left text-[13px] text-blue-600 hover:bg-blue-50"
                     >
-                      <RotateCcw className="h-4 w-4" /> Khôi phục môn học
+                      <RotateCcw className="h-4 w-4" /> Khôi phục lớp học
                     </button>
                   )}
                 </div>

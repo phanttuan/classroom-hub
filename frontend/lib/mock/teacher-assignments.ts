@@ -162,7 +162,7 @@ export const assignmentList: TeacherAssignment[] = [
 
 export const assignmentClassOptions = ["Tất cả lớp học", "WEB301", "PY101", "CS201"];
 export const assignmentCourseOptions = [
-  "Tất cả khóa học",
+  "Tất cả lớp học",
   "Lập trình Web nâng cao",
   "Lập trình Python cơ bản",
   "Cấu trúc dữ liệu và giải thuật",

@@ -219,7 +219,7 @@ describe('Resource Preview & Download Endpoints (E2E)', () => {
     expect(res.status).toBe(401);
   });
 
-  it('2. Sinh viên chưa tham gia môn học -> 403 Forbidden', async () => {
+  it('2. Sinh viên chưa tham gia lớp học -> 403 Forbidden', async () => {
     const res = await request(app.getHttpServer())
       .get(`/resources/${publishedResourceId}/preview`)
       .set('Authorization', `Bearer ${unenrolledUser.token}`);
@@ -237,7 +237,7 @@ describe('Resource Preview & Download Endpoints (E2E)', () => {
     expect(res.body.data.fileName).toBe('tailieu-chinhthuc.pdf');
     expect(res.body.data.expiresIn).toBe(600);
     expect(res.body.data.url).toContain('authenticated');
-    expect(res.body.data.url).not.toContain('fl_attachment');
+    expect(res.body.data.url).not.toContain('attachment=true');
   });
 
   it('4. Sinh viên xem tài liệu của bài học DRAFT -> 403 Forbidden', async () => {
@@ -257,13 +257,13 @@ describe('Resource Preview & Download Endpoints (E2E)', () => {
     expect(res.body.data.fileName).toBe('tailieu-nhap.pdf');
   });
 
-  it('6. Lấy link tải xuống (download) -> có cờ fl_attachment', async () => {
+  it('6. Lấy link tải xuống (download) -> có cờ attachment', async () => {
     const res = await request(app.getHttpServer())
       .get(`/resources/${publishedResourceId}/download`)
       .set('Authorization', `Bearer ${studentUser.token}`);
 
     expect(res.status).toBe(200);
-    expect(res.body.data.url).toContain('fl_attachment');
+    expect(res.body.data.url).toContain('attachment=true');
     expect(res.body.data.expiresIn).toBe(600);
   });
 

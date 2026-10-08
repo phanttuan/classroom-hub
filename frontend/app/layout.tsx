@@ -3,6 +3,7 @@ import { Plus_Jakarta_Sans, Dancing_Script } from "next/font/google";
 import "./globals.css";
 import SmoothScrollHandler from "./components/common/SmoothScrollHandler";
 import ToastProvider from "./components/common/Toast";
+import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
 
 const plusJakartaSans = Plus_Jakarta_Sans({
   variable: "--font-sans",
@@ -36,7 +37,9 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col font-sans bg-white text-slate-900 selection:bg-blue-600 selection:text-white">
         <SmoothScrollHandler />
-        <ToastProvider>{children}</ToastProvider>
+        <ToastProvider>
+          <ConfirmProvider>{children}</ConfirmProvider>
+        </ToastProvider>
       </body>
     </html>
   );

@@ -162,12 +162,12 @@ export default function TeacherDashboardPage() {
         setClasses((prev) =>
           prev.map((c) => (c.id === editingClass.id ? updated : c)),
         );
-        showToast(`Đã lưu thay đổi môn học ${res.courseCode}`);
+        showToast(`Đã lưu thay đổi lớp học ${res.courseCode}`);
         setEditingClass(null);
         setCreateOpen(false);
       } catch (err: unknown) {
         const error = err as { message?: string };
-        showToast(error?.message || "Không thể lưu thay đổi môn học");
+        showToast(error?.message || "Không thể lưu thay đổi lớp học");
       }
     } else {
       try {
@@ -177,11 +177,11 @@ export default function TeacherDashboardPage() {
         });
         const newClass = mapCourseDtoToTeacherClass(res);
         setClasses((prev) => [newClass, ...prev]);
-        showToast(`Đã tạo môn học ${res.courseCode} thành công!`);
+        showToast(`Đã tạo lớp học ${res.courseCode} thành công!`);
         setCreateOpen(false);
       } catch (err: unknown) {
         const error = err as { message?: string };
-        showToast(error?.message || "Không thể tạo môn học");
+        showToast(error?.message || "Không thể tạo lớp học");
       }
     }
   };
@@ -206,10 +206,10 @@ export default function TeacherDashboardPage() {
         closed: "đóng",
         archived: "lưu trữ",
       };
-      showToast(`Đã ${labelMap[targetStatus]} môn học ${res.courseCode}`);
+      showToast(`Đã ${labelMap[targetStatus]} lớp học ${res.courseCode}`);
     } catch (err: unknown) {
       const error = err as { message?: string };
-      showToast(error?.message || "Không thể thay đổi trạng thái môn học");
+      showToast(error?.message || "Không thể thay đổi trạng thái lớp học");
     } finally {
       setStatusConfirm(null);
     }

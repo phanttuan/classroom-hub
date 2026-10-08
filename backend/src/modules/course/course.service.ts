@@ -14,6 +14,7 @@ import { CreateCourseDto } from './dto/create-course.dto.js';
 import { UpdateCourseDto } from './dto/update-course.dto.js';
 import { UpdateCourseStatusDto } from './dto/update-course-status.dto.js';
 import { generateCourseCode } from './utils/course-code.util.js';
+import { DEFAULT_MODULE_TITLE } from '../learning-content/learning-content.constants.js';
 
 export interface CourseListFilter {
   status?: string;
@@ -45,6 +46,10 @@ export class CourseService {
             name: dto.name,
             description: dto.description ?? null,
             status: CourseStatus.ACTIVE,
+            // Mỗi môn học luôn có module mặc định "Chung" (tạo cùng transaction)
+            modules: {
+              create: { title: DEFAULT_MODULE_TITLE, orderIndex: 1, isDefault: true },
+            },
           },
         });
         return course;
@@ -54,11 +59,11 @@ export class CourseService {
           error.code === 'P2002'
         ) {
           this.logger.warn(
-            `Trùng mã môn học ${courseCode} ở lần thử ${attempt}. Đang sinh lại mã...`,
+            `Trùng mã lớp học ${courseCode} ở lần thử ${attempt}. Đang sinh lại mã...`,
           );
           if (attempt === maxRetries) {
             throw new InternalServerErrorException(
-              'Không thể khởi tạo mã môn học duy nhất. Vui lòng thử lại.',
+              'Không thể khởi tạo mã lớp học duy nhất. Vui lòng thử lại.',
             );
           }
           continue;
@@ -68,7 +73,7 @@ export class CourseService {
     }
 
     throw new InternalServerErrorException(
-      'Không thể khởi tạo mã môn học duy nhất. Vui lòng thử lại.',
+      'Không thể khởi tạo mã lớp học duy nhất. Vui lòng thử lại.',
     );
   }
 
@@ -82,12 +87,12 @@ export class CourseService {
     });
 
     if (!existing) {
-      throw new NotFoundException('Môn học không tồn tại');
+      throw new NotFoundException('Lớp học không tồn tại');
     }
 
     if (existing.status === CourseStatus.ARCHIVED) {
       throw new ConflictException(
-        'Môn học đã lưu trữ, không thể chỉnh sửa thông tin',
+        'Lớp học đã lưu trữ, không thể chỉnh sửa thông tin',
       );
     }
 
@@ -114,17 +119,17 @@ export class CourseService {
     });
 
     if (!existing) {
-      throw new NotFoundException('Môn học không tồn tại');
+      throw new NotFoundException('Lớp học không tồn tại');
     }
 
     if (existing.status === dto.status) {
-      throw new ConflictException('Môn học đã ở trạng thái này');
+      throw new ConflictException('Lớp học đã ở trạng thái này');
     }
 
     // Kiểm tra quy tắc chuyển trạng thái
     if (existing.status === CourseStatus.ARCHIVED && dto.status !== CourseStatus.ACTIVE) {
       throw new BadRequestException(
-        'Môn học lưu trữ chỉ có thể khôi phục về trạng thái hoạt động',
+        'Lớp học lưu trữ chỉ có thể khôi phục về trạng thái hoạt động',
       );
     }
 
@@ -163,7 +168,7 @@ export class CourseService {
     });
 
     if (!course) {
-      throw new NotFoundException('Môn học không tồn tại');
+      throw new NotFoundException('Lớp học không tồn tại');
     }
 
     return course;
@@ -390,7 +395,7 @@ export class CourseService {
     });
 
     if (!course) {
-      throw new NotFoundException('Mã môn học không hợp lệ hoặc không tồn tại');
+      throw new NotFoundException('Mã lớp học không hợp lệ hoặc không tồn tại');
     }
 
     if (
@@ -398,7 +403,7 @@ export class CourseService {
       course.status === CourseStatus.ARCHIVED
     ) {
       throw new ForbiddenException(
-        'Môn học đã đóng hoặc lưu trữ, không thể tham gia',
+        'Lớp học đã đóng hoặc lưu trữ, không thể tham gia',
       );
     }
 
@@ -414,7 +419,7 @@ export class CourseService {
 
     if (existingEnrollment) {
       if (existingEnrollment.status === EnrollmentStatus.ACTIVE) {
-        throw new ConflictException('Bạn đã là thành viên của môn học này');
+        throw new ConflictException('Bạn đã là thành viên của lớp học này');
       }
 
       // Tái kích hoạt enrollment đã bị REMOVED
@@ -454,7 +459,7 @@ export class CourseService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        throw new ConflictException('Bạn đã là thành viên của môn học này');
+        throw new ConflictException('Bạn đã là thành viên của lớp học này');
       }
       throw error;
     }

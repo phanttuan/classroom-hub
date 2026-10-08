@@ -26,7 +26,7 @@ export class CourseMemberGuard implements CanActivate {
 
     const courseId = extractCourseId(req);
     if (courseId === null) {
-      throw new BadRequestException('Mã môn học (courseId) không hợp lệ hoặc bị thiếu');
+      throw new BadRequestException('Mã lớp học (courseId) không hợp lệ hoặc bị thiếu');
     }
 
     const course = await this.prisma.course.findUnique({
@@ -34,7 +34,7 @@ export class CourseMemberGuard implements CanActivate {
     });
 
     if (!course) {
-      throw new NotFoundException('Môn học không tồn tại');
+      throw new NotFoundException('Lớp học không tồn tại');
     }
 
     const userIdBigInt = BigInt(user.id);
@@ -51,12 +51,12 @@ export class CourseMemberGuard implements CanActivate {
         req.course = course;
         return true;
       }
-      throw new ForbiddenException('Bạn không phải là giáo viên phụ trách môn học này');
+      throw new ForbiddenException('Bạn không phải là giáo viên phụ trách lớp học này');
     }
 
     // 3. Chỉ sinh viên mới tiếp tục kiểm tra enrollment
     if (user.role !== UserRole.STUDENT) {
-      throw new ForbiddenException('Bạn không có quyền truy cập vào môn học này');
+      throw new ForbiddenException('Bạn không có quyền truy cập vào lớp học này');
     }
 
     // Kiểm tra tư cách tham gia của sinh viên
@@ -70,11 +70,11 @@ export class CourseMemberGuard implements CanActivate {
     });
 
     if (!enrollment) {
-      throw new ForbiddenException('Bạn chưa tham gia môn học này');
+      throw new ForbiddenException('Bạn chưa tham gia lớp học này');
     }
 
     if (enrollment.status !== EnrollmentStatus.ACTIVE) {
-      throw new ForbiddenException('Bạn đã bị gỡ khỏi môn học này');
+      throw new ForbiddenException('Bạn đã bị gỡ khỏi lớp học này');
     }
 
     req.course = course;

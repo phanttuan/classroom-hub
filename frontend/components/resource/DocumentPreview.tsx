@@ -17,6 +17,7 @@ import {
   fetchResourcePreview,
   triggerResourceDownload,
 } from '@/lib/api/resource-api';
+import { toast } from '@/app/components/common/Toast';
 import type { ResourcePreviewResponse } from '@/lib/types/resource';
 
 interface DocumentPreviewProps {
@@ -271,7 +272,7 @@ export default function DocumentPreview({
       const fileName = previewData?.fileName || initialFileName;
       await triggerResourceDownload(resourceId, fileName);
     } catch (err: any) {
-      alert(err?.message || 'Lỗi khi tải tài liệu');
+      toast.error('Không tải được tài liệu', err?.message || 'Vui lòng thử lại sau');
     } finally {
       setDownloading(false);
     }
@@ -290,6 +291,13 @@ export default function DocumentPreview({
       aria-modal="true"
       className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-5 bg-slate-900/60 backdrop-blur-sm"
     >
+      <button
+        type="button"
+        aria-label="Đóng"
+        tabIndex={-1}
+        onClick={onClose}
+        className="absolute inset-0 cursor-default"
+      />
       <div className="relative flex flex-col w-full max-w-5xl h-[88vh] bg-white rounded-2xl shadow-2xl overflow-hidden border border-slate-200">
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-100 bg-white">

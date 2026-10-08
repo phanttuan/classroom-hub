@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service.js';
 import { CloudinaryService } from './cloudinary.service.js';
+import { extname } from 'node:path';
 import {
   UserRole,
   EnrollmentStatus,
@@ -64,7 +65,7 @@ export class ResourceService {
     const course = resource.lesson.module?.course;
 
     if (!course) {
-      throw new NotFoundException('Môn học chứa tài liệu không tồn tại');
+      throw new NotFoundException('Lớp học chứa tài liệu không tồn tại');
     }
 
     return {
@@ -99,7 +100,7 @@ export class ResourceService {
 
     const course = lesson.module?.course;
     if (!course) {
-      throw new NotFoundException('Môn học chứa bài học không tồn tại');
+      throw new NotFoundException('Lớp học chứa bài học không tồn tại');
     }
 
     return {
@@ -131,7 +132,7 @@ export class ResourceService {
     if (user.role === UserRole.TEACHER) {
       if (course.ownerId !== user.id) {
         throw new ForbiddenException(
-          'Bạn không phải là giáo viên phụ trách môn học này',
+          'Bạn không phải là giáo viên phụ trách lớp học này',
         );
       }
       return;
@@ -157,11 +158,11 @@ export class ResourceService {
       });
 
       if (!enrollment) {
-        throw new ForbiddenException('Bạn chưa tham gia môn học này');
+        throw new ForbiddenException('Bạn chưa tham gia lớp học này');
       }
 
       if (enrollment.status !== EnrollmentStatus.ACTIVE) {
-        throw new ForbiddenException('Bạn đã bị gỡ khỏi môn học này');
+        throw new ForbiddenException('Bạn đã bị gỡ khỏi lớp học này');
       }
 
       return;
@@ -219,7 +220,7 @@ export class ResourceService {
     // Ký URL Cloudinary authenticated
     const signed = this.cloudinaryService.generateSignedUrl(
       resource.storageKey,
-      { isDownload: false, expiresInSeconds: 600 },
+      { isDownload: false, expiresInSeconds: 600, format: extname(resource.fileName).slice(1) },
     );
 
     return {
@@ -246,7 +247,7 @@ export class ResourceService {
     // Ký URL Cloudinary authenticated kèm fl_attachment
     const signed = this.cloudinaryService.generateSignedUrl(
       resource.storageKey,
-      { isDownload: true, expiresInSeconds: 600 },
+      { isDownload: true, expiresInSeconds: 600, format: extname(resource.fileName).slice(1) },
     );
 
     return {

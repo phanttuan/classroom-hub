@@ -88,7 +88,7 @@ describe('ResourceService Real DB Integration Test', () => {
     // 4. Tạo môn học (Course)
     const course = await prisma.course.create({
       data: {
-        name: 'Môn học Kiến trúc Phần mềm',
+        name: 'Lớp học Kiến trúc Phần mềm',
         courseCode: `RSC${timestamp.toString().slice(-5)}`,
         ownerId: teacherId,
       },
@@ -187,7 +187,7 @@ describe('ResourceService Real DB Integration Test', () => {
     ).rejects.toThrow(ForbiddenException);
   });
 
-  it('2. Sinh viên tham gia môn học thành công (Enrollment ACTIVE)', async () => {
+  it('2. Sinh viên tham gia lớp học thành công (Enrollment ACTIVE)', async () => {
     const enrollment = await prisma.enrollment.create({
       data: {
         courseId,
@@ -246,7 +246,7 @@ describe('ResourceService Real DB Integration Test', () => {
     );
     expect(preview.expiresIn).toBe(600);
     expect(preview.mimeType).toBe('application/pdf');
-    expect(preview.url).not.toContain('fl_attachment');
+    expect(preview.url).not.toContain('attachment=true');
     expect(preview.url).toMatch(/(?:exp|expires_at)=(\d+)/);
 
     const download = await service.getDownloadUrl(
@@ -254,11 +254,11 @@ describe('ResourceService Real DB Integration Test', () => {
       publishedResourceId,
     );
     expect(download.expiresIn).toBe(600);
-    expect(download.url).toContain('fl_attachment');
+    expect(download.url).toContain('attachment=true');
     expect(download.url).toMatch(/(?:exp|expires_at)=(\d+)/);
   });
 
-  it('7. Sinh viên bị gỡ (REMOVED) khỏi môn học lập tức bị chặn 403', async () => {
+  it('7. Sinh viên bị gỡ (REMOVED) khỏi lớp học lập tức bị chặn 403', async () => {
     await prisma.enrollment.update({
       where: {
         uk_enrollments_course_student: {

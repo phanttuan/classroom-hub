@@ -60,7 +60,9 @@ export async function fetchResourceDownload(
 }
 
 /**
- * Tự động kích hoạt tải file xuống máy tính từ download URL
+ * Tải tệp về máy với đúng tên gốc.
+ * URL ký của Cloudinary luôn đặt tên chung (vd. file.pdf) nên tải qua fetch → Blob rồi tự đặt tên.
+ * Lỗi (mạng / CORS) thì mở thẳng URL như cũ.
  */
 export async function triggerResourceDownload(
   resourceId: string,
@@ -70,14 +72,23 @@ export async function triggerResourceDownload(
   if (!data?.url) {
     throw new Error('Không lấy được đường dẫn tải tài liệu');
   }
+  const fileName = preferredFileName || data.fileName || 'download';
 
   const link = document.createElement('a');
-  link.href = data.url;
-  link.setAttribute('download', preferredFileName || data.fileName || 'download');
-  link.setAttribute('target', '_blank');
+  link.setAttribute('download', fileName);
   link.setAttribute('rel', 'noopener noreferrer');
+  let objectUrl: string | null = null;
+  try {
+    const res = await fetch(data.url);
+    if (!res.ok) throw new Error(String(res.status));
+    objectUrl = URL.createObjectURL(await res.blob());
+    link.href = objectUrl;
+  } catch {
+    link.href = data.url;
+    link.setAttribute('target', '_blank');
+  }
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
+  if (objectUrl) window.setTimeout(() => URL.revokeObjectURL(objectUrl!), 10_000);
 }
-

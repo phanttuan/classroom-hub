@@ -32,11 +32,11 @@ export const greetingDateLabel = "Thứ Hai, 15 tháng 9, 2026";
 export const dashboardStats: DashboardStat[] = [
   {
     id: "stat-classes",
-    label: "Tổng môn học",
+    label: "Tổng lớp học",
     value: 3,
     tone: "blue",
     icon: "classes",
-    detailHref: "/teacher/courses",
+    detailHref: "/teacher/content/courses",
   },
   {
     id: "stat-students",
@@ -188,26 +188,12 @@ export const teacherNotifications: TeacherNotification[] = [
 
 export const teacherSidebarNav: SidebarItem[] = [
   { id: "home", label: "Tổng quan", icon: "home", href: "/teacher" },
-  { id: "classes", label: "Môn học", icon: "classes", href: "/teacher/courses" },
   {
     id: "content",
-    label: "Nội dung học tập",
+    label: "Lớp học",
     icon: "content",
-    href: "/teacher/content",
-    expandable: true,
-    children: [
-      { label: "Khóa học", href: "/teacher/content/courses" },
-      { label: "Bài học", href: "/teacher/content/lessons" },
-      { label: "Tài liệu", href: "/teacher/content/docs" },
-    ],
+    href: "/teacher/content/courses",
   },
-  {
-    id: "assignments",
-    label: "Bài tập",
-    icon: "assignment",
-    href: "/teacher/assignments",
-  },
-  { id: "quizzes", label: "Kiểm tra trắc nghiệm", icon: "quiz", href: "/teacher/quizzes" },
   { id: "grades", label: "Sổ điểm", icon: "gradebook", href: "/teacher/grades" },
   { id: "notifs", label: "Thông báo", icon: "bell", href: "/teacher/notifications" },
   { id: "schedule", label: "Lịch", icon: "calendar", href: "/teacher/schedule" },

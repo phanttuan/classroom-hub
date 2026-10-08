@@ -70,23 +70,23 @@ describe('CloudinaryService', () => {
       expect(result.expiresAt).toBeGreaterThanOrEqual(beforeNow + 600);
       expect(result.expiresAt).toBeLessThanOrEqual(afterNow + 600);
 
-      // URL chứa domain cloudinary và delivery authenticated
-      expect(result.url).toContain('https://res.cloudinary.com/test-cloud/raw/authenticated/');
-      expect(result.url).toContain('classroom-hub/lessons/abc123/de-cuong.pdf');
-      // Không chứa flag attachment
-      expect(result.url).not.toContain('fl_attachment');
+      // Download API của Cloudinary (chạy được ở gói Free), type authenticated
+      expect(result.url).toContain('https://api.cloudinary.com/v1_1/test-cloud/raw/download?');
+      expect(result.url).toContain(encodeURIComponent('classroom-hub/lessons/abc123/de-cuong.pdf'));
+      // Xem trực tiếp: không có cờ attachment
+      expect(result.url).not.toContain('attachment=true');
       // Có tham số expires_at hoặc exp token
       expect(result.url).toMatch(/(?:exp|expires_at)=(\d+)/);
     });
 
-    it('ký URL tải xuống (download) có cờ fl_attachment để trình duyệt tải file về', () => {
+    it('ký URL tải xuống (download) có cờ attachment để trình duyệt tải file về', () => {
       const result = service.generateSignedUrl(
         'raw:classroom-hub/lessons/abc123/de-cuong.pdf',
         { isDownload: true },
       );
 
       expect(result.expiresIn).toBe(600);
-      expect(result.url).toContain('fl_attachment');
+      expect(result.url).toContain('attachment=true');
       expect(result.url).toContain('authenticated');
       expect(result.url).toMatch(/(?:exp|expires_at)=(\d+)/);
     });
@@ -98,7 +98,7 @@ describe('CloudinaryService', () => {
       );
 
       expect(result.expiresIn).toBe(300);
-      expect(result.url).toContain('image/authenticated');
+      expect(result.url).toContain('/image/download?');
     });
   });
 });

@@ -179,7 +179,7 @@ export default function TeacherSchedulePage() {
     const q = topSearch.trim().toLowerCase();
     let list = [...events];
     if (classCode !== "ALL") list = list.filter((e) => e.classCode === classCode);
-    if (courseFilter !== "Tất cả khóa học") list = list.filter((e) => e.courseName === courseFilter);
+    if (courseFilter !== "Tất cả lớp học") list = list.filter((e) => e.courseName === courseFilter);
     if (typeFilter !== "Tất cả loại") list = list.filter((e) => e.kind === KIND_MAP[typeFilter]);
     if (statusFilter === "Sắp diễn ra") list = list.filter((e) => !isDone(e.date));
     if (statusFilter === "Đã kết thúc") list = list.filter((e) => isDone(e.date));
@@ -361,6 +361,18 @@ export default function TeacherSchedulePage() {
             <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
           </button>
           {classOpen && (
+            <button
+              type="button"
+              aria-label="Đóng menu"
+              tabIndex={-1}
+              onClick={(e) => {
+                e.stopPropagation();
+                setClassOpen(false);
+              }}
+              className="fixed inset-0 z-10 cursor-default"
+            />
+          )}
+          {classOpen && (
             <span className="absolute left-0 right-0 top-full z-20 mt-1 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
               {scheduleClassOptions.map((o) => (
                 <button key={o.code} onClick={() => { setClassCode(o.code); setClassOpen(false); }} className={`block w-full px-3.5 py-2 text-left hover:bg-slate-50 ${o.code === classCode ? "bg-blue-50/60" : ""}`}>
@@ -372,7 +384,7 @@ export default function TeacherSchedulePage() {
           )}
         </span>
         {([
-          ["Khóa học", courseFilter, setCourseFilter, scheduleCourseOptions],
+          ["Lớp học", courseFilter, setCourseFilter, scheduleCourseOptions],
           ["Loại sự kiện", typeFilter, setTypeFilter, scheduleTypeOptions],
           ["Trạng thái", statusFilter, setStatusFilter, scheduleStatusOptions],
         ] as const).map(([label, value, set, options]) => (

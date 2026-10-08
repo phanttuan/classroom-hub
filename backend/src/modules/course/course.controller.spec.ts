@@ -47,7 +47,7 @@ describe('CourseController', () => {
       const result = await controller.createCourse(req, dto);
       expect(service.create).toHaveBeenCalledWith(10n, dto);
       expect(result).toEqual({
-        message: 'Tạo môn học thành công',
+        message: 'Tạo lớp học thành công',
         data: expectedResult,
       });
     });
@@ -68,7 +68,7 @@ describe('CourseController', () => {
       const result = await controller.updateCourse(req, dto);
       expect(service.update).toHaveBeenCalledWith(1n, dto);
       expect(result).toEqual({
-        message: 'Cập nhật thông tin môn học thành công',
+        message: 'Cập nhật thông tin lớp học thành công',
         data: updated,
       });
     });
@@ -89,7 +89,7 @@ describe('CourseController', () => {
       const result = await controller.updateCourseStatus(req, dto);
       expect(service.changeStatus).toHaveBeenCalledWith(1n, dto);
       expect(result).toEqual({
-        message: 'Cập nhật trạng thái môn học thành công',
+        message: 'Cập nhật trạng thái lớp học thành công',
         data: updated,
       });
     });
@@ -184,7 +184,7 @@ describe('CourseController', () => {
       const result = await controller.joinCourse(req, dto);
       expect(service.joinCourse).toHaveBeenCalledWith(20n, 'CODE1234');
       expect(result).toEqual({
-        message: 'Tham gia môn học thành công',
+        message: 'Tham gia lớp học thành công',
         data: course,
       });
     });

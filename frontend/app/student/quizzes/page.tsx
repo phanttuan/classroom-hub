@@ -210,7 +210,7 @@ export default function StudentQuizzesPage() {
   };
 
   return (
-    <StudentShell activeId="quizzes" searchPlaceholder="Tìm kiếm bài kiểm tra, lớp học, môn học..." searchValue={topSearch} onSearchChange={setTopSearch}>
+    <StudentShell activeId="quizzes" searchPlaceholder="Tìm kiếm bài kiểm tra, lớp học..." searchValue={topSearch} onSearchChange={setTopSearch}>
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0">
           <h1 className="text-[26px] font-extrabold tracking-tight">Kiểm tra trắc nghiệm</h1>

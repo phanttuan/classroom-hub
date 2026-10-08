@@ -47,7 +47,7 @@ export class CourseController {
     const teacherId = BigInt(req.user!.id);
     const createdCourse = await this.courseService.create(teacherId, dto);
     return {
-      message: 'Tạo môn học thành công',
+      message: 'Tạo lớp học thành công',
       data: createdCourse,
     };
   }
@@ -69,8 +69,8 @@ export class CourseController {
     const result = await this.courseService.joinCourse(studentId, dto.courseCode);
     return {
       message: result.isReactivated
-        ? 'Tham gia lại môn học thành công. Lịch sử học tập trước đó đã được khôi phục.'
-        : 'Tham gia môn học thành công',
+        ? 'Tham gia lại lớp học thành công. Lịch sử học tập trước đó đã được khôi phục.'
+        : 'Tham gia lớp học thành công',
       data: result.course,
     };
   }
@@ -110,7 +110,7 @@ export class CourseController {
       return this.courseService.findAllCourses(filter);
     }
 
-    throw new ForbiddenException('Chưa hỗ trợ danh sách môn học cho vai trò này');
+    throw new ForbiddenException('Chưa hỗ trợ danh sách lớp học cho vai trò này');
   }
 
   /**
@@ -136,7 +136,7 @@ export class CourseController {
     const courseId = req.course!.id;
     const updated = await this.courseService.update(courseId, dto);
     return {
-      message: 'Cập nhật thông tin môn học thành công',
+      message: 'Cập nhật thông tin lớp học thành công',
       data: updated,
     };
   }
@@ -154,7 +154,7 @@ export class CourseController {
     const courseId = req.course!.id;
     const updated = await this.courseService.changeStatus(courseId, dto);
     return {
-      message: 'Cập nhật trạng thái môn học thành công',
+      message: 'Cập nhật trạng thái lớp học thành công',
       data: updated,
     };
   }
