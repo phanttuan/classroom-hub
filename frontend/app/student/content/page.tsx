@@ -14,6 +14,8 @@ import {
 } from "lucide-react";
 import StudentShell, { Toast } from "../components/StudentShell";
 import Modal from "../../teacher/components/Modal";
+import DocumentPreview from "@/components/resource/DocumentPreview";
+import { triggerResourceDownload } from "@/lib/api/resource-api";
 import { Donut, Progress, SectionHead, TONE_BOX } from "../components/student-shared";
 import { contentGroups, featuredDocs, recentActivities } from "@/lib/mock/student";
 import type { ContentItemState, ContentItemType } from "@/lib/types/student";
@@ -67,6 +69,7 @@ export default function StudentContentPage() {
   const [undoneIds, setUndoneIds] = useState<string[]>([]);
   const [menuKey, setMenuKey] = useState<string | null>(null);
   const [progressOpen, setProgressOpen] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<{ id: string; title: string } | null>(null);
   const [toast, setToast] = useState("");
   const showToast = (m: string) => {
     setToast(m);
@@ -189,7 +192,16 @@ export default function StudentContentPage() {
                         return (
                           <li key={it.id} className="flex items-center gap-2.5">
                             <TypeIcon type={it.type} />
-                            <button onClick={() => toggleDone(it.id, it.title, st)} className="min-w-0 flex-1 text-left">
+                            <button
+                              onClick={() => {
+                                if (it.type === "doc") {
+                                  setPreviewDoc({ id: it.id, title: it.title });
+                                } else {
+                                  toggleDone(it.id, it.title, st);
+                                }
+                              }}
+                              className="min-w-0 flex-1 text-left hover:text-blue-600 transition"
+                            >
                               <b className="block truncate text-[13px]">{it.title}</b>
                               <span className="block truncate text-[11.5px] text-slate-400">{it.meta}</span>
                             </button>
@@ -202,10 +214,33 @@ export default function StudentContentPage() {
                                 <>
                                   <button aria-label="Đóng" onClick={() => setMenuKey(null)} className="fixed inset-0 z-10 cursor-default" />
                                   <span className="absolute right-0 top-full z-20 w-48 overflow-hidden rounded-xl border bg-white py-1 text-left shadow-xl">
+                                    {it.type === "doc" && (
+                                      <button
+                                        onClick={() => {
+                                          setMenuKey(null);
+                                          setPreviewDoc({ id: it.id, title: it.title });
+                                        }}
+                                        className="block w-full px-3.5 py-2 text-[12.5px] text-blue-600 font-medium hover:bg-blue-50"
+                                      >
+                                        Xem tài liệu
+                                      </button>
+                                    )}
                                     <button onClick={() => { setMenuKey(null); toggleDone(it.id, it.title, st); }} className="block w-full px-3.5 py-2 text-[12.5px] text-slate-600 hover:bg-slate-50">
                                       {st === "done" ? "Đánh dấu chưa học" : "Đánh dấu hoàn thành"}
                                     </button>
-                                    <button onClick={() => { setMenuKey(null); showToast(`Đang tải "${it.title}" (demo)`); }} className="block w-full px-3.5 py-2 text-[12.5px] text-slate-600 hover:bg-slate-50">Tải xuống</button>
+                                    <button
+                                      onClick={async () => {
+                                        setMenuKey(null);
+                                        try {
+                                          await triggerResourceDownload(it.id, it.title);
+                                        } catch {
+                                          showToast(`Đang tải "${it.title}"...`);
+                                        }
+                                      }}
+                                      className="block w-full px-3.5 py-2 text-[12.5px] text-slate-600 hover:bg-slate-50"
+                                    >
+                                      Tải xuống
+                                    </button>
                                   </span>
                                 </>
                               )}
@@ -281,6 +316,13 @@ export default function StudentContentPage() {
           ))}
         </ul>
       </Modal>
+
+      <DocumentPreview
+        isOpen={!!previewDoc}
+        resourceId={previewDoc?.id ?? null}
+        initialFileName={previewDoc?.title}
+        onClose={() => setPreviewDoc(null)}
+      />
 
       <Toast message={toast} />
     </StudentShell>
