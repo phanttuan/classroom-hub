@@ -205,7 +205,7 @@ export function CourseDetailModal({
   );
 }
 
-/* ---------- Modal Chuyển trạng thái lớp học (Đóng / Lưu trữ / Khôi phục) ---------- */
+/* ---------- Modal Chuyển trạng thái môn học (Đóng / Lưu trữ / Khôi phục) ---------- */
 export function ConfirmStatusChangeModal({
   classInfo,
   targetStatus,
@@ -221,20 +221,20 @@ export function ConfirmStatusChangeModal({
 
   const config = {
     closed: {
-      title: "Đóng lớp học?",
-      message: `Bạn có chắc muốn đóng lớp "${classInfo.name}" (${classInfo.code})? Lớp sẽ ngừng tiếp nhận học sinh mới và không tạo thêm hoạt động mới.`,
-      btnText: "Đóng lớp",
+      title: "Đóng môn học?",
+      message: `Bạn có chắc muốn đóng môn "${classInfo.name}" (${classInfo.code})? Môn học sẽ ngừng tiếp nhận học sinh mới và không tạo thêm hoạt động mới.`,
+      btnText: "Đóng môn học",
       btnClass: "bg-amber-600 hover:bg-amber-700 text-white",
     },
     archived: {
-      title: "Lưu trữ lớp học?",
-      message: `Bạn có chắc muốn lưu trữ lớp "${classInfo.name}" (${classInfo.code})? Lớp học sẽ chuyển sang chế độ chỉ đọc. Toàn bộ tài liệu và kết quả học tập sẽ được bảo toàn.`,
-      btnText: "Lưu trữ lớp",
+      title: "Lưu trữ môn học?",
+      message: `Bạn có chắc muốn lưu trữ môn "${classInfo.name}" (${classInfo.code})? Môn học sẽ chuyển sang chế độ chỉ đọc. Toàn bộ tài liệu và kết quả học tập sẽ được bảo toàn.`,
+      btnText: "Lưu trữ môn học",
       btnClass: "bg-slate-700 hover:bg-slate-800 text-white",
     },
     active: {
-      title: "Khôi phục lớp học?",
-      message: `Bạn có chắc muốn mở lại hoạt động cho lớp "${classInfo.name}" (${classInfo.code})?`,
+      title: "Khôi phục môn học?",
+      message: `Bạn có chắc muốn mở lại hoạt động cho môn "${classInfo.name}" (${classInfo.code})?`,
       btnText: "Khôi phục hoạt động",
       btnClass: "bg-blue-600 hover:bg-blue-700 text-white",
     },
@@ -276,12 +276,12 @@ export function ConfirmDeleteModal({
   onConfirm: () => void;
 }) {
   return (
-    <Modal open={!!classInfo} onClose={onClose} title="Lưu trữ lớp học?" widthClass="max-w-[420px]">
+    <Modal open={!!classInfo} onClose={onClose} title="Lưu trữ môn học?" widthClass="max-w-[420px]">
       {classInfo && (
         <div className="space-y-4">
           <p className="text-sm leading-relaxed text-slate-600">
-            Theo chính sách hệ thống, lớp học không xóa vĩnh viễn để bảo tồn kết quả của sinh viên.
-            Bạn có muốn chuyển lớp <b className="text-slate-900">{classInfo.name}</b> sang trạng thái lưu trữ?
+            Theo chính sách hệ thống, môn học không xóa vĩnh viễn để bảo tồn kết quả của sinh viên.
+            Bạn có muốn chuyển môn <b className="text-slate-900">{classInfo.name}</b> sang trạng thái lưu trữ?
           </p>
           <div className="flex justify-end gap-2">
             <button

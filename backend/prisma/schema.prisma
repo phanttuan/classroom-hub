@@ -118,10 +118,6 @@ enum OtpType {
   TWO_FACTOR_AUTH
 }
 
-// ==============================================================================
-// 2. CORE IDENTITY & CLASSROOM DOMAIN (NGƯỜI DÙNG & LỚP HỌC)
-// ==============================================================================
-
 model User {
   id           BigInt     @id @default(autoincrement())
   email        String     @unique @db.VarChar(255)

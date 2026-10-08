@@ -42,7 +42,6 @@ export class CourseMemberGuard implements CanActivate {
     // 1. Admin hệ thống có quyền truy cập toàn diện
     if (user.role === UserRole.ADMIN) {
       req.course = course;
-      (req as any).classroom = course;
       return true;
     }
 
@@ -50,7 +49,6 @@ export class CourseMemberGuard implements CanActivate {
     if (user.role === UserRole.TEACHER) {
       if (course.ownerId === userIdBigInt) {
         req.course = course;
-        (req as any).classroom = course;
         return true;
       }
       throw new ForbiddenException('Bạn không phải là giáo viên phụ trách môn học này');
@@ -81,12 +79,7 @@ export class CourseMemberGuard implements CanActivate {
 
     req.course = course;
     req.enrollment = enrollment;
-    (req as any).classroom = course;
-    (req as any).classMembership = enrollment;
     return true;
   }
 }
-
-export const ClassMemberGuard = CourseMemberGuard;
-export type ClassMemberGuard = CourseMemberGuard;
 

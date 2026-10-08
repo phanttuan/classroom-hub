@@ -40,7 +40,6 @@ export class CourseOwnerGuard implements CanActivate {
     // Admin có quyền truy cập quản trị hệ thống
     if (user.role === UserRole.ADMIN) {
       req.course = course;
-      (req as any).classroom = course;
       return true;
     }
 
@@ -56,11 +55,7 @@ export class CourseOwnerGuard implements CanActivate {
     }
 
     req.course = course;
-    (req as any).classroom = course;
     return true;
   }
 }
-
-export const ClassOwnerGuard = CourseOwnerGuard;
-export type ClassOwnerGuard = CourseOwnerGuard;
 
