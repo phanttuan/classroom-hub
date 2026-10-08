@@ -220,4 +220,24 @@ input::-webkit-credentials-auto-fill-button {
   right: 0 !important;
 }
 
+/* Document Preview Styles */
+.spreadsheet-container table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.spreadsheet-container th,
+.spreadsheet-container td {
+  border: 1px solid #e2e8f0;
+  padding: 6px 10px;
+  white-space: nowrap;
+}
+.spreadsheet-container th {
+  background-color: #f8fafc;
+  font-weight: 600;
+}
+.spreadsheet-container tr:hover td {
+  background-color: #f1f5f9;
+}
+
+
 

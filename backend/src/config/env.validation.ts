@@ -161,6 +161,19 @@ export class EnvironmentVariables {
   @IsString()
   @IsOptional()
   GOOGLE_CLIENT_SECRET?: string;
+
+  // --- Cấu hình Cloudinary (Quản lý lưu trữ tài liệu và media) ---
+  @IsString()
+  @IsOptional()
+  CLOUDINARY_CLOUD_NAME?: string;
+
+  @IsString()
+  @IsOptional()
+  CLOUDINARY_API_KEY?: string;
+
+  @IsString()
+  @IsOptional()
+  CLOUDINARY_API_SECRET?: string;
 }
 
 export function validateEnvironment(
