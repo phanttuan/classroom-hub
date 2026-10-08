@@ -27,12 +27,12 @@ enum UserStatus {
   LOCKED
 }
 
-enum MembershipStatus {
+enum EnrollmentStatus {
   ACTIVE
   REMOVED
 }
 
-enum ClassStatus {
+enum CourseStatus {
   ACTIVE
   CLOSED
   ARCHIVED
@@ -118,10 +118,6 @@ enum OtpType {
   TWO_FACTOR_AUTH
 }
 
-// ==============================================================================
-// 2. CORE IDENTITY & CLASSROOM DOMAIN (NGƯỜI DÙNG & LỚP HỌC)
-// ==============================================================================
-
 model User {
   id           BigInt     @id @default(autoincrement())
   email        String     @unique @db.VarChar(255)
@@ -134,8 +130,8 @@ model User {
   updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Quan hệ 1-nhiều
-  ownedClasses          Classroom[]       @relation("ClassOwner")
-  classMemberships      ClassMembership[]
+  ownedCourses          Course[]          @relation("CourseOwner")
+  enrollments           Enrollment[]
   lessonProgresses      LessonProgress[]
   uploadedResources     Resource[]        @relation("ResourceUploader")
   createdAssignments    Assignment[]      @relation("AssignmentCreator")
@@ -155,20 +151,24 @@ model User {
   @@map("users")
 }
 
-model Classroom {
-  id          BigInt      @id @default(autoincrement())
-  ownerId     BigInt      @map("owner_id")
-  classCode   String      @unique @map("class_code") @db.VarChar(50)
-  name        String      @db.VarChar(255)
-  description String?     @db.Text
-  status      ClassStatus @default(ACTIVE)
-  createdAt   DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+// ==============================================================================
+// 2. CORE IDENTITY & COURSE DOMAIN (NGƯỜI DÙNG & MÔN HỌC / LỚP HỌC PHẦN)
+// ==============================================================================
+
+model Course {
+  id          BigInt       @id @default(autoincrement())
+  ownerId     BigInt       @map("owner_id")
+  courseCode  String       @unique @map("course_code") @db.VarChar(50)
+  name        String       @db.VarChar(255)
+  description String?      @db.Text
+  status      CourseStatus @default(ACTIVE)
+  createdAt   DateTime     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   // Quan hệ
-  owner          User              @relation("ClassOwner", fields: [ownerId], references: [id], onDelete: Restrict)
-  memberships    ClassMembership[]
-  courses        Course[]
+  owner          User            @relation("CourseOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  enrollments    Enrollment[]
+  modules        Module[]
   assignments    Assignment[]
   gradeItems     GradeItem[]
   gradeConfig    GradeConfig?
@@ -176,41 +176,22 @@ model Classroom {
   announcements  Announcement[]
   calendarEvents CalendarEvent[]
 
-  @@map("classes")
+  @@map("courses")
 }
 
-model ClassMembership {
+model Enrollment {
   id        BigInt           @id @default(autoincrement())
-  classId   BigInt           @map("class_id")
+  courseId  BigInt           @map("course_id")
   studentId BigInt           @map("student_id")
-  status    MembershipStatus @default(ACTIVE)
+  status    EnrollmentStatus @default(ACTIVE)
   joinedAt  DateTime         @default(now()) @map("joined_at") @db.Timestamptz(6)
   removedAt DateTime?        @map("removed_at") @db.Timestamptz(6)
 
-  classroom Classroom @relation(fields: [classId], references: [id], onDelete: Cascade)
-  student   User      @relation(fields: [studentId], references: [id], onDelete: Restrict)
+  course  Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  student User   @relation(fields: [studentId], references: [id], onDelete: Restrict)
 
-  @@unique([classId, studentId], name: "uk_class_memberships_class_student")
-  @@map("class_memberships")
-}
-
-// ==============================================================================
-// 3. LEARNING CONTENT DOMAIN (NỘI DUNG HỌC TẬP: COURSE - MODULE - LESSON)
-// ==============================================================================
-
-model Course {
-  id         BigInt   @id @default(autoincrement())
-  classId    BigInt   @map("class_id")
-  title      String   @db.VarChar(255)
-  orderIndex Int      @map("order_index")
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
-
-  classroom Classroom @relation(fields: [classId], references: [id], onDelete: Cascade)
-  modules   Module[]
-
-  @@unique([classId, orderIndex], name: "uk_courses_class_order")
-  @@map("courses")
+  @@unique([courseId, studentId], name: "uk_enrollments_course_student")
+  @@map("enrollments")
 }
 
 model Module {
@@ -286,7 +267,7 @@ model Resource {
 
 model Assignment {
   id          BigInt         @id @default(autoincrement())
-  classId     BigInt         @map("class_id")
+  courseId    BigInt         @map("course_id")
   createdBy   BigInt         @map("created_by")
   title       String         @db.VarChar(255)
   description String?        @db.Text
@@ -298,7 +279,7 @@ model Assignment {
   createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  classroom   Classroom    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
   creator     User         @relation("AssignmentCreator", fields: [createdBy], references: [id], onDelete: Restrict)
   submissions Submission[]
   gradeItem   GradeItem?
@@ -325,14 +306,14 @@ model Submission {
 
 model GradeItem {
   id           BigInt        @id @default(autoincrement())
-  classId      BigInt        @map("class_id")
+  courseId     BigInt        @map("course_id")
   category     GradeCategory
   assignmentId BigInt?       @unique @map("assignment_id")
   quizId       BigInt?       @unique @map("quiz_id")
   maxScore     Decimal       @map("max_score") @db.Decimal(10, 2)
   createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  classroom  Classroom   @relation(fields: [classId], references: [id], onDelete: Cascade)
+  course     Course      @relation(fields: [courseId], references: [id], onDelete: Cascade)
   assignment Assignment? @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   quiz       Quiz?       @relation(fields: [quizId], references: [id], onDelete: Cascade)
   grades     Grade[]
@@ -380,12 +361,12 @@ model GradeHistory {
 
 model GradeConfig {
   id               BigInt   @id @default(autoincrement())
-  classId          BigInt   @unique @map("class_id")
+  courseId         BigInt   @unique @map("course_id")
   assignmentWeight Decimal  @default(50.00) @map("assignment_weight") @db.Decimal(5, 2)
   quizWeight       Decimal  @default(50.00) @map("quiz_weight") @db.Decimal(5, 2)
   updatedAt        DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  classroom Classroom @relation(fields: [classId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   @@map("grade_configs")
 }
@@ -430,7 +411,7 @@ model QuestionChoice {
 
 model Quiz {
   id                     BigInt         @id @default(autoincrement())
-  classId                BigInt         @map("class_id")
+  courseId               BigInt         @map("course_id")
   createdBy              BigInt         @map("created_by")
   title                  String         @db.VarChar(255)
   instructions           String?        @db.Text
@@ -445,7 +426,7 @@ model Quiz {
   createdAt              DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt              DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  classroom     Classroom      @relation(fields: [classId], references: [id], onDelete: Cascade)
+  course        Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
   creator       User           @relation("QuizCreator", fields: [createdBy], references: [id], onDelete: Restrict)
   quizQuestions QuizQuestion[]
   attempts      QuizAttempt[]
@@ -540,7 +521,7 @@ model AttemptAnswerChoice {
 
 model Announcement {
   id        BigInt             @id @default(autoincrement())
-  classId   BigInt             @map("class_id")
+  courseId  BigInt             @map("course_id")
   authorId  BigInt             @map("author_id")
   title     String             @db.VarChar(255)
   content   String             @db.Text
@@ -548,8 +529,8 @@ model Announcement {
   createdAt DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  classroom Classroom @relation(fields: [classId], references: [id], onDelete: Cascade)
-  author    User      @relation("AnnouncementAuthor", fields: [authorId], references: [id], onDelete: Restrict)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  author User   @relation("AnnouncementAuthor", fields: [authorId], references: [id], onDelete: Restrict)
 
   @@map("announcements")
 }
@@ -574,7 +555,7 @@ model Notification {
 
 model CalendarEvent {
   id         BigInt      @id @default(autoincrement())
-  classId    BigInt      @map("class_id")
+  courseId   BigInt      @map("course_id")
   createdBy  BigInt?     @map("created_by")
   title      String      @db.VarChar(255)
   startAt    DateTime    @map("start_at") @db.Timestamptz(6)
@@ -584,8 +565,8 @@ model CalendarEvent {
   createdAt  DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt  DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  classroom Classroom @relation(fields: [classId], references: [id], onDelete: Cascade)
-  creator   User?     @relation("CalendarEventCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+  course  Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  creator User?  @relation("CalendarEventCreator", fields: [createdBy], references: [id], onDelete: SetNull)
 
   @@index([sourceType, sourceId], name: "idx_calendar_events_source")
   @@map("calendar_events")

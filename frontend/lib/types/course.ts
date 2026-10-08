@@ -1,22 +1,22 @@
 import type { TeacherClass } from './teacher';
 import type { StudentClass, StudentClassStatus } from './student';
 
-export type BackendClassStatus = 'ACTIVE' | 'CLOSED' | 'ARCHIVED';
+export type BackendCourseStatus = 'ACTIVE' | 'CLOSED' | 'ARCHIVED';
 
-export interface ClassroomDto {
+export interface CourseDto {
   id: string;
   ownerId: string;
-  classCode: string;
+  courseCode: string;
   name: string;
   description?: string | null;
-  status: BackendClassStatus;
+  status: BackendCourseStatus;
   createdAt: string;
   updatedAt: string;
   _count?: {
-    memberships: number;
-    courses: number;
-    assignments: number;
-    quizzes: number;
+    enrollments?: number;
+    modules?: number;
+    assignments?: number;
+    quizzes?: number;
   };
   owner?: {
     id: string;
@@ -26,22 +26,22 @@ export interface ClassroomDto {
   };
 }
 
-export interface CreateClassPayload {
+export interface CreateCoursePayload {
   name: string;
   description?: string;
 }
 
-export interface UpdateClassPayload {
+export interface UpdateCoursePayload {
   name?: string;
   description?: string;
 }
 
-export interface UpdateClassStatusPayload {
-  status: BackendClassStatus;
+export interface UpdateCourseStatusPayload {
+  status: BackendCourseStatus;
 }
 
-export interface ClassListResponse {
-  items: ClassroomDto[];
+export interface CourseListResponse {
+  items: CourseDto[];
   meta: {
     total: number;
     page: number;
@@ -50,8 +50,8 @@ export interface ClassListResponse {
   };
 }
 
-export function mapClassroomDtoToTeacherClass(dto: ClassroomDto): TeacherClass {
-  const statusMap: Record<BackendClassStatus, 'active' | 'closed' | 'archived'> = {
+export function mapCourseDtoToTeacherClass(dto: CourseDto): TeacherClass {
+  const statusMap: Record<BackendCourseStatus, 'active' | 'closed' | 'archived'> = {
     ACTIVE: 'active',
     CLOSED: 'closed',
     ARCHIVED: 'archived',
@@ -76,10 +76,10 @@ export function mapClassroomDtoToTeacherClass(dto: ClassroomDto): TeacherClass {
 
   return {
     id: dto.id,
-    code: dto.classCode,
+    code: dto.courseCode,
     name: dto.name,
-    studentCount: dto._count?.memberships ?? 0,
-    courseCount: dto._count?.courses ?? 0,
+    studentCount: dto._count?.enrollments ?? 0,
+    courseCount: dto._count?.modules ?? 0,
     assignmentCount: dto._count?.assignments ?? 0,
     quizCount: dto._count?.quizzes ?? 0,
     updatedAt: formattedDate,
@@ -90,7 +90,7 @@ export function mapClassroomDtoToTeacherClass(dto: ClassroomDto): TeacherClass {
   };
 }
 
-export function mapClassroomDtoToStudentClass(dto: ClassroomDto): StudentClass {
+export function mapCourseDtoToStudentClass(dto: CourseDto): StudentClass {
   const gradients = [
     'from-blue-600 via-indigo-600 to-sky-600',
     'from-emerald-600 via-teal-600 to-cyan-600',
@@ -109,17 +109,17 @@ export function mapClassroomDtoToStudentClass(dto: ClassroomDto): StudentClass {
 
   return {
     id: dto.id,
-    code: dto.classCode,
+    code: dto.courseCode,
     name: dto.name,
     teacher: dto.owner?.fullName || 'Giảng viên',
     status,
-    memberCount: dto._count?.memberships ?? 0,
+    memberCount: dto._count?.enrollments ?? 0,
     coverGradient,
     coverEmoji,
     coverImageUrl: null,
     progress: 0,
     lessonsDone: 0,
-    lessonsTotal: dto._count?.courses ?? 0,
+    lessonsTotal: dto._count?.modules ?? 0,
     currentScore: null,
     assignmentNote: dto._count?.assignments ? `${dto._count.assignments} bài tập` : undefined,
     quizNote: dto._count?.quizzes ? `${dto._count.quizzes} bài kiểm tra` : undefined,

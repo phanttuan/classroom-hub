@@ -5,10 +5,10 @@ import { JwtService } from '@nestjs/jwt';
 import request from 'supertest';
 import { AppModule } from '../src/app.module.js';
 import { PrismaService } from '../src/database/prisma.service.js';
-import { UserRole, UserStatus, ClassStatus } from '../src/generated/prisma/enums.js';
+import { UserRole, UserStatus, CourseStatus } from '../src/generated/prisma/enums.js';
 import bcrypt from 'bcryptjs';
 
-describe('Class Management Permissions & Authorization (E2E)', () => {
+describe('Course Management Permissions & Authorization (E2E)', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   let jwtService: JwtService;
@@ -16,8 +16,8 @@ describe('Class Management Permissions & Authorization (E2E)', () => {
   let teacherA: { id: bigint; token: string };
   let teacherB: { id: bigint; token: string };
   let student: { id: bigint; token: string };
-  let classOfTeacherAId: bigint;
-  let classOfTeacherACode: string;
+  let courseOfTeacherAId: bigint;
+  let courseOfTeacherACode: string;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -94,9 +94,9 @@ describe('Class Management Permissions & Authorization (E2E)', () => {
   });
 
   afterAll(async () => {
-    if (classOfTeacherAId) {
-      await prisma.classMembership.deleteMany({ where: { classId: classOfTeacherAId } });
-      await prisma.classroom.deleteMany({ where: { id: classOfTeacherAId } });
+    if (courseOfTeacherAId) {
+      await prisma.enrollment.deleteMany({ where: { courseId: courseOfTeacherAId } });
+      await prisma.course.deleteMany({ where: { id: courseOfTeacherAId } });
     }
     if (teacherA?.id) await prisma.user.deleteMany({ where: { id: teacherA.id } });
     if (teacherB?.id) await prisma.user.deleteMany({ where: { id: teacherB.id } });
@@ -104,54 +104,54 @@ describe('Class Management Permissions & Authorization (E2E)', () => {
     await app.close();
   });
 
-  describe('1. Quyền tạo lớp học (POST /classes)', () => {
+  describe('1. Quyền tạo môn học (POST /courses)', () => {
     it('Chưa đăng nhập -> 401 Unauthorized', async () => {
       const res = await request(app.getHttpServer())
-        .post('/classes')
-        .send({ name: 'Lớp Không Token' });
+        .post('/courses')
+        .send({ name: 'Môn Không Token' });
 
       expect(res.status).toBe(401);
     });
 
-    it('Học sinh cố tình tạo lớp -> 403 Forbidden', async () => {
+    it('Học sinh cố tình tạo môn -> 403 Forbidden', async () => {
       const res = await request(app.getHttpServer())
-        .post('/classes')
+        .post('/courses')
         .set('Authorization', `Bearer ${student.token}`)
-        .send({ name: 'Lớp Do Học Sinh Tạo' });
+        .send({ name: 'Môn Do Học Sinh Tạo' });
 
       expect(res.status).toBe(403);
     });
 
-    it('Giáo viên A tạo lớp hợp lệ -> 201 Created', async () => {
+    it('Giáo viên A tạo môn hợp lệ -> 201 Created', async () => {
       const res = await request(app.getHttpServer())
-        .post('/classes')
+        .post('/courses')
         .set('Authorization', `Bearer ${teacherA.token}`)
         .send({
-          name: 'Lớp Học Của Thầy A',
-          description: 'Mô tả lớp học',
+          name: 'Môn Học Của Thầy A',
+          description: 'Mô tả môn học',
         });
 
       expect(res.status).toBe(201);
       expect(res.body.data.id).toBeDefined();
-      expect(res.body.data.classCode).toHaveLength(8);
-      classOfTeacherAId = BigInt(res.body.data.id);
-      classOfTeacherACode = res.body.data.classCode;
+      expect(res.body.data.courseCode).toHaveLength(8);
+      courseOfTeacherAId = BigInt(res.body.data.id);
+      courseOfTeacherACode = res.body.data.courseCode;
     });
   });
 
-  describe('2. Quyền chỉnh sửa thông tin lớp (PATCH /classes/:classId)', () => {
-    it('Học sinh cố tình sửa lớp -> 403 Forbidden (ClassOwnerGuard)', async () => {
+  describe('2. Quyền chỉnh sửa thông tin môn (PATCH /courses/:courseId)', () => {
+    it('Học sinh cố tình sửa môn -> 403 Forbidden (CourseOwnerGuard)', async () => {
       const res = await request(app.getHttpServer())
-        .patch(`/classes/${classOfTeacherAId}`)
+        .patch(`/courses/${courseOfTeacherAId}`)
         .set('Authorization', `Bearer ${student.token}`)
         .send({ name: 'Học sinh đổi tên' });
 
       expect(res.status).toBe(403);
     });
 
-    it('Giáo viên B cố tình sửa lớp của Giáo viên A -> 403 Forbidden (ClassOwnerGuard)', async () => {
+    it('Giáo viên B cố tình sửa môn của Giáo viên A -> 403 Forbidden (CourseOwnerGuard)', async () => {
       const res = await request(app.getHttpServer())
-        .patch(`/classes/${classOfTeacherAId}`)
+        .patch(`/courses/${courseOfTeacherAId}`)
         .set('Authorization', `Bearer ${teacherB.token}`)
         .send({ name: 'Giáo viên B đổi tên trái phép' });
 
@@ -159,113 +159,113 @@ describe('Class Management Permissions & Authorization (E2E)', () => {
       expect(res.body.message).toContain('không phải là giáo viên sở hữu');
     });
 
-    it('Chính chủ Giáo viên A sửa lớp của mình -> 200 OK', async () => {
+    it('Chính chủ Giáo viên A sửa môn của mình -> 200 OK', async () => {
       const res = await request(app.getHttpServer())
-        .patch(`/classes/${classOfTeacherAId}`)
+        .patch(`/courses/${courseOfTeacherAId}`)
         .set('Authorization', `Bearer ${teacherA.token}`)
-        .send({ name: 'Tên Lớp Đã Được Thầy A Sửa' });
+        .send({ name: 'Tên Môn Đã Được Thầy A Sửa' });
 
       expect(res.status).toBe(200);
-      expect(res.body.data.name).toBe('Tên Lớp Đã Được Thầy A Sửa');
+      expect(res.body.data.name).toBe('Tên Môn Đã Được Thầy A Sửa');
     });
   });
 
-  describe('3. Quyền chuyển trạng thái Đóng / Lưu trữ (PATCH /classes/:classId/status)', () => {
-    it('Giáo viên B cố tình đóng lớp của Giáo viên A -> 403 Forbidden', async () => {
+  describe('3. Quyền chuyển trạng thái Đóng / Lưu trữ (PATCH /courses/:courseId/status)', () => {
+    it('Giáo viên B cố tình đóng môn của Giáo viên A -> 403 Forbidden', async () => {
       const res = await request(app.getHttpServer())
-        .patch(`/classes/${classOfTeacherAId}/status`)
+        .patch(`/courses/${courseOfTeacherAId}/status`)
         .set('Authorization', `Bearer ${teacherB.token}`)
-        .send({ status: ClassStatus.CLOSED });
+        .send({ status: CourseStatus.CLOSED });
 
       expect(res.status).toBe(403);
     });
 
-    it('Chính chủ Giáo viên A đóng lớp của mình -> 200 OK', async () => {
+    it('Chính chủ Giáo viên A đóng môn của mình -> 200 OK', async () => {
       const res = await request(app.getHttpServer())
-        .patch(`/classes/${classOfTeacherAId}/status`)
+        .patch(`/courses/${courseOfTeacherAId}/status`)
         .set('Authorization', `Bearer ${teacherA.token}`)
-        .send({ status: ClassStatus.CLOSED });
+        .send({ status: CourseStatus.CLOSED });
 
       expect(res.status).toBe(200);
-      expect(res.body.data.status).toBe(ClassStatus.CLOSED);
+      expect(res.body.data.status).toBe(CourseStatus.CLOSED);
     });
   });
 
-  describe('4. Quyền và luồng tham gia lớp học (POST /classes/join) & Xem danh sách (GET /classes)', () => {
-    it('Giáo viên cố tình gọi API join lớp -> 403 Forbidden (RolesGuard)', async () => {
+  describe('4. Quyền và luồng tham gia môn học (POST /courses/join) & Xem danh sách (GET /courses)', () => {
+    it('Giáo viên cố tình gọi API join môn -> 403 Forbidden (RolesGuard)', async () => {
       const res = await request(app.getHttpServer())
-        .post('/classes/join')
+        .post('/courses/join')
         .set('Authorization', `Bearer ${teacherB.token}`)
-        .send({ classCode: classOfTeacherACode });
+        .send({ courseCode: courseOfTeacherACode });
 
       expect(res.status).toBe(403);
     });
 
-    it('Lớp học đang CLOSED -> Học sinh tham gia bị chặn 403 Forbidden', async () => {
+    it('Môn học đang CLOSED -> Học sinh tham gia bị chặn 403 Forbidden', async () => {
       const res = await request(app.getHttpServer())
-        .post('/classes/join')
+        .post('/courses/join')
         .set('Authorization', `Bearer ${student.token}`)
-        .send({ classCode: classOfTeacherACode });
+        .send({ courseCode: courseOfTeacherACode });
 
       expect(res.status).toBe(403);
       expect(res.body.message).toContain('đã đóng hoặc lưu trữ');
     });
 
-    it('Mã lớp không tồn tại -> 404 Not Found', async () => {
+    it('Mã môn không tồn tại -> 404 Not Found', async () => {
       const res = await request(app.getHttpServer())
-        .post('/classes/join')
+        .post('/courses/join')
         .set('Authorization', `Bearer ${student.token}`)
-        .send({ classCode: 'NOTFOUND' });
+        .send({ courseCode: 'NOTFOUND' });
 
       expect(res.status).toBe(404);
     });
 
-    it('Giáo viên A mở lại lớp (ACTIVE) và Học sinh tham gia thành công -> 200 OK', async () => {
-      // 1. Thầy A mở lại lớp
+    it('Giáo viên A mở lại môn (ACTIVE) và Học sinh tham gia thành công -> 200 OK', async () => {
+      // 1. Thầy A mở lại môn
       await request(app.getHttpServer())
-        .patch(`/classes/${classOfTeacherAId}/status`)
+        .patch(`/courses/${courseOfTeacherAId}/status`)
         .set('Authorization', `Bearer ${teacherA.token}`)
-        .send({ status: ClassStatus.ACTIVE });
+        .send({ status: CourseStatus.ACTIVE });
 
       // 2. Học sinh join
       const res = await request(app.getHttpServer())
-        .post('/classes/join')
+        .post('/courses/join')
         .set('Authorization', `Bearer ${student.token}`)
-        .send({ classCode: classOfTeacherACode });
+        .send({ courseCode: courseOfTeacherACode });
 
       expect(res.status).toBe(200);
-      expect(res.body.message).toContain('Tham gia lớp học thành công');
-      expect(res.body.data.id).toBe(classOfTeacherAId.toString());
+      expect(res.body.message).toContain('Tham gia môn học thành công');
+      expect(res.body.data.id).toBe(courseOfTeacherAId.toString());
     });
 
-    it('Học sinh tham gia lại lớp đã có mặt -> 409 Conflict', async () => {
+    it('Học sinh tham gia lại môn đã có mặt -> 409 Conflict', async () => {
       const res = await request(app.getHttpServer())
-        .post('/classes/join')
+        .post('/courses/join')
         .set('Authorization', `Bearer ${student.token}`)
-        .send({ classCode: classOfTeacherACode });
+        .send({ courseCode: courseOfTeacherACode });
 
       expect(res.status).toBe(409);
       expect(res.body.message).toContain('đã là thành viên');
     });
 
-    it('Học sinh gọi GET /classes -> 200 OK, thấy lớp mình đang tham gia', async () => {
+    it('Học sinh gọi GET /courses -> 200 OK, thấy môn mình đang tham gia', async () => {
       const res = await request(app.getHttpServer())
-        .get('/classes')
+        .get('/courses')
         .set('Authorization', `Bearer ${student.token}`);
 
       expect(res.status).toBe(200);
       expect(res.body.data.items).toBeDefined();
-      expect(res.body.data.items.some((c: any) => c.id === classOfTeacherAId.toString())).toBe(true);
+      expect(res.body.data.items.some((c: any) => c.id === courseOfTeacherAId.toString())).toBe(true);
     });
 
-    it('Giáo viên A gọi GET /classes -> 200 OK, thấy lớp do mình làm chủ', async () => {
+    it('Giáo viên A gọi GET /courses -> 200 OK, thấy môn do mình làm chủ', async () => {
       const res = await request(app.getHttpServer())
-        .get('/classes')
+        .get('/courses')
         .set('Authorization', `Bearer ${teacherA.token}`);
 
       expect(res.status).toBe(200);
       expect(res.body.data.items).toBeDefined();
-      expect(res.body.data.items.some((c: any) => c.id === classOfTeacherAId.toString())).toBe(true);
+      expect(res.body.data.items.some((c: any) => c.id === courseOfTeacherAId.toString())).toBe(true);
     });
   });
 });

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import {
   BarChart3,
   CalendarDays,
@@ -26,25 +26,33 @@ import {
 } from "lucide-react";
 import TeacherShell, { Toast } from "../components/TeacherShell";
 import {
-  ClassDetailModal,
+  CourseDetailModal,
   ConfirmStatusChangeModal,
-  CreateClassModal,
+  CreateCourseModal,
 } from "../components/TeacherModals";
-import { classPageClasses, demoAvatars, type ClassTab } from "@/lib/mock/teacher-classes";
 import { dashboardStats } from "@/lib/mock/teacher-dashboard";
 import type { TeacherClass } from "@/lib/types/teacher";
 import {
-  fetchTeacherClasses,
-  createClass,
-  updateClass,
-  updateClassStatus,
-} from "@/lib/api/class-api";
+  fetchTeacherCourses,
+  createCourse,
+  updateCourse,
+  updateCourseStatus,
+} from "@/lib/api/course-api";
 import {
-  mapClassroomDtoToTeacherClass,
-  type BackendClassStatus,
-} from "@/lib/types/class";
+  mapCourseDtoToTeacherClass,
+  type BackendCourseStatus,
+} from "@/lib/types/course";
 
-const TABS: { id: ClassTab; label: (counts: Record<ClassTab, number>) => string }[] = [
+type CourseTab = "all" | "active" | "closed" | "archived";
+
+const demoAvatars = [
+  "https://i.pravatar.cc/64?img=47",
+  "https://i.pravatar.cc/64?img=12",
+  "https://i.pravatar.cc/64?img=32",
+  "https://i.pravatar.cc/64?img=56",
+];
+
+const TABS: { id: CourseTab; label: (counts: Record<CourseTab, number>) => string }[] = [
   { id: "all", label: (c) => `Tất cả (${c.all})` },
   { id: "active", label: (c) => `Đang hoạt động (${c.active})` },
   { id: "closed", label: (c) => `Đã đóng (${c.closed})` },
@@ -60,25 +68,30 @@ function StatusBadge({ status }: { status: TeacherClass["status"] }) {
     );
   if (status === "closed")
     return (
-      <span className="whitespace-nowrap rounded-full bg-slate-100/90 px-3 py-1 text-[12px] font-medium text-slate-600">
+      <span className="whitespace-nowrap rounded-full bg-amber-100/90 px-3 py-1 text-[12px] font-medium text-amber-700">
         Đã đóng
       </span>
     );
   return (
-    <span className="whitespace-nowrap rounded-full bg-slate-200/90 px-3 py-1 text-[12px] font-medium text-slate-600">
+    <span className="whitespace-nowrap rounded-full bg-slate-200/90 px-3 py-1 text-[12px] font-medium text-slate-700">
       Đã lưu trữ
     </span>
   );
 }
 
-export default function TeacherClassesPage() {
+export default function TeacherCoursesPage() {
   const [topSearch, setTopSearch] = useState("");
-  const [tab, setTab] = useState<ClassTab>("all");
+  const [tab, setTab] = useState<CourseTab>("all");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("Mới cập nhật");
-  const [classes, setClasses] = useState<TeacherClass[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [copied, setCopied] = useState("");
   const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+
+  // Dữ liệu từ API
+  const [courses, setCourses] = useState<TeacherClass[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  // Modals state
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<TeacherClass | null>(null);
   const [viewing, setViewing] = useState<TeacherClass | null>(null);
@@ -86,130 +99,126 @@ export default function TeacherClassesPage() {
     classInfo: TeacherClass;
     targetStatus: "active" | "closed" | "archived";
   } | null>(null);
-  const [copied, setCopied] = useState("");
-  const [toast, setToast] = useState("");
-  const toastTimer = useRef<number | undefined>(undefined);
 
+  // Toast
+  const [toast, setToast] = useState("");
   const showToast = (msg: string) => {
     setToast(msg);
-    window.clearTimeout(toastTimer.current);
-    toastTimer.current = window.setTimeout(() => setToast(""), 2500);
+    window.setTimeout(() => setToast(""), 2500);
   };
 
-  // Load danh sách lớp học từ Backend API
-  const loadClasses = useCallback(async () => {
+  // Tải danh sách môn học từ API
+  const loadCourses = useCallback(async () => {
     try {
       setLoading(true);
-      // Gửi query 'all' để lấy cả ACTIVE, CLOSED và ARCHIVED
-      const res = await fetchTeacherClasses({ status: "all" });
-      if (res && res.items) {
-        const mapped = res.items.map(mapClassroomDtoToTeacherClass);
-        setClasses(mapped);
-      }
-    } catch {
-      setClasses([]);
+      const res = await fetchTeacherCourses();
+      const mapped = (res.items || []).map(mapCourseDtoToTeacherClass);
+      setCourses(mapped);
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      showToast(error?.message || "Không thể tải danh sách môn học");
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    loadClasses();
-  }, [loadClasses]);
+    loadCourses();
+  }, [loadCourses]);
 
   const counts = useMemo(() => {
-    const c: Record<ClassTab, number> = {
-      all: classes.length,
-      active: classes.filter((x) => x.status === "active").length,
-      closed: classes.filter((x) => x.status === "closed").length,
-      archived: classes.filter((x) => x.status === "archived").length,
+    const c: Record<CourseTab, number> = {
+      all: courses.length,
+      active: courses.filter((x) => x.status === "active").length,
+      closed: courses.filter((x) => x.status === "closed").length,
+      archived: courses.filter((x) => x.status === "archived").length,
     };
     return c;
-  }, [classes]);
+  }, [courses]);
 
   const filtered = useMemo(() => {
     const q = (query || topSearch).trim().toLowerCase();
-    let list = classes.filter((c) => (tab === "all" ? true : c.status === tab));
+    let list = courses.filter((c) => (tab === "all" ? true : c.status === tab));
     if (q) list = list.filter((c) => c.name.toLowerCase().includes(q) || c.code.toLowerCase().includes(q));
     if (sort === "Tên A-Z") list = [...list].sort((a, b) => a.name.localeCompare(b.name, "vi"));
     if (sort === "Đông sinh viên nhất")
       list = [...list].sort((a, b) => b.studentCount - a.studentCount);
     return list;
-  }, [classes, tab, query, topSearch, sort]);
+  }, [courses, tab, query, topSearch, sort]);
 
   const copyCode = async (code: string) => {
     try {
       await navigator.clipboard.writeText(code);
     } catch {
-      /* clipboard có thể bị chặn */
+      /* clipboard fallback */
     }
     setCopied(code);
-    showToast(`Đã sao chép mã lớp ${code}`);
+    showToast(`Đã sao chép mã môn học ${code}`);
     window.setTimeout(() => setCopied(""), 1500);
   };
 
-  // Xử lý Tạo / Chỉnh sửa lớp học qua API
-  const handleSaveClass = async (v: {
+  // Xử lý Tạo / Chỉnh sửa môn học qua API
+  const handleSaveCourse = async (v: {
     name: string;
     description?: string;
   }) => {
     if (editing) {
       try {
-        const res = await updateClass(editing.id, {
+        const res = await updateCourse(editing.id, {
           name: v.name,
           description: v.description,
         });
-        const updated = mapClassroomDtoToTeacherClass(res);
-        setClasses((prev) => prev.map((c) => (c.id === editing.id ? updated : c)));
-        showToast(`Đã lưu thay đổi lớp ${res.classCode}`);
+        const updated = mapCourseDtoToTeacherClass(res);
+        setCourses((prev) => prev.map((c) => (c.id === editing.id ? updated : c)));
+        showToast(`Đã lưu thay đổi môn học ${res.courseCode}`);
         setEditing(null);
         setCreateOpen(false);
       } catch (err: unknown) {
         const error = err as { message?: string };
-        showToast(error?.message || "Không thể lưu thay đổi lớp học");
+        showToast(error?.message || "Không thể lưu thay đổi môn học");
       }
     } else {
       try {
-        const res = await createClass({
+        const res = await createCourse({
           name: v.name,
           description: v.description,
         });
-        const newClass = mapClassroomDtoToTeacherClass(res);
-        setClasses((prev) => [newClass, ...prev]);
-        showToast(`Đã tạo lớp ${res.classCode} thành công!`);
+        const newCourse = mapCourseDtoToTeacherClass(res);
+        setCourses((prev) => [newCourse, ...prev]);
+        showToast(`Đã tạo môn học ${res.courseCode} thành công!`);
         setCreateOpen(false);
       } catch (err: unknown) {
         const error = err as { message?: string };
-        showToast(error?.message || "Không thể tạo lớp học");
+        showToast(error?.message || "Không thể tạo môn học");
       }
     }
   };
 
-  // Xử lý chuyển trạng thái lớp học qua API
+  // Xử lý chuyển trạng thái môn học qua API
   const handleConfirmStatusChange = async () => {
     if (!statusConfirm) return;
     const { classInfo, targetStatus } = statusConfirm;
 
-    const statusMap: Record<"active" | "closed" | "archived", BackendClassStatus> = {
+    const statusMap: Record<"active" | "closed" | "archived", BackendCourseStatus> = {
       active: "ACTIVE",
       closed: "CLOSED",
       archived: "ARCHIVED",
     };
 
     try {
-      const res = await updateClassStatus(classInfo.id, statusMap[targetStatus]);
-      const updated = mapClassroomDtoToTeacherClass(res);
-      setClasses((prev) => prev.map((c) => (c.id === classInfo.id ? updated : c)));
+      const res = await updateCourseStatus(classInfo.id, statusMap[targetStatus]);
+      const updated = mapCourseDtoToTeacherClass(res);
+      setCourses((prev) => prev.map((c) => (c.id === classInfo.id ? updated : c)));
 
       const labelMap = {
         active: "khôi phục",
         closed: "đóng",
         archived: "lưu trữ",
       };
-      showToast(`Đã ${labelMap[targetStatus]} lớp ${res.classCode}`);
+      showToast(`Đã ${labelMap[targetStatus]} môn học ${res.courseCode}`);
     } catch (err: unknown) {
       const error = err as { message?: string };
-      showToast(error?.message || "Không thể thay đổi trạng thái lớp");
+      showToast(error?.message || "Không thể thay đổi trạng thái môn học");
     } finally {
       setStatusConfirm(null);
     }
@@ -218,15 +227,15 @@ export default function TeacherClassesPage() {
   return (
     <TeacherShell
       activeId="classes"
-      searchPlaceholder="Tìm kiếm lớp học, mã lớp, sinh viên..."
+      searchPlaceholder="Tìm kiếm môn học, mã môn, sinh viên..."
       searchValue={topSearch}
       onSearchChange={setTopSearch}
     >
       {/* Header */}
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-[26px] font-extrabold tracking-tight">Lớp học</h1>
-          <p className="mt-0.5 text-[14px] text-slate-500">Quản lý các lớp học bạn đang giảng dạy</p>
+          <h1 className="text-[26px] font-extrabold tracking-tight">Môn học</h1>
+          <p className="mt-0.5 text-[14px] text-slate-500">Quản lý các môn học bạn đang giảng dạy</p>
         </div>
         <button
           onClick={() => {
@@ -235,7 +244,7 @@ export default function TeacherClassesPage() {
           }}
           className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-5 py-2.5 text-[14px] font-semibold text-white shadow-sm shadow-blue-600/30 transition hover:bg-blue-700"
         >
-          <Plus className="h-4 w-4" /> Tạo lớp học
+          <Plus className="h-4 w-4" /> Tạo môn học
         </button>
       </div>
 
@@ -253,7 +262,7 @@ export default function TeacherClassesPage() {
             <span>
               <span className="block text-[13px] text-slate-500">{s.label}</span>
               <span className="block text-[22px] font-extrabold leading-tight">
-                {i === 0 ? classes.length : s.value}
+                {i === 0 ? courses.length : s.value}
               </span>
             </span>
           </div>
@@ -282,7 +291,7 @@ export default function TeacherClassesPage() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Tìm kiếm lớp học..."
+              placeholder="Tìm kiếm môn học..."
               className="h-10 w-full rounded-lg bg-slate-100 pl-10 pr-3 text-[13px] outline-none placeholder:text-slate-400 focus:bg-white focus:ring-4 focus:ring-blue-100"
             />
           </div>
@@ -300,7 +309,7 @@ export default function TeacherClassesPage() {
         {loading && (
           <div className="flex h-48 flex-col items-center justify-center gap-2 text-slate-400">
             <Loader2 className="h-7 w-7 animate-spin text-blue-600" />
-            <span className="text-[13px]">Đang tải danh sách lớp học...</span>
+            <span className="text-[13px]">Đang tải danh sách môn học...</span>
           </div>
         )}
 
@@ -355,7 +364,7 @@ export default function TeacherClassesPage() {
                             }}
                             className="flex w-full items-center gap-2 px-3.5 py-2 text-[13px] text-amber-600 hover:bg-amber-50"
                           >
-                            <Lock className="h-4 w-4" /> Đóng lớp
+                            <Lock className="h-4 w-4" /> Đóng môn học
                           </button>
                         )}
 
@@ -367,7 +376,7 @@ export default function TeacherClassesPage() {
                             }}
                             className="flex w-full items-center gap-2 px-3.5 py-2 text-[13px] text-blue-600 hover:bg-blue-50"
                           >
-                            <RotateCcw className="h-4 w-4" /> Mở lại lớp
+                            <RotateCcw className="h-4 w-4" /> Mở lại môn học
                           </button>
                         )}
 
@@ -391,7 +400,7 @@ export default function TeacherClassesPage() {
                             }}
                             className="flex w-full items-center gap-2 px-3.5 py-2 text-[13px] text-blue-600 hover:bg-blue-50"
                           >
-                            <RotateCcw className="h-4 w-4" /> Khôi phục lớp
+                            <RotateCcw className="h-4 w-4" /> Khôi phục môn học
                           </button>
                         )}
                       </span>
@@ -402,7 +411,7 @@ export default function TeacherClassesPage() {
                 <div className="p-4">
                   <h3 className="text-[16px] font-bold">{c.name}</h3>
                   <p className="mt-1 flex items-center gap-1.5 text-[13px] text-slate-500">
-                    Mã lớp: <span className="font-mono font-semibold text-slate-700">{c.code}</span>
+                    Mã môn: <span className="font-mono font-semibold text-slate-700">{c.code}</span>
                     <button
                       onClick={() => copyCode(c.code)}
                       aria-label={`Sao chép mã ${c.code}`}
@@ -412,7 +421,7 @@ export default function TeacherClassesPage() {
                     </button>
                   </p>
                   <p className="mt-1.5 line-clamp-2 min-h-[40px] text-[13px] leading-relaxed text-slate-500">
-                    {c.description || "Chưa có mô tả cho lớp học."}
+                    {c.description || "Chưa có mô tả cho môn học."}
                   </p>
 
                   <div className="mt-3 grid grid-cols-3 gap-2">
@@ -479,13 +488,13 @@ export default function TeacherClassesPage() {
                           onClick={() => setStatusConfirm({ classInfo: c, targetStatus: "active" })}
                           className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 px-3 py-2 text-[13px] font-semibold text-slate-700 hover:bg-slate-100"
                         >
-                          <RotateCcw className="h-4 w-4" /> Mở lại lớp
+                          <RotateCcw className="h-4 w-4" /> Mở lại môn
                         </button>
                       </>
                     ) : (
                       <>
                         <button
-                          onClick={() => showToast(`Mở quản lý lớp ${c.code}`)}
+                          onClick={() => showToast(`Mở quản lý môn ${c.code}`)}
                           className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-blue-200 px-3 py-2 text-[13px] font-semibold text-blue-600 hover:bg-blue-50"
                         >
                           <Settings className="h-4 w-4" /> Quản lý
@@ -507,12 +516,12 @@ export default function TeacherClassesPage() {
 
         {!loading && filtered.length === 0 && (
           <p className="mt-5 rounded-xl bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-            Không có lớp học nào trong mục này.
+            Không có môn học nào trong mục này.
           </p>
         )}
 
         <div className="mt-5 flex items-center justify-between text-[13px] text-slate-500">
-          <span>Hiển thị {filtered.length} lớp học</span>
+          <span>Hiển thị {filtered.length} môn học</span>
           <span className="flex items-center gap-1.5">
             <button aria-label="Trang trước" className="grid h-8 w-8 place-items-center rounded-lg border border-slate-200 text-slate-300">
               <ChevronLeft className="h-4 w-4" />
@@ -525,16 +534,16 @@ export default function TeacherClassesPage() {
         </div>
       </div>
 
-      <CreateClassModal
+      <CreateCourseModal
         open={createOpen}
         initial={editing}
         onClose={() => {
           setCreateOpen(false);
           setEditing(null);
         }}
-        onSubmit={handleSaveClass}
+        onSubmit={handleSaveCourse}
       />
-      <ClassDetailModal classInfo={viewing} onClose={() => setViewing(null)} />
+      <CourseDetailModal classInfo={viewing} onClose={() => setViewing(null)} />
       <ConfirmStatusChangeModal
         classInfo={statusConfirm?.classInfo ?? null}
         targetStatus={statusConfirm?.targetStatus ?? null}
@@ -545,3 +554,4 @@ export default function TeacherClassesPage() {
     </TeacherShell>
   );
 }
+

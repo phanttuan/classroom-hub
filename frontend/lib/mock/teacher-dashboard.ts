@@ -32,11 +32,11 @@ export const greetingDateLabel = "Thứ Hai, 15 tháng 9, 2026";
 export const dashboardStats: DashboardStat[] = [
   {
     id: "stat-classes",
-    label: "Tổng lớp học",
+    label: "Tổng môn học",
     value: 3,
     tone: "blue",
     icon: "classes",
-    detailHref: "/teacher/classes",
+    detailHref: "/teacher/courses",
   },
   {
     id: "stat-students",
@@ -188,7 +188,7 @@ export const teacherNotifications: TeacherNotification[] = [
 
 export const teacherSidebarNav: SidebarItem[] = [
   { id: "home", label: "Tổng quan", icon: "home", href: "/teacher" },
-  { id: "classes", label: "Lớp học", icon: "classes", href: "/teacher/classes" },
+  { id: "classes", label: "Môn học", icon: "classes", href: "/teacher/courses" },
   {
     id: "content",
     label: "Nội dung học tập",
