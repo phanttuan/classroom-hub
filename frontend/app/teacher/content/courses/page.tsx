@@ -1,18 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Eye,
   LayoutGrid,
   List,
-  MoreVertical,
   Pencil,
   Plus,
   Search,
   Archive,
   AlertCircle,
+  Lock,
+  RotateCcw,
   Loader2,
   X,
 } from "lucide-react";
@@ -24,7 +25,8 @@ import {
   updateCourseStatus,
 } from "@/lib/api/course-api";
 import type { BackendCourseStatus, CourseDto } from "@/lib/types/course";
-import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { useConfirm, type ConfirmOptions } from "@/components/ui/ConfirmDialog";
+import KebabMenu, { type KebabMenuItem } from "@/components/ui/KebabMenu";
 
 const GRADIENTS = [
   "from-blue-600 via-indigo-600 to-sky-700",
@@ -39,6 +41,26 @@ const STATUS_LABEL: Record<BackendCourseStatus, string> = {
   ARCHIVED: "Đã lưu trữ",
 };
 
+/** Thao tác theo trạng thái lớp — dùng chung cho dạng lưới và dạng danh sách */
+function buildCourseActions(
+  course: CourseDto,
+  h: {
+    open: (c: CourseDto) => void;
+    edit: (c: CourseDto) => void;
+    changeStatus: (c: CourseDto, target: BackendCourseStatus) => void;
+  },
+): KebabMenuItem[] {
+  const archived = course.status === "ARCHIVED";
+  return [
+    { label: "Vào lớp học", icon: Eye, onClick: () => h.open(course) },
+    { label: "Chỉnh sửa", icon: Pencil, onClick: () => h.edit(course), hidden: archived },
+    { label: "Đóng lớp học", icon: Lock, onClick: () => h.changeStatus(course, "CLOSED"), hidden: course.status !== "ACTIVE" },
+    { label: "Mở lại lớp học", icon: RotateCcw, onClick: () => h.changeStatus(course, "ACTIVE"), hidden: course.status !== "CLOSED" },
+    { label: "Lưu trữ", icon: Archive, tone: "warning", onClick: () => h.changeStatus(course, "ARCHIVED"), hidden: archived },
+    { label: "Khôi phục lớp học", icon: RotateCcw, tone: "success", onClick: () => h.changeStatus(course, "ACTIVE"), hidden: !archived },
+  ];
+}
+
 export default function TeacherCoursesPage() {
   const router = useRouter();
   const confirm = useConfirm();
@@ -51,7 +73,6 @@ export default function TeacherCoursesPage() {
   const [courses, setCourses] = useState<CourseDto[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [editing, setEditing] = useState<CourseDto | null>(null);
   const [courseTitleInput, setCourseTitleInput] = useState("");
@@ -59,13 +80,16 @@ export default function TeacherCoursesPage() {
   const [modalError, setModalError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
-  const [toastMessage, setToastMessage] = useState("");
-  const timer = useRef<number | undefined>(undefined);
-  const showToast = (m: string) => {
-    setToastMessage(m);
-    window.clearTimeout(timer.current);
-    timer.current = window.setTimeout(() => setToastMessage(""), 2500);
-  };
+  // Toast tự ẩn sau 2,5 giây; id mới mỗi lần gọi để toast liên tiếp vẫn đặt lại thời gian
+  const [toast, setToast] = useState<{ message: string; id: number } | null>(null);
+  const toastMessage = toast?.message ?? "";
+  useEffect(() => {
+    if (!toast) return;
+    const t = window.setTimeout(() => setToast(null), 2500);
+    return () => window.clearTimeout(t);
+  }, [toast]);
+  const showToast = (message: string) => setToast((prev) => ({ message, id: (prev?.id ?? 0) + 1 }));
+
 
   const handleOpenCreateModal = () => {
     setEditing(null);
@@ -170,28 +194,70 @@ export default function TeacherCoursesPage() {
     }
   };
 
-  // Môn học không bị xóa cứng (giữ dữ liệu điểm, bài nộp) — chỉ chuyển sang lưu trữ
-  const handleArchiveCourse = async (course: CourseDto) => {
-    const ok = await confirm({
-      tone: "warning",
-      title: "Lưu trữ lớp học?",
-      message: (
-        <>
-          <strong className="text-slate-800">{course.name}</strong> sẽ chuyển sang chế độ chỉ đọc. Toàn bộ nội dung,
-          bài nộp và điểm số vẫn được giữ nguyên.
-        </>
-      ),
-      confirmText: "Lưu trữ",
-    });
-    if (!ok) return;
+  // Đổi trạng thái lớp theo quy tắc backend: Hoạt động ⇄ Đã đóng, mọi trạng thái → Lưu trữ,
+  // Lưu trữ chỉ khôi phục về Hoạt động. Lớp không bị xóa cứng để giữ bài nộp và điểm số.
+  const handleChangeStatus = async (course: CourseDto, target: BackendCourseStatus) => {
+    const name = <strong className="text-slate-800">{course.name}</strong>;
+    const dialogs: Record<string, ConfirmOptions & { done: string }> = {
+      CLOSED: {
+        tone: "warning",
+        icon: Lock,
+        title: "Đóng lớp học?",
+        message: (
+          <>
+            {name} sẽ ngừng nhận sinh viên mới tham gia bằng mã. Sinh viên hiện tại vẫn học và xem nội dung bình thường.
+          </>
+        ),
+        confirmText: "Đóng lớp",
+        done: "Đã đóng lớp học",
+      },
+      ARCHIVED: {
+        tone: "warning",
+        title: "Lưu trữ lớp học?",
+        message: (
+          <>
+            {name} sẽ chuyển sang chế độ chỉ đọc: không chỉnh sửa được nội dung, không nhận sinh viên mới. Toàn bộ nội
+            dung, bài nộp và điểm số vẫn được giữ nguyên, có thể khôi phục bất cứ lúc nào.
+          </>
+        ),
+        confirmText: "Lưu trữ",
+        done: "Đã lưu trữ lớp học",
+      },
+      ACTIVE:
+        course.status === "ARCHIVED"
+          ? {
+              tone: "primary",
+              icon: RotateCcw,
+              title: "Khôi phục lớp học?",
+              message: <>{name} sẽ hoạt động trở lại: chỉnh sửa được nội dung và nhận sinh viên tham gia bằng mã.</>,
+              confirmText: "Khôi phục",
+              done: "Đã khôi phục lớp học",
+            }
+          : {
+              tone: "primary",
+              icon: RotateCcw,
+              title: "Mở lại lớp học?",
+              message: <>Sinh viên có thể tham gia lại {name} bằng mã lớp.</>,
+              confirmText: "Mở lại",
+              done: "Đã mở lại lớp học",
+            },
+    };
+    const { done, ...dialog } = dialogs[target];
+    if (!(await confirm(dialog))) return;
     try {
-      await updateCourseStatus(course.id, "ARCHIVED");
-      showToast("Đã lưu trữ lớp học");
+      await updateCourseStatus(course.id, target);
+      showToast(done);
       await refreshData();
     } catch (err: unknown) {
       const error = err as { message?: string };
-      showToast(error?.message || "Lưu trữ lớp học thất bại");
+      showToast(error?.message || "Không thể thay đổi trạng thái lớp học");
     }
+  };
+
+  const actionHandlers = {
+    open: (course: CourseDto) => router.push(`/teacher/content/courses/${course.id}`),
+    edit: handleOpenEditModal,
+    changeStatus: handleChangeStatus,
   };
 
   return (
@@ -349,68 +415,27 @@ export default function TeacherCoursesPage() {
 
                     <div className="relative z-10 flex h-full flex-col justify-between">
                       <div className="flex items-start justify-between">
-                        <span className="rounded-md bg-white/20 px-2.5 py-1 text-[11px] font-bold backdrop-blur-md">
-                          {course.courseCode}
+                        <span className="flex flex-wrap items-center gap-1.5">
+                          <span className="rounded-md bg-white/20 px-2.5 py-1 text-[11px] font-bold backdrop-blur-md">
+                            {course.courseCode}
+                          </span>
+                          {course.status !== "ACTIVE" && (
+                            <span
+                              className={`rounded-md px-2.5 py-1 text-[11px] font-bold backdrop-blur-md ${
+                                course.status === "ARCHIVED" ? "bg-slate-200/90 text-slate-700" : "bg-amber-300/90 text-amber-900"
+                              }`}
+                            >
+                              {STATUS_LABEL[course.status]}
+                            </span>
+                          )}
                         </span>
 
                         {/* Nút 3 chấm menu */}
-                        <div
-                          className="relative"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <button
-                            onClick={() =>
-                              setOpenMenuId(openMenuId === course.id ? null : course.id)
-                            }
-                            className="grid h-8 w-8 place-items-center rounded-lg bg-black/20 text-white backdrop-blur-md hover:bg-black/40"
-                          >
-                            <MoreVertical className="h-4 w-4" />
-                          </button>
-
-                          {openMenuId === course.id && (
-                            <button
-                              type="button"
-                              aria-label="Đóng menu"
-                              tabIndex={-1}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setOpenMenuId(null);
-                              }}
-                              className="fixed inset-0 z-10 cursor-default"
-                            />
-                          )}
-                          {openMenuId === course.id && (
-                            <div className="absolute right-0 top-full z-30 mt-1 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 text-slate-700 shadow-2xl">
-                              <button
-                                onClick={() => {
-                                  setOpenMenuId(null);
-                                  router.push(`/teacher/content/courses/${course.id}`);
-                                }}
-                                className="flex w-full items-center gap-2 px-3.5 py-2 text-[13px] hover:bg-slate-50"
-                              >
-                                <Eye className="h-4 w-4 text-blue-600" /> Vào lớp học
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setOpenMenuId(null);
-                                  handleOpenEditModal(course);
-                                }}
-                                className="flex w-full items-center gap-2 px-3.5 py-2 text-[13px] hover:bg-slate-50"
-                              >
-                                <Pencil className="h-4 w-4 text-slate-600" /> Chỉnh sửa
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setOpenMenuId(null);
-                                  handleArchiveCourse(course);
-                                }}
-                                className="flex w-full items-center gap-2 px-3.5 py-2 text-[13px] text-amber-700 hover:bg-amber-50"
-                              >
-                                <Archive className="h-4 w-4" /> Lưu trữ
-                              </button>
-                            </div>
-                          )}
-                        </div>
+                        <KebabMenu
+                          label={`Thao tác với ${course.name}`}
+                          items={buildCourseActions(course, actionHandlers)}
+                          triggerClassName="grid h-8 w-8 place-items-center rounded-lg bg-black/20 text-white backdrop-blur-md transition hover:bg-black/40"
+                        />
                       </div>
 
                       <div className="text-right text-xs opacity-70">
@@ -473,12 +498,15 @@ export default function TeacherCoursesPage() {
                     </p>
                   </div>
                 </div>
-                <Link
-                  href={`/teacher/content/courses/${course.id}`}
-                  className="rounded-lg bg-blue-50 px-3.5 py-1.5 text-[13px] font-semibold text-blue-600 hover:bg-blue-100"
-                >
-                  Vào lớp học
-                </Link>
+                <div className="flex items-center gap-1.5">
+                  <Link
+                    href={`/teacher/content/courses/${course.id}`}
+                    className="rounded-lg bg-blue-50 px-3.5 py-1.5 text-[13px] font-semibold text-blue-600 hover:bg-blue-100"
+                  >
+                    Vào lớp học
+                  </Link>
+                  <KebabMenu label={`Thao tác với ${course.name}`} items={buildCourseActions(course, actionHandlers).slice(1)} />
+                </div>
               </div>
             ))}
           </div>

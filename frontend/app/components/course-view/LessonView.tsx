@@ -162,6 +162,7 @@ export default function LessonView({ courseId, lessonId, role, backHref }: Lesso
   const next = index >= 0 && index < sequence.length - 1 ? sequence[index + 1] : undefined;
   const isCompleted = course?.modules.flatMap((m) => m.lessons).find((l) => l.id === lessonId)?.isCompleted ?? false;
   const hidden = lesson?.status !== "PUBLISHED";
+  const isArchived = course?.status === "ARCHIVED";
 
   const toggleCompleted = async () => {
     setSavingProgress(true);
@@ -204,15 +205,18 @@ export default function LessonView({ courseId, lessonId, role, backHref }: Lesso
     const updated = formatDate(lesson.updatedAt);
     if (updated) stats.push({ dot: "slate", label: `Cập nhật ${updated}` });
     if (role === "STUDENT" && isCompleted) stats.push({ icon: Check, highlight: true, label: "Đã hoàn thành" });
+    if (isArchived) stats.push({ dot: "slate", label: "Lớp đã lưu trữ (chỉ đọc)" });
     return stats;
   };
 
   const heroActions =
     role === "TEACHER" ? (
       <>
-        <HeroButton variant="solid" href={`/teacher/content/courses/${courseId}/lessons/${lessonId}/edit`}>
-          <Pencil className="h-4 w-4" /> Chỉnh sửa
-        </HeroButton>
+        {!isArchived && (
+          <HeroButton variant="solid" href={`/teacher/content/courses/${courseId}/lessons/${lessonId}/edit`}>
+            <Pencil className="h-4 w-4" /> Chỉnh sửa
+          </HeroButton>
+        )}
         <HeroButton href={`${coursePath}#module-section-${lesson?.moduleId ?? ""}`}>
           <ArrowLeft className="h-4 w-4" /> Về trang lớp học
         </HeroButton>

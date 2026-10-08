@@ -460,7 +460,8 @@ async function seedCourse(c: SeedCourse, userIds: Record<UserKey, bigint>) {
         },
       });
       lessonCount++;
-      if (status === LessonStatus.PUBLISHED) publishedLessonIds.push(lesson.id);
+      // Chỉ bài đã đăng và không phải LABEL mới có tiến độ (khớp với LearningContentService)
+      if (status === LessonStatus.PUBLISHED && type !== LessonType.LABEL) publishedLessonIds.push(lesson.id);
 
       for (const r of l.resources ?? []) {
         await prisma.resource.create({

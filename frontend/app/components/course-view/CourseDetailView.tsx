@@ -18,6 +18,8 @@ import {
   Eye,
   EyeOff,
   ExternalLink,
+  Archive,
+  RotateCcw,
   FileText,
   Download,
 } from "lucide-react";
@@ -33,6 +35,7 @@ import {
   toggleLessonProgress,
 } from "@/lib/api/learning-content-api";
 import { triggerResourceDownload } from "@/lib/api/resource-api";
+import { updateCourseStatus } from "@/lib/api/course-api";
 import DocumentPreview from "@/components/resource/DocumentPreview";
 import RichContent from "@/components/content/RichContent";
 import KebabMenu from "@/components/ui/KebabMenu";
@@ -67,7 +70,11 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
   const [collapsedModules, setCollapsedModules] = useState<Record<string, boolean>>({});
 
   // Chế độ chỉnh sửa cho Giáo viên
-  const [editMode, setEditMode] = useState(role === "TEACHER");
+  const [editModeSetting, setEditMode] = useState(role === "TEACHER");
+  // Lớp đã lưu trữ là chỉ đọc (backend cũng chặn mọi thay đổi nội dung)
+  const isArchived = course?.status === "ARCHIVED";
+  const editMode = editModeSetting && !isArchived;
+  const [restoring, setRestoring] = useState(false);
 
   // Modal Topic
   const [moduleModalOpen, setModuleModalOpen] = useState(false);
@@ -168,6 +175,32 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
       await reloadData();
     } catch (err) {
       showToast((err as Error)?.message || "Xóa topic thất bại");
+    }
+  };
+
+  const handleRestoreCourse = async () => {
+    const ok = await confirm({
+      tone: "primary",
+      icon: RotateCcw,
+      title: "Khôi phục lớp học?",
+      message: (
+        <>
+          <strong className="text-slate-800">{course?.name}</strong> sẽ hoạt động trở lại: chỉnh sửa được nội dung và nhận
+          sinh viên tham gia bằng mã.
+        </>
+      ),
+      confirmText: "Khôi phục",
+    });
+    if (!ok) return;
+    setRestoring(true);
+    try {
+      await updateCourseStatus(courseId, "ACTIVE");
+      showToast("Đã khôi phục lớp học");
+      await reloadData();
+    } catch (err) {
+      showToast((err as Error)?.message || "Không thể khôi phục lớp học");
+    } finally {
+      setRestoring(false);
     }
   };
 
@@ -294,9 +327,11 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
 
   // ===================== Thống kê & tìm kiếm =====================
   const totalLessons = course?.modules?.reduce((acc, m) => acc + (m.lessons?.length || 0), 0) || 0;
-  const completedCount =
-    course?.modules?.reduce((acc, m) => acc + (m.lessons?.filter((l) => l.isCompleted)?.length || 0), 0) || 0;
-  const progressPercent = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
+  // Tiến độ chỉ tính mục có thể hoàn thành — bỏ "Văn bản và phương tiện" (khớp với backend)
+  const trackableLessons = course?.modules?.flatMap((m) => m.lessons.filter((l) => l.type !== "LABEL")) ?? [];
+  const trackableCount = trackableLessons.length;
+  const completedCount = trackableLessons.filter((l) => l.isCompleted).length;
+  const progressPercent = trackableCount > 0 ? Math.round((completedCount / trackableCount) * 100) : 0;
 
   const query = searchQuery.toLowerCase().trim();
   const filteredModules = !course?.modules
@@ -487,10 +522,10 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
       searchPlaceholder="Tìm kiếm topic, hoạt động trong khóa..."
       activeModuleId={activeNavId || course.modules[0]?.id}
       onModuleClick={scrollToModule}
-      onAddTopic={role === "TEACHER" ? handleOpenCreateModule : undefined}
+      onAddTopic={role === "TEACHER" && !isArchived ? handleOpenCreateModule : undefined}
       actionRight={
         <div className="flex items-center gap-2">
-          {role === "TEACHER" && (
+          {role === "TEACHER" && !isArchived && (
             <button
               type="button"
               role="switch"
@@ -549,12 +584,35 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
             { dot: "sky", label: `${course.modules.length} topic` },
             { dot: "amber", label: `${totalLessons} hoạt động & tài nguyên` },
             ...(role === "STUDENT"
-              ? [{ icon: Check, highlight: true, label: `Đã hoàn thành ${completedCount}/${totalLessons} (${progressPercent}%)` }]
+              ? [{ icon: Check, highlight: true, label: `Đã hoàn thành ${completedCount}/${trackableCount} (${progressPercent}%)` }]
               : []),
           ]}
           brandTag="Lớp học"
           status={COURSE_STATUS[course.status]}
         />
+
+        {isArchived && (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-300 bg-slate-100 px-4 py-3">
+            <p className="flex items-center gap-2.5 text-[13.5px] text-slate-700">
+              <Archive className="h-5 w-5 shrink-0 text-slate-500" />
+              <span>
+                <strong className="text-slate-900">Lớp học đã lưu trữ — chế độ chỉ đọc.</strong>{" "}
+                {role === "TEACHER"
+                  ? "Nội dung, bài nộp và điểm số được giữ nguyên nhưng không thể chỉnh sửa."
+                  : "Bạn vẫn xem lại được nội dung nhưng lớp học không còn hoạt động."}
+              </span>
+            </p>
+            {role === "TEACHER" && (
+              <button
+                onClick={handleRestoreCourse}
+                disabled={restoring}
+                className="flex items-center gap-1.5 rounded-lg bg-[#0f6cbf] px-3.5 py-1.5 text-[13px] font-semibold text-white hover:bg-[#0c599e] disabled:opacity-60"
+              >
+                <RotateCcw className={`h-4 w-4 ${restoring ? "animate-spin" : ""}`} /> Khôi phục lớp học
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Thanh Tab trắng nằm bên dưới banner (Ảnh 2, 3: Khoá học, Danh sách thành viên, Điểm số, Năng lực) */}
         <div className="mt-3 flex items-center justify-between rounded-xl border border-slate-200/90 bg-white px-2 shadow-xs sm:px-4">

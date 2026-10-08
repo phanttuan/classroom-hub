@@ -6,7 +6,7 @@ import {
   Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service.js';
-import { UserRole, LessonStatus, EnrollmentStatus, CourseStatus } from '../../generated/prisma/enums.js';
+import { UserRole, LessonStatus, LessonType, EnrollmentStatus, CourseStatus } from '../../generated/prisma/enums.js';
 import { Prisma } from '../../generated/prisma/client.js';
 import { CloudinaryService } from '../resource/cloudinary.service.js';
 import { buildLessonFields } from './utils/lesson-fields.js';
@@ -142,13 +142,16 @@ export class LearningContentService {
 
     const formattedModules = course.modules.map((m) => {
       const formattedLessons = m.lessons.map((l) => {
-        totalPublished++;
         const { progresses, ...lesson } = l as typeof l & {
           progresses?: { isCompleted: boolean; completedAt: Date | null }[];
         };
         const progress = progresses?.[0];
         const isCompleted = progress?.isCompleted ?? false;
-        if (isCompleted) completedCount++;
+        // "Văn bản và phương tiện" chỉ hiển thị trên trang lớp, không có hoàn thành → không tính vào tiến độ
+        if (l.type !== LessonType.LABEL) {
+          totalPublished++;
+          if (isCompleted) completedCount++;
+        }
 
         return {
           ...lesson,
@@ -465,6 +468,9 @@ export class LearningContentService {
 
     if (lesson.status !== LessonStatus.PUBLISHED) {
       throw new ForbiddenException('Chỉ có thể đánh dấu bài học đã xuất bản');
+    }
+    if (lesson.type === LessonType.LABEL) {
+      throw new BadRequestException('Văn bản và phương tiện không có trạng thái hoàn thành');
     }
 
     await this.verifyCourseMemberOrTeacherAccess(lesson.module.courseId, studentId, UserRole.STUDENT);

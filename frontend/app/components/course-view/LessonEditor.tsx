@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertCircle,
+  Archive,
   ChevronDown,
   ChevronRight,
   Eye,
@@ -459,7 +460,25 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
       </div>
 
       <main className="mx-auto max-w-[1440px] px-4 py-5 sm:px-6 lg:px-8">
-        {loadError ? (
+        {course?.status === "ARCHIVED" ? (
+          <div className="flex flex-col items-center rounded-2xl border border-slate-200 bg-white px-6 py-14 text-center shadow-xs">
+            <div className="grid h-16 w-16 place-items-center rounded-2xl bg-slate-100 text-slate-500">
+              <Archive className="h-8 w-8" />
+            </div>
+            <p className="mt-4 text-[18px] font-bold text-slate-900">Lớp học đã lưu trữ</p>
+            <p className="mt-1 max-w-md text-[14px] text-slate-500">
+              Lớp học đang ở chế độ chỉ đọc nên không thể thêm hoặc chỉnh sửa nội dung. Hãy khôi phục lớp học để tiếp tục
+              soạn thảo.
+            </p>
+            <button
+              type="button"
+              onClick={() => router.push(coursePath)}
+              className="mt-5 rounded-xl bg-[#0f6cbf] px-5 py-2.5 text-[14px] font-semibold text-white hover:bg-[#0c599e]"
+            >
+              Về trang lớp học
+            </button>
+          </div>
+        ) : loadError ? (
           <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-red-700">{loadError}</div>
         ) : isEdit && !lesson ? (
           <div className="grid place-items-center rounded-2xl bg-white py-20">

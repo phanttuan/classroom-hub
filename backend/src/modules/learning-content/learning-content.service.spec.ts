@@ -7,7 +7,7 @@ import {
 import { LearningContentService } from './learning-content.service.js';
 import { PrismaService } from '../../database/prisma.service.js';
 import { CloudinaryService } from '../resource/cloudinary.service.js';
-import { UserRole, LessonStatus, EnrollmentStatus } from '../../generated/prisma/enums.js';
+import { UserRole, LessonStatus, LessonType, EnrollmentStatus } from '../../generated/prisma/enums.js';
 
 describe('LearningContentService', () => {
   let service: LearningContentService;
@@ -106,6 +106,29 @@ describe('LearningContentService', () => {
       expect(result.progressPercent).toBe(50);
       expect(result.modules[0].lessons[0]).not.toHaveProperty('progresses');
       expect(result.modules[0].lessons[0].isCompleted).toBe(true);
+    });
+
+    it('không tính Văn bản và phương tiện (LABEL) vào tiến độ', async () => {
+      prisma.course.findUnique.mockResolvedValueOnce({ ownerId: teacherId }).mockResolvedValueOnce({
+        ...courseWithModules,
+        modules: [
+          {
+            ...courseWithModules.modules[0],
+            lessons: [
+              { id: 1000n, type: LessonType.PAGE, progresses: [{ isCompleted: true, completedAt: new Date() }] },
+              { id: 1001n, type: LessonType.LABEL, progresses: [] },
+            ],
+          },
+        ],
+      });
+      prisma.enrollment.findUnique.mockResolvedValue({ status: EnrollmentStatus.ACTIVE });
+
+      const result = await service.getCourseContent(studentId, UserRole.STUDENT, courseId);
+
+      // Chỉ còn 1 bài tính tiến độ và đã hoàn thành → 100%
+      expect(result.totalLessons).toBe(1);
+      expect(result.completedLessons).toBe(1);
+      expect(result.progressPercent).toBe(100);
     });
 
     it('chỉ lấy bài học PUBLISHED khi là sinh viên', async () => {
@@ -262,6 +285,18 @@ describe('LearningContentService', () => {
         select: { ownerId: true },
       });
       expect(result.isCompleted).toBe(true);
+    });
+
+    it('không cho đánh dấu hoàn thành Văn bản và phương tiện (LABEL)', async () => {
+      prisma.lesson.findUnique.mockResolvedValue({
+        id: 1000n,
+        type: LessonType.LABEL,
+        status: LessonStatus.PUBLISHED,
+        module: { courseId },
+      });
+
+      await expect(service.toggleLessonProgress(studentId, 1000n)).rejects.toThrow(BadRequestException);
+      expect(prisma.lessonProgress.upsert).not.toHaveBeenCalled();
     });
 
     it('không cho đánh dấu bài học chưa xuất bản', async () => {
