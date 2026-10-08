@@ -235,7 +235,7 @@ describe('ResourceService Real DB Integration Test', () => {
       { id: teacherId, role: UserRole.TEACHER },
       draftResourceId,
     );
-    expect(preview.filename).toBe('de-cuong-nhap.docx');
+    expect(preview.fileName).toBe('de-cuong-nhap.docx');
     expect(preview.expiresIn).toBe(600);
   });
 

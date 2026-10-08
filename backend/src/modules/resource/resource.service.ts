@@ -22,7 +22,6 @@ export interface ResourceUrlResponse {
   url: string;
   expiresIn: number;
   mimeType: string;
-  filename: string;
   fileName: string;
 }
 
@@ -227,7 +226,6 @@ export class ResourceService {
       url: signed.url,
       expiresIn: signed.expiresIn,
       mimeType: resource.mimeType,
-      filename: resource.fileName,
       fileName: resource.fileName,
     };
   }
@@ -255,7 +253,6 @@ export class ResourceService {
       url: signed.url,
       expiresIn: signed.expiresIn,
       mimeType: resource.mimeType,
-      filename: resource.fileName,
       fileName: resource.fileName,
     };
   }

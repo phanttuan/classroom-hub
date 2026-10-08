@@ -203,7 +203,7 @@ describe('ResourceService', () => {
 
       expect(result.expiresIn).toBe(600);
       expect(result.mimeType).toBe('application/pdf');
-      expect(result.filename).toBe('de-cuong.pdf');
+      expect(result.fileName).toBe('de-cuong.pdf');
       expect(result.url).toContain('https://res.cloudinary.com/test-cloud/raw/authenticated/');
       expect(result.url).not.toContain('fl_attachment');
       expect(result.url).toMatch(/(?:exp|expires_at)=(\d+)/);
@@ -214,7 +214,7 @@ describe('ResourceService', () => {
 
       const result = await service.getPreviewUrl(teacherUser, 41n);
       expect(result.expiresIn).toBe(600);
-      expect(result.filename).toBe('nhap.pdf');
+      expect(result.fileName).toBe('nhap.pdf');
     });
 
     it('Học sinh xem tài liệu của bài học DRAFT bị chặn 403', async () => {
@@ -248,7 +248,7 @@ describe('ResourceService', () => {
 
       expect(result.expiresIn).toBe(600);
       expect(result.url).toContain('fl_attachment');
-      expect(result.filename).toBe('de-cuong.pdf');
+      expect(result.fileName).toBe('de-cuong.pdf');
     });
 
     it('Học sinh bị gỡ (REMOVED) khi tải file bị chặn 403', async () => {

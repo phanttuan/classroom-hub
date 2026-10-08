@@ -15,7 +15,6 @@ export interface ResourcePreviewResponse {
   url: string;
   expiresIn: number;
   mimeType: string;
-  filename: string;
-  fileName?: string;
+  fileName: string;
 }
 

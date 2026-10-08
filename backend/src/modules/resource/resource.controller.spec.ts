@@ -52,7 +52,6 @@ describe('ResourceController & LessonResourceController', () => {
         url: 'https://res.cloudinary.com/test/preview',
         expiresIn: 600,
         mimeType: 'application/pdf',
-        filename: 'tailieu.pdf',
         fileName: 'tailieu.pdf',
       };
       mockResourceService.getPreviewUrl.mockResolvedValue(mockResult);
@@ -71,7 +70,6 @@ describe('ResourceController & LessonResourceController', () => {
         url: 'https://res.cloudinary.com/test/download',
         expiresIn: 600,
         mimeType: 'application/pdf',
-        filename: 'tailieu.pdf',
         fileName: 'tailieu.pdf',
       };
       mockResourceService.getDownloadUrl.mockResolvedValue(mockResult);

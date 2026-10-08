@@ -163,7 +163,7 @@ export default function DocumentPreview({
     if (!previewData?.url || !docxContainerRef.current) return;
     const category = getFileTypeCategory(
       previewData.mimeType || initialMimeType || '',
-      previewData.filename || initialFileName || '',
+      previewData.fileName || initialFileName || '',
     );
 
     if (category !== 'docx') return;
@@ -182,7 +182,7 @@ export default function DocumentPreview({
             await loadPreview(true);
             return;
           }
-          throw new Error('Liên kết tài liệu đã hết hạn (10 phút).');
+          throw new Error('Liên kết tài liệu đã hết hạn.');
         }
 
         const blob = await response.blob();
@@ -214,7 +214,7 @@ export default function DocumentPreview({
     if (!previewData?.url) return;
     const category = getFileTypeCategory(
       previewData.mimeType || initialMimeType || '',
-      previewData.filename || initialFileName || '',
+      previewData.fileName || initialFileName || '',
     );
 
     if (category !== 'sheet') return;
@@ -268,7 +268,7 @@ export default function DocumentPreview({
     if (!resourceId) return;
     try {
       setDownloading(true);
-      const fileName = previewData?.filename || initialFileName;
+      const fileName = previewData?.fileName || initialFileName;
       await triggerResourceDownload(resourceId, fileName);
     } catch (err: any) {
       alert(err?.message || 'Lỗi khi tải tài liệu');
@@ -279,7 +279,7 @@ export default function DocumentPreview({
 
   if (!isOpen) return null;
 
-  const fileName = previewData?.filename || initialFileName || 'Tài liệu bài học';
+  const fileName = previewData?.fileName || initialFileName || 'Tài liệu bài học';
   const fileSizeStr = formatFileSize(initialFileSize);
   const mimeType = previewData?.mimeType || initialMimeType || '';
   const category = getFileTypeCategory(mimeType, fileName);
@@ -311,8 +311,6 @@ export default function DocumentPreview({
                     <span>{fileSizeStr}</span>
                   </>
                 )}
-                <span>•</span>
-                <span className="text-emerald-600 font-medium">Bảo mật CDN (10 phút)</span>
               </div>
             </div>
           </div>
@@ -321,7 +319,7 @@ export default function DocumentPreview({
             <button
               onClick={() => loadPreview(false)}
               disabled={loading}
-              title="Tải lại liên kết (nếu quá hạn 10 phút)"
+              title="Tải lại tài liệu"
               className="p-2 text-slate-500 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition disabled:opacity-40"
             >
               <RotateCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />

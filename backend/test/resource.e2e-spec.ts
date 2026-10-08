@@ -234,7 +234,7 @@ describe('Resource Preview & Download Endpoints (E2E)', () => {
 
     expect(res.status).toBe(200);
     expect(res.body.success).toBe(true);
-    expect(res.body.data.filename).toBe('tailieu-chinhthuc.pdf');
+    expect(res.body.data.fileName).toBe('tailieu-chinhthuc.pdf');
     expect(res.body.data.expiresIn).toBe(600);
     expect(res.body.data.url).toContain('authenticated');
     expect(res.body.data.url).not.toContain('fl_attachment');
@@ -254,7 +254,7 @@ describe('Resource Preview & Download Endpoints (E2E)', () => {
       .set('Authorization', `Bearer ${teacherUser.token}`);
 
     expect(res.status).toBe(200);
-    expect(res.body.data.filename).toBe('tailieu-nhap.pdf');
+    expect(res.body.data.fileName).toBe('tailieu-nhap.pdf');
   });
 
   it('6. Lấy link tải xuống (download) -> có cờ fl_attachment', async () => {

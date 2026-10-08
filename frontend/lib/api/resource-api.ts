@@ -73,7 +73,7 @@ export async function triggerResourceDownload(
 
   const link = document.createElement('a');
   link.href = data.url;
-  link.setAttribute('download', preferredFileName || data.filename || 'download');
+  link.setAttribute('download', preferredFileName || data.fileName || 'download');
   link.setAttribute('target', '_blank');
   link.setAttribute('rel', 'noopener noreferrer');
   document.body.appendChild(link);
