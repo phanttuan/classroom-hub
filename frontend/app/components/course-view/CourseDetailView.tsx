@@ -24,6 +24,7 @@ import {
   Download,
 } from "lucide-react";
 import type { LessonDto, ModuleDto, ResourceDto } from "@/lib/types/learning-content";
+import type { CourseMembersResponse } from "@/lib/types/course";
 import {
   createModule,
   updateModule,
@@ -35,7 +36,7 @@ import {
   toggleLessonProgress,
 } from "@/lib/api/learning-content-api";
 import { triggerResourceDownload } from "@/lib/api/resource-api";
-import { updateCourseStatus } from "@/lib/api/course-api";
+import { updateCourseStatus, fetchCourseMembers } from "@/lib/api/course-api";
 import DocumentPreview from "@/components/resource/DocumentPreview";
 import RichContent from "@/components/content/RichContent";
 import KebabMenu from "@/components/ui/KebabMenu";
@@ -82,6 +83,24 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
   const [moduleTitleInput, setModuleTitleInput] = useState("");
 
   const [previewResource, setPreviewResource] = useState<ResourceDto | null>(null);
+
+  // Danh sách thành viên lớp học (tải khi mở tab members)
+  const [members, setMembers] = useState<CourseMembersResponse | null>(null);
+  const [membersLoading, setMembersLoading] = useState(false);
+  const [membersError, setMembersError] = useState("");
+
+  useEffect(() => {
+    if (activeTab !== "members" || members || membersError) return;
+    let active = true;
+    setMembersLoading(true);
+    fetchCourseMembers(courseId)
+      .then((data) => active && setMembers(data))
+      .catch((err) => active && setMembersError((err as Error)?.message || "Không tải được danh sách thành viên"))
+      .finally(() => active && setMembersLoading(false));
+    return () => {
+      active = false;
+    };
+  }, [activeTab, courseId, members, membersError]);
 
   // Toast
   const [toastMessage, setToastMessage] = useState("");
@@ -788,21 +807,53 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  <tr>
-                    <td className="px-4 py-3 font-semibold text-slate-900">ThS. Nguyễn Văn A</td>
-                    <td className="px-4 py-3 font-medium text-[#0f6cbf]">Giảng viên</td>
-                    <td className="px-4 py-3 text-emerald-600 font-medium">Đang hoạt động</td>
-                  </tr>
-                  <tr>
-                    <td className="px-4 py-3 text-slate-800">Trần Thị Mai (student1@classroomhub.edu.vn)</td>
-                    <td className="px-4 py-3 text-slate-500">Sinh viên</td>
-                    <td className="px-4 py-3 text-emerald-600 font-medium">Đang hoạt động</td>
-                  </tr>
-                  <tr>
-                    <td className="px-4 py-3 text-slate-800">Lê Hoàng Nam (student2@classroomhub.edu.vn)</td>
-                    <td className="px-4 py-3 text-slate-500">Sinh viên</td>
-                    <td className="px-4 py-3 text-emerald-600 font-medium">Đang hoạt động</td>
-                  </tr>
+                  {membersLoading ? (
+                    <tr>
+                      <td colSpan={3} className="px-4 py-6 text-center text-sm text-slate-400">
+                        Đang tải danh sách thành viên...
+                      </td>
+                    </tr>
+                  ) : membersError ? (
+                    <tr>
+                      <td colSpan={3} className="px-4 py-6 text-center text-sm">
+                        <p className="text-rose-600">{membersError}</p>
+                        <button
+                          onClick={() => setMembersError("")}
+                          className="mt-2 rounded-lg px-3 py-1.5 text-[13px] font-semibold text-[#0f6cbf] hover:bg-blue-50"
+                        >
+                          Thử lại
+                        </button>
+                      </td>
+                    </tr>
+                  ) : (
+                    <>
+                      {members?.owner && (
+                        <tr>
+                          <td className="px-4 py-3 font-semibold text-slate-900">
+                            {members.owner.fullName} <span className="font-normal text-slate-400">({members.owner.email})</span>
+                          </td>
+                          <td className="px-4 py-3 font-medium text-[#0f6cbf]">Giảng viên</td>
+                          <td className="px-4 py-3 text-emerald-600 font-medium">Đang hoạt động</td>
+                        </tr>
+                      )}
+                      {members?.students.map((s) => (
+                        <tr key={s.id}>
+                          <td className="px-4 py-3 text-slate-800">
+                            {s.fullName} <span className="text-slate-400">({s.email})</span>
+                          </td>
+                          <td className="px-4 py-3 text-slate-500">Sinh viên</td>
+                          <td className="px-4 py-3 text-emerald-600 font-medium">Đang hoạt động</td>
+                        </tr>
+                      ))}
+                      {!members?.owner && (members?.students.length ?? 0) === 0 && (
+                        <tr>
+                          <td colSpan={3} className="px-4 py-6 text-center text-sm text-slate-400">
+                            Chưa có thành viên nào trong lớp học.
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  )}
                 </tbody>
               </table>
             </div>

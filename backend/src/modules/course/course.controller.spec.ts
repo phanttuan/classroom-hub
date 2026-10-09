@@ -18,6 +18,7 @@ describe('CourseController', () => {
     findStudentCourses: ReturnType<typeof vi.fn>;
     findAllCourses: ReturnType<typeof vi.fn>;
     joinCourse: ReturnType<typeof vi.fn>;
+    findMembers: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -30,6 +31,7 @@ describe('CourseController', () => {
       findStudentCourses: vi.fn(),
       findAllCourses: vi.fn(),
       joinCourse: vi.fn(),
+      findMembers: vi.fn(),
     };
     controller = new CourseController(service as unknown as CourseService);
   });
@@ -108,6 +110,23 @@ describe('CourseController', () => {
       const result = await controller.getCourseDetail(req);
       expect(service.findOne).toHaveBeenCalledWith(1n);
       expect(result).toEqual(course);
+    });
+  });
+
+  describe('getCourseMembers', () => {
+    it('should call service.findMembers with courseId', async () => {
+      const course = { id: 1n, name: 'Môn 1' } as any;
+      const req = {
+        course,
+        user: { id: '10', role: UserRole.TEACHER },
+      } as RequestWithCourseContext;
+      const members = { owner: { id: 10n, fullName: 'Thầy A' }, students: [] };
+
+      service.findMembers.mockResolvedValue(members);
+
+      const result = await controller.getCourseMembers(req);
+      expect(service.findMembers).toHaveBeenCalledWith(1n);
+      expect(result).toEqual(members);
     });
   });
 

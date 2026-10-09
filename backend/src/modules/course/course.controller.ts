@@ -124,6 +124,16 @@ export class CourseController {
   }
 
   /**
+   * Lấy danh sách thành viên lớp học (giảng viên phụ trách + sinh viên đang tham gia)
+   */
+  @Get(':courseId/members')
+  @UseGuards(CourseMemberGuard)
+  async getCourseMembers(@Req() req: RequestWithCourseContext) {
+    const courseId = req.course!.id;
+    return this.courseService.findMembers(courseId);
+  }
+
+  /**
    * Chỉnh sửa thông tin môn học (Tên, mô tả)
    * Chỉ Giáo viên sở hữu môn học mới có quyền thực hiện.
    */

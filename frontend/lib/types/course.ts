@@ -50,6 +50,20 @@ export interface CourseListResponse {
   };
 }
 
+export interface CourseMemberDto {
+  id: string;
+  fullName: string;
+  email: string;
+  avatarUrl?: string | null;
+  status?: string;
+  joinedAt?: string;
+}
+
+export interface CourseMembersResponse {
+  owner: CourseMemberDto | null;
+  students: CourseMemberDto[];
+}
+
 export function mapCourseDtoToTeacherClass(dto: CourseDto): TeacherClass {
   const statusMap: Record<BackendCourseStatus, 'active' | 'closed' | 'archived'> = {
     ACTIVE: 'active',

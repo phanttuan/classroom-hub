@@ -279,6 +279,44 @@ describe('CourseService', () => {
     });
   });
 
+  describe('findMembers', () => {
+    it('should return owner and active students', async () => {
+      const courseId = 1n;
+      const joinedAt = new Date('2026-09-01T00:00:00Z');
+      prisma.course.findUnique.mockResolvedValue({
+        owner: { id: 10n, fullName: 'Thầy A', email: 'teacher@school.edu.vn', avatarUrl: null },
+        enrollments: [
+          {
+            status: EnrollmentStatus.ACTIVE,
+            joinedAt,
+            student: { id: 20n, fullName: 'Sinh viên B', email: 'sv@school.edu.vn', avatarUrl: null },
+          },
+        ],
+      });
+
+      const result = await service.findMembers(courseId);
+
+      expect(result.owner).toEqual({ id: 10n, fullName: 'Thầy A', email: 'teacher@school.edu.vn', avatarUrl: null });
+      expect(result.students).toEqual([
+        { id: 20n, fullName: 'Sinh viên B', email: 'sv@school.edu.vn', avatarUrl: null, status: EnrollmentStatus.ACTIVE, joinedAt },
+      ]);
+      expect(prisma.course.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: courseId },
+          select: expect.objectContaining({
+            owner: expect.anything(),
+            enrollments: expect.anything(),
+          }),
+        }),
+      );
+    });
+
+    it('should throw NotFoundException if course not found', async () => {
+      prisma.course.findUnique.mockResolvedValue(null);
+      await expect(service.findMembers(99n)).rejects.toThrow(NotFoundException);
+    });
+  });
+
   describe('findTeacherCourses', () => {
     it('should list teacher courses with pagination and default exclude archived', async () => {
       const teacherId = 10n;

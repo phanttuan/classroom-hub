@@ -5,6 +5,7 @@ import type {
   UpdateCoursePayload,
   UpdateCourseStatusPayload,
   CourseListResponse,
+  CourseMembersResponse,
   BackendCourseStatus,
 } from '../types/course';
 
@@ -42,6 +43,14 @@ export async function fetchTeacherCourses(params?: {
 
 export async function fetchCourseDetail(courseId: string): Promise<CourseDto> {
   const res = await apiFetch<ApiEnvelope<CourseDto> | CourseDto>(`/courses/${courseId}`);
+  return unwrap(res);
+}
+
+/** Lấy danh sách thành viên lớp học (giảng viên phụ trách + sinh viên đang tham gia) */
+export async function fetchCourseMembers(courseId: string): Promise<CourseMembersResponse> {
+  const res = await apiFetch<ApiEnvelope<CourseMembersResponse> | CourseMembersResponse>(
+    `/courses/${courseId}/members`,
+  );
   return unwrap(res);
 }
 

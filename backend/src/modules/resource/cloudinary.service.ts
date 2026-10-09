@@ -153,29 +153,54 @@ export class CloudinaryService {
   async uploadBuffer(buffer: Buffer, options: UploadBufferOptions): Promise<UploadResult> {
     this.assertConfigured();
 
-    const result = await new Promise<{ public_id: string; secure_url: string; bytes: number }>(
-      (resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(
-          {
-            public_id: options.publicId,
-            resource_type: options.resourceType,
-            type: options.deliveryType,
-            overwrite: false,
-          },
-          (error, res) => {
-            if (error || !res) return reject(error ?? new Error('Upload Cloudinary thất bại'));
-            resolve(res);
-          },
-        );
-        stream.end(buffer);
-      },
-    );
+    let result: { public_id: string; secure_url: string; bytes: number };
+    try {
+      result = await new Promise<{ public_id: string; secure_url: string; bytes: number }>(
+        (resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            {
+              public_id: options.publicId,
+              resource_type: options.resourceType,
+              type: options.deliveryType,
+              overwrite: false,
+            },
+            (error, res) => {
+              if (error || !res) return reject(error ?? new Error('Upload Cloudinary thất bại'));
+              resolve(res);
+            },
+          );
+          stream.end(buffer);
+        },
+      );
+    } catch (error) {
+      throw this.toUploadException(error);
+    }
 
     return {
       storageKey: `${options.resourceType}:${result.public_id}`,
       secureUrl: result.secure_url,
       bytes: result.bytes,
     };
+  }
+
+  /**
+   * Cloudinary SDK reject bằng object thường ({ http_code, message, name }),
+   * không phải Error → chuẩn hóa thành ServiceUnavailableException để
+   * AllExceptionsFilter trả message rõ ràng thay vì 500 chung chung.
+   * 401/403 hầu như luôn là sai API key/secret.
+   */
+  private toUploadException(error: unknown): ServiceUnavailableException {
+    const err = error as { http_code?: unknown; message?: unknown } | null | undefined;
+    const httpCode = typeof err?.http_code === 'number' ? err.http_code : undefined;
+    const detail = typeof err?.message === 'string' && err.message ? err.message : 'Upload Cloudinary thất bại';
+    if (httpCode === 401 || httpCode === 403) {
+      return new ServiceUnavailableException(
+        'Cloudinary từ chối upload (HTTP 401/403): sai CLOUDINARY_API_KEY / CLOUDINARY_API_SECRET, key đã bị thu hồi, hoặc key bị giới hạn quyền (thiếu quyền upload/create — kiểm tra Access Keys trong Cloudinary Console). Kiểm tra lại file backend/.env rồi restart server',
+      );
+    }
+    return new ServiceUnavailableException(
+      `Upload lên Cloudinary thất bại${httpCode ? ` (HTTP ${httpCode})` : ''}: ${detail}`,
+    );
   }
 
   /** Xóa file theo storageKey. Lỗi chỉ ghi log (không chặn việc xóa dữ liệu trong DB) */

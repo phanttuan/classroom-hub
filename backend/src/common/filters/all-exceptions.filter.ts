@@ -8,6 +8,15 @@ import {
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 
+function safeStringify(value: unknown): string {
+  try {
+    const s = JSON.stringify(value);
+    return typeof s === 'string' ? s : String(value);
+  } catch {
+    return String(value);
+  }
+}
+
 @Catch()
 export class AllExceptionsFilter implements ExceptionFilter {
   private readonly logger = new Logger(AllExceptionsFilter.name);
@@ -52,6 +61,11 @@ export class AllExceptionsFilter implements ExceptionFilter {
       }
     } else if (exception instanceof Error) {
       this.logger.error(`Unhandled Exception: ${exception.message}`, exception.stack);
+    } else {
+      // SDK bên thứ ba (vd. Cloudinary) đôi khi reject object thường thay vì Error
+      this.logger.error(
+        `Unhandled non-Error exception: ${request.method} ${request.url} -> ${status}: ${safeStringify(exception)}`,
+      );
     }
 
     response.status(status).json({

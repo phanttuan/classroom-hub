@@ -30,7 +30,30 @@ ALTER TABLE "otps" ADD COLUMN IF NOT EXISTS "blocked_until" TIMESTAMPTZ(6);
 ALTER TABLE "otps" ADD COLUMN IF NOT EXISTS "consumed_at" TIMESTAMPTZ(6);
 ALTER TABLE "otps" ALTER COLUMN "type" SET DEFAULT 'REGISTER_VERIFY';
 
--- 3. Đổi tên index theo schema.prisma
-ALTER INDEX IF EXISTS "otps_email_type_idx" RENAME TO "idx_otps_email_type";
-ALTER INDEX IF EXISTS "otps_expires_at_idx" RENAME TO "idx_otps_expires_at";
-ALTER INDEX IF EXISTS "refresh_tokens_user_id_idx" RENAME TO "idx_refresh_tokens_user";
+-- 3. Đổi tên index theo schema.prisma (nếu index mới đã tồn tại thì xóa index cũ)
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'otps_email_type_idx') THEN
+        IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_otps_email_type') THEN
+            ALTER INDEX "otps_email_type_idx" RENAME TO "idx_otps_email_type";
+        ELSE
+            DROP INDEX "otps_email_type_idx";
+        END IF;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'otps_expires_at_idx') THEN
+        IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_otps_expires_at') THEN
+            ALTER INDEX "otps_expires_at_idx" RENAME TO "idx_otps_expires_at";
+        ELSE
+            DROP INDEX "otps_expires_at_idx";
+        END IF;
+    END IF;
+
+    IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'refresh_tokens_user_id_idx') THEN
+        IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname = 'idx_refresh_tokens_user') THEN
+            ALTER INDEX "refresh_tokens_user_id_idx" RENAME TO "idx_refresh_tokens_user";
+        ELSE
+            DROP INDEX "refresh_tokens_user_id_idx";
+        END IF;
+    END IF;
+END $$;

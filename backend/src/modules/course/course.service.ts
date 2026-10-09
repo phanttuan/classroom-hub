@@ -175,6 +175,55 @@ export class CourseService {
   }
 
   /**
+   * Lấy danh sách thành viên lớp học: giảng viên phụ trách + sinh viên đang tham gia.
+   * Quyền truy cập do CourseMemberGuard đảm bảo (chủ lớp / sinh viên ACTIVE / admin).
+   */
+  async findMembers(courseId: bigint) {
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+      select: {
+        owner: {
+          select: {
+            id: true,
+            fullName: true,
+            email: true,
+            avatarUrl: true,
+          },
+        },
+        enrollments: {
+          where: { status: EnrollmentStatus.ACTIVE },
+          select: {
+            status: true,
+            joinedAt: true,
+            student: {
+              select: {
+                id: true,
+                fullName: true,
+                email: true,
+                avatarUrl: true,
+              },
+            },
+          },
+          orderBy: { joinedAt: 'asc' },
+        },
+      },
+    });
+
+    if (!course) {
+      throw new NotFoundException('Lớp học không tồn tại');
+    }
+
+    return {
+      owner: course.owner,
+      students: course.enrollments.map((e) => ({
+        ...e.student,
+        status: e.status,
+        joinedAt: e.joinedAt,
+      })),
+    };
+  }
+
+  /**
    * Lấy danh sách môn học do giáo viên quản lý
    */
   async findTeacherCourses(teacherId: bigint, filter: CourseListFilter) {
