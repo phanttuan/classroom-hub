@@ -12,7 +12,7 @@ describe('Course DTOs Validation', () => {
     it('should pass with valid name and optional description', async () => {
       const dto = plainToInstance(CreateCourseDto, {
         name: 'Lập trình Web nâng cao',
-        description: 'Mô tả lớp học',
+        description: 'Mô tả khóa học',
       });
       const errors = await validate(dto);
       expect(errors.length).toBe(0);
@@ -55,7 +55,7 @@ describe('Course DTOs Validation', () => {
 
     it('should pass when updating both name and description', async () => {
       const dto = plainToInstance(UpdateCourseDto, {
-        name: 'Tên lớp mới',
+        name: 'Tên khóa học mới',
         description: 'Mô tả mới',
       });
       const errors = await validate(dto);

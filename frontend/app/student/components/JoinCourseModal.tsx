@@ -26,12 +26,12 @@ export default function JoinCourseModal({
     const cleanCode = courseCode.trim().toUpperCase();
 
     if (!cleanCode) {
-      setError("Vui lòng nhập mã lớp học");
+      setError("Vui lòng nhập mã khóa học");
       return;
     }
 
     if (cleanCode.length < 6 || cleanCode.length > 12) {
-      setError("Mã lớp học phải có độ dài từ 6 đến 12 ký tự");
+      setError("Mã khóa học phải có độ dài từ 6 đến 12 ký tự");
       return;
     }
 
@@ -45,7 +45,7 @@ export default function JoinCourseModal({
       onSuccess(result.course, result.message);
       onClose();
     } catch (err: any) {
-      setError(err?.message || "Không thể tham gia lớp học. Vui lòng thử lại.");
+      setError(err?.message || "Không thể tham gia khóa học. Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }
@@ -60,18 +60,18 @@ export default function JoinCourseModal({
   };
 
   return (
-    <Modal open={open} onClose={handleClose} title="Tham gia lớp học">
+    <Modal open={open} onClose={handleClose} title="Tham gia khóa học">
       <form onSubmit={handleSubmit} className="space-y-4">
         <div className="flex items-start gap-3 rounded-xl border border-blue-100 bg-blue-50/70 p-3.5 text-[13px] text-blue-900">
           <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-blue-600" />
           <p className="leading-relaxed">
-            Nhập <strong>mã lớp học</strong> do giảng viên cung cấp (gồm 8 ký tự, ví dụ: <code className="rounded bg-blue-100/80 px-1 py-0.5 font-mono font-bold text-blue-700">TOAN12NC</code>) để tham gia lớp học.
+            Nhập <strong>mã khóa học</strong> do giảng viên cung cấp (gồm 8 ký tự, ví dụ: <code className="rounded bg-blue-100/80 px-1 py-0.5 font-mono font-bold text-blue-700">TOAN12NC</code>) để tham gia khóa học.
           </p>
         </div>
 
         <div>
           <label htmlFor="course-code-input" className="mb-1.5 block text-[13px] font-semibold text-slate-700">
-            Mã lớp học <span className="text-red-500">*</span>
+            Mã khóa học <span className="text-red-500">*</span>
           </label>
           <div className="relative">
             <KeyRound className="pointer-events-none absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />

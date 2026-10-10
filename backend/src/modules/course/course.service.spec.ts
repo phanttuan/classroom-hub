@@ -49,7 +49,7 @@ describe('CourseService', () => {
   describe('create', () => {
     it('should create a new course with auto-generated courseCode and ACTIVE status', async () => {
       const teacherId = 10n;
-      const dto = { name: 'Môn Lập trình Web', description: 'Mô tả lớp học' };
+      const dto = { name: 'Môn Lập trình Web', description: 'Mô tả khóa học' };
       const createdCourse = {
         id: 1n,
         ownerId: teacherId,
@@ -554,7 +554,7 @@ describe('CourseService', () => {
         ConflictException,
       );
       await expect(service.joinCourse(studentId, courseCode)).rejects.toThrow(
-        'Bạn đã là thành viên của lớp học này',
+        'Bạn đã là thành viên của khóa học này',
       );
     });
   });

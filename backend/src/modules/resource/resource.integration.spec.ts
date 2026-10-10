@@ -88,7 +88,7 @@ describe('ResourceService Real DB Integration Test', () => {
     // 4. Tạo môn học (Course)
     const course = await prisma.course.create({
       data: {
-        name: 'Lớp học Kiến trúc Phần mềm',
+        name: 'Khóa học Kiến trúc Phần mềm',
         courseCode: `RSC${timestamp.toString().slice(-5)}`,
         ownerId: teacherId,
       },
@@ -187,7 +187,7 @@ describe('ResourceService Real DB Integration Test', () => {
     ).rejects.toThrow(ForbiddenException);
   });
 
-  it('2. Sinh viên tham gia lớp học thành công (Enrollment ACTIVE)', async () => {
+  it('2. Sinh viên tham gia khóa học thành công (Enrollment ACTIVE)', async () => {
     const enrollment = await prisma.enrollment.create({
       data: {
         courseId,
@@ -258,7 +258,7 @@ describe('ResourceService Real DB Integration Test', () => {
     expect(download.url).toMatch(/(?:exp|expires_at)=(\d+)/);
   });
 
-  it('7. Sinh viên bị gỡ (REMOVED) khỏi lớp học lập tức bị chặn 403', async () => {
+  it('7. Sinh viên bị gỡ (REMOVED) khỏi khóa học lập tức bị chặn 403', async () => {
     await prisma.enrollment.update({
       where: {
         uk_enrollments_course_student: {

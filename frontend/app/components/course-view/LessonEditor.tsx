@@ -59,7 +59,7 @@ const TYPE_TIPS: Record<LessonTypeKey, string[]> = {
   ],
   FOLDER: [
     "Gom nhiều tệp cùng chủ đề (slide, bài tập, tài liệu đọc thêm) vào một thư mục.",
-    '"Ngay trên trang lớp học" hiển thị danh sách tệp ngay dưới tên thư mục.',
+    '"Ngay trên trang khóa học" hiển thị danh sách tệp ngay dưới tên thư mục.',
     "Sinh viên có thể tải từng tệp hoặc tải tất cả.",
   ],
   URL: [
@@ -68,9 +68,9 @@ const TYPE_TIPS: Record<LessonTypeKey, string[]> = {
     'Nhiều trang (Google, Zalo, Facebook) chặn nhúng — nên chọn "Mở trong cửa sổ mới".',
   ],
   LABEL: [
-    "Nội dung hiển thị trực tiếp trên trang lớp học, giữa các hoạt động.",
+    "Nội dung hiển thị trực tiếp trên trang khóa học, giữa các hoạt động.",
     "Phù hợp cho lời chào, thông báo ngắn, ảnh minh họa hoặc video giới thiệu.",
-    "Nên viết ngắn gọn để trang lớp học không bị dài.",
+    "Nên viết ngắn gọn để trang khóa học không bị dài.",
   ],
 };
 
@@ -402,7 +402,7 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
         <CourseHero
           eyebrow={{
             icon: meta?.icon,
-            primary: course?.name ?? "Lớp học",
+            primary: course?.name ?? "Khóa học",
             primaryHref: coursePath,
             secondary: targetModule?.title,
             secondaryHref: backToCourse,
@@ -465,9 +465,9 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
             <div className="grid h-16 w-16 place-items-center rounded-2xl bg-slate-100 text-slate-500">
               <Archive className="h-8 w-8" />
             </div>
-            <p className="mt-4 text-[18px] font-bold text-slate-900">Lớp học đã lưu trữ</p>
+            <p className="mt-4 text-[18px] font-bold text-slate-900">Khóa học đã lưu trữ</p>
             <p className="mt-1 max-w-md text-[14px] text-slate-500">
-              Lớp học đang ở chế độ chỉ đọc nên không thể thêm hoặc chỉnh sửa nội dung. Hãy khôi phục lớp học để tiếp tục
+              Khóa học đang ở chế độ chỉ đọc nên không thể thêm hoặc chỉnh sửa nội dung. Hãy khôi phục khóa học để tiếp tục
               soạn thảo.
             </p>
             <button
@@ -475,7 +475,7 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
               onClick={() => router.push(coursePath)}
               className="mt-5 rounded-xl bg-[#0f6cbf] px-5 py-2.5 text-[14px] font-semibold text-white hover:bg-[#0c599e]"
             >
-              Về trang lớp học
+              Về trang khóa học
             </button>
           </div>
         ) : loadError ? (
@@ -513,10 +513,10 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
                       maxLength={255}
                       placeholder={
                         type === "URL"
-                          ? "VD: Nhóm Zalo lớp học"
+                          ? "VD: Nhóm Zalo khóa học"
                           : type === "FILE"
                             ? "VD: Slide bài giảng Chương 1"
-                            : "VD: Bài 1 — Giới thiệu lớp học"
+                            : "VD: Bài 1 — Giới thiệu khóa học"
                       }
                       className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-[#0f6cbf] focus:ring-4 focus:ring-blue-100"
                     />
@@ -537,7 +537,7 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
                           markDirty();
                         }}
                         onUploadImage={(file) => uploadContentImage(courseId, file)}
-                        placeholder="Nội dung sẽ hiển thị trực tiếp trên trang lớp học..."
+                        placeholder="Nội dung sẽ hiển thị trực tiếp trên trang khóa học..."
                         minHeight={260}
                       />
                     )}
@@ -559,7 +559,7 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
                         <Checkbox
                           checked={!!settings.showDescription}
                           onChange={(v) => updateSetting("showDescription", v)}
-                          label="Hiển thị mô tả trên trang lớp học"
+                          label="Hiển thị mô tả trên trang khóa học"
                         />
                       </div>
                     </Field>
@@ -776,7 +776,7 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
                       className={selectClass}
                     >
                       <option value="PAGE">Trên một trang riêng</option>
-                      <option value="INLINE">Ngay trên trang lớp học</option>
+                      <option value="INLINE">Ngay trên trang khóa học</option>
                     </select>
                   </Field>
                 </Fieldset>
@@ -827,7 +827,7 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
                   className="flex items-center gap-2 rounded-lg bg-[#0f6cbf] px-5 py-2.5 text-[14px] font-semibold text-white shadow-xs hover:bg-[#0c599e] disabled:opacity-60"
                 >
                   {saving === "course" && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Lưu và quay lại lớp học
+                  Lưu và quay lại khóa học
                 </button>
                 {type !== "LABEL" && (
                   <button
@@ -899,7 +899,7 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
                   className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0f6cbf] px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-[#0c599e] disabled:opacity-60"
                 >
                   {saving === "course" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  Lưu và quay lại lớp học
+                  Lưu và quay lại khóa học
                 </button>
                 {type !== "LABEL" && (
                   <button

@@ -47,9 +47,9 @@ import CourseHero, { type HeroStatusTone } from "./CourseHero";
 import CourseSkeleton from "./CourseSkeleton";
 
 const COURSE_STATUS: Record<string, { caption: string; label: string; tone: HeroStatusTone }> = {
-  ACTIVE: { caption: "Trạng thái lớp học", label: "Đang giảng dạy", tone: "emerald" },
-  CLOSED: { caption: "Trạng thái lớp học", label: "Đã kết thúc", tone: "amber" },
-  ARCHIVED: { caption: "Trạng thái lớp học", label: "Đã lưu trữ", tone: "slate" },
+  ACTIVE: { caption: "Trạng thái khóa học", label: "Đang giảng dạy", tone: "emerald" },
+  CLOSED: { caption: "Trạng thái khóa học", label: "Đã kết thúc", tone: "amber" },
+  ARCHIVED: { caption: "Trạng thái khóa học", label: "Đã lưu trữ", tone: "slate" },
 };
 
 interface CourseDetailViewProps {
@@ -201,7 +201,7 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
     const ok = await confirm({
       tone: "primary",
       icon: RotateCcw,
-      title: "Khôi phục lớp học?",
+      title: "Khôi phục khóa học?",
       message: (
         <>
           <strong className="text-slate-800">{course?.name}</strong> sẽ hoạt động trở lại: chỉnh sửa được nội dung và nhận
@@ -214,10 +214,10 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
     setRestoring(true);
     try {
       await updateCourseStatus(courseId, "ACTIVE");
-      showToast("Đã khôi phục lớp học");
+      showToast("Đã khôi phục khóa học");
       await reloadData();
     } catch (err) {
-      showToast((err as Error)?.message || "Không thể khôi phục lớp học");
+      showToast((err as Error)?.message || "Không thể khôi phục khóa học");
     } finally {
       setRestoring(false);
     }
@@ -378,7 +378,7 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
   if (!course) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-[#f0f2f5] p-6 text-center">
-        <p className="font-semibold text-slate-800">{loadError || "Không tìm thấy lớp học"}</p>
+        <p className="font-semibold text-slate-800">{loadError || "Không tìm thấy khóa học"}</p>
         <Link href={backHref} className="text-sm font-semibold text-[#0f6cbf] hover:underline">
           ← Quay lại danh sách
         </Link>
@@ -555,7 +555,7 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
                   ? "border border-blue-300 bg-blue-50/90 text-blue-700 shadow-xs hover:bg-blue-100/90"
                   : "border border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50"
               }`}
-              title={editMode ? "Tắt chế độ chỉnh sửa" : "Bật chế độ chỉnh sửa lớp học"}
+              title={editMode ? "Tắt chế độ chỉnh sửa" : "Bật chế độ chỉnh sửa khóa học"}
             >
               <Pencil className={`h-3.5 w-3.5 ${editMode ? "text-blue-600" : "text-slate-500"}`} />
               <span className="select-none">{editMode ? "Đang bật chỉnh sửa" : "Bật chỉnh sửa"}</span>
@@ -594,8 +594,8 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
       <div className="mx-auto max-w-[1440px] px-4 pt-4 sm:px-6 lg:px-8">
         <CourseHero
           eyebrow={{
-            primary: course.owner?.fullName || "LỚP HỌC",
-            secondary: `Mã lớp: ${course.courseCode}`,
+            primary: course.owner?.fullName || "KHÓA HỌC",
+            secondary: `Mã khóa học: ${course.courseCode}`,
             secondaryMono: true,
           }}
           title={course.name}
@@ -606,7 +606,7 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
               ? [{ icon: Check, highlight: true, label: `Đã hoàn thành ${completedCount}/${trackableCount} (${progressPercent}%)` }]
               : []),
           ]}
-          brandTag="Lớp học"
+          brandTag="Khóa học"
           status={COURSE_STATUS[course.status]}
         />
 
@@ -615,10 +615,10 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
             <p className="flex items-center gap-2.5 text-[13.5px] text-slate-700">
               <Archive className="h-5 w-5 shrink-0 text-slate-500" />
               <span>
-                <strong className="text-slate-900">Lớp học đã lưu trữ — chế độ chỉ đọc.</strong>{" "}
+                <strong className="text-slate-900">Khóa học đã lưu trữ — chế độ chỉ đọc.</strong>{" "}
                 {role === "TEACHER"
                   ? "Nội dung, bài nộp và điểm số được giữ nguyên nhưng không thể chỉnh sửa."
-                  : "Bạn vẫn xem lại được nội dung nhưng lớp học không còn hoạt động."}
+                  : "Bạn vẫn xem lại được nội dung nhưng khóa học không còn hoạt động."}
               </span>
             </p>
             {role === "TEACHER" && (
@@ -627,7 +627,7 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
                 disabled={restoring}
                 className="flex items-center gap-1.5 rounded-lg bg-[#0f6cbf] px-3.5 py-1.5 text-[13px] font-semibold text-white hover:bg-[#0c599e] disabled:opacity-60"
               >
-                <RotateCcw className={`h-4 w-4 ${restoring ? "animate-spin" : ""}`} /> Khôi phục lớp học
+                <RotateCcw className={`h-4 w-4 ${restoring ? "animate-spin" : ""}`} /> Khôi phục khóa học
               </button>
             )}
           </div>
@@ -716,7 +716,7 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
                   {isSearching ? (
                     <p>Không tìm thấy topic hoặc hoạt động nào khớp với &quot;{searchQuery}&quot;.</p>
                   ) : (
-                    <p>Lớp học chưa có topic nào.</p>
+                    <p>Khóa học chưa có topic nào.</p>
                   )}
                 </div>
               )}
@@ -793,9 +793,9 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
           </div>
         ) : activeTab === "members" ? (
           <div className="rounded-xl border border-slate-200/90 bg-white p-6 shadow-xs">
-            <h3 className="text-base font-bold text-slate-900">Danh sách thành viên lớp học</h3>
+            <h3 className="text-base font-bold text-slate-900">Danh sách thành viên khóa học</h3>
             <p className="mt-1 text-xs text-slate-500">
-              Danh sách giảng viên và sinh viên tham gia lớp học.
+              Danh sách giảng viên và sinh viên tham gia khóa học.
             </p>
             <div className="mt-4 overflow-hidden rounded-xl border border-slate-200">
               <table className="w-full text-left text-sm">
@@ -848,7 +848,7 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
                       {!members?.owner && (members?.students.length ?? 0) === 0 && (
                         <tr>
                           <td colSpan={3} className="px-4 py-6 text-center text-sm text-slate-400">
-                            Chưa có thành viên nào trong lớp học.
+                            Chưa có thành viên nào trong khóa học.
                           </td>
                         </tr>
                       )}
@@ -866,7 +866,7 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
             </p>
             <div className="mt-6 flex flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 p-10 text-center">
               <Award className="h-10 w-10 text-[#0f6cbf] mb-2" />
-              <p className="font-bold text-slate-800">Sổ điểm lớp học</p>
+              <p className="font-bold text-slate-800">Sổ điểm khóa học</p>
               <p className="text-xs text-slate-500 max-w-sm mt-1">
                 Điểm số các bài tập và bài kiểm tra sẽ được đồng bộ trực tiếp tại đây.
               </p>

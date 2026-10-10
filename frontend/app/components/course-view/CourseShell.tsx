@@ -32,7 +32,7 @@ export function useCourseContent(courseId: string) {
       setError("");
       return data;
     } catch (err) {
-      setError((err as Error)?.message || "Không tải được nội dung lớp học");
+      setError((err as Error)?.message || "Không tải được nội dung khóa học");
       return null;
     }
   }, [courseId]);
@@ -41,7 +41,7 @@ export function useCourseContent(courseId: string) {
     let active = true;
     fetchCourseContent(courseId)
       .then((data) => active && setCourse(data))
-      .catch((err) => active && setError((err as Error)?.message || "Không tải được nội dung lớp học"))
+      .catch((err) => active && setError((err as Error)?.message || "Không tải được nội dung khóa học"))
       .finally(() => active && setLoading(false));
     return () => {
       active = false;
@@ -116,7 +116,7 @@ export default function CourseShell({
   backHref,
   searchQuery,
   onSearchChange,
-  searchPlaceholder = "Tìm kiếm trong lớp học...",
+  searchPlaceholder = "Tìm kiếm trong khóa học...",
   actionRight,
   activeModuleId,
   activeLessonId,
@@ -169,8 +169,8 @@ export default function CourseShell({
       {/* Nút tròn mở mục lục */}
       <button
         onClick={() => setDrawerOpen(true)}
-        aria-label="Mở mục lục lớp học"
-        title="Mục lục lớp học"
+        aria-label="Mở mục lục khóa học"
+        title="Mục lục khóa học"
         className="fixed left-3 top-20 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-slate-300 bg-white text-slate-700 shadow-md transition-all duration-200 hover:scale-105 hover:border-[#0f6cbf] hover:text-[#0f6cbf] active:scale-95"
       >
         <ListTree className="h-5 w-5" />
@@ -190,7 +190,7 @@ export default function CourseShell({
         <div className="flex h-14 items-center justify-between border-b border-slate-200 px-4">
           <div className="flex min-w-0 items-center gap-2 text-[15px] font-bold text-slate-800">
             <ListTree className="h-5 w-5 shrink-0 text-[#0f6cbf]" />
-            <span className="truncate">{course?.name || "Mục lục lớp học"}</span>
+            <span className="truncate">{course?.name || "Mục lục khóa học"}</span>
           </div>
           <button
             onClick={() => setDrawerOpen(false)}

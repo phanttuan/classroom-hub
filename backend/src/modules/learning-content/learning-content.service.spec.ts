@@ -82,12 +82,12 @@ describe('LearningContentService', () => {
     const course = (id: bigint, modules: number) => ({
       id,
       courseCode: `C${id}`,
-      name: `Lớp ${id}`,
+      name: `Khóa học ${id}`,
       _count: { modules },
     });
     const ofCourse = (id: bigint) => ({ module: { courseId: id } });
 
-    it('tính tiến độ từng lớp chỉ với 3 truy vấn (không N+1)', async () => {
+    it('tính tiến độ từng khóa học chỉ với 3 truy vấn (không N+1)', async () => {
       prisma.enrollment.findMany.mockResolvedValue([{ course: course(1n, 3) }, { course: course(2n, 1) }]);
       // Lớp 1: 4 bài tính tiến độ, hoàn thành 3 — Lớp 2: 2 bài, chưa hoàn thành
       prisma.lesson.findMany.mockResolvedValue([
@@ -120,7 +120,7 @@ describe('LearningContentService', () => {
       });
     });
 
-    it('trả về mảng rỗng và không truy vấn thêm khi chưa vào lớp nào', async () => {
+    it('trả về mảng rỗng và không truy vấn thêm khi chưa vào khóa học nào', async () => {
       prisma.enrollment.findMany.mockResolvedValue([]);
 
       await expect(service.getMyCourseProgress(studentId)).resolves.toEqual([]);
@@ -202,7 +202,7 @@ describe('LearningContentService', () => {
       expect(query.select.modules.include.lessons.where).toEqual({ status: LessonStatus.PUBLISHED });
     });
 
-    it('chặn sinh viên đã bị xóa khỏi lớp học', async () => {
+    it('chặn sinh viên đã bị xóa khỏi khóa học', async () => {
       prisma.course.findUnique.mockResolvedValue({ ownerId: teacherId });
       prisma.enrollment.findUnique.mockResolvedValue({ status: EnrollmentStatus.REMOVED });
 
@@ -211,7 +211,7 @@ describe('LearningContentService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('chặn giáo viên không sở hữu lớp học', async () => {
+    it('chặn giáo viên không sở hữu khóa học', async () => {
       prisma.course.findUnique.mockResolvedValue({ ownerId: 999n });
 
       await expect(
@@ -219,7 +219,7 @@ describe('LearningContentService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('báo 404 khi lớp học không tồn tại', async () => {
+    it('báo 404 khi khóa học không tồn tại', async () => {
       prisma.course.findUnique.mockResolvedValue(null);
 
       await expect(
@@ -229,7 +229,7 @@ describe('LearningContentService', () => {
   });
 
   describe('createModule', () => {
-    it('tạo topic trực tiếp dưới lớp học với orderIndex kế tiếp', async () => {
+    it('tạo topic trực tiếp dưới khóa học với orderIndex kế tiếp', async () => {
       prisma.course.findUnique.mockResolvedValue({ ownerId: teacherId });
       prisma.module.findFirst.mockResolvedValue({ orderIndex: 3 });
       prisma.module.create.mockResolvedValue({ id: 5n });
@@ -354,7 +354,7 @@ describe('LearningContentService', () => {
   });
 
   describe('reorder', () => {
-    it('từ chối reorder topic khi có ID không thuộc lớp học', async () => {
+    it('từ chối reorder topic khi có ID không thuộc khóa học', async () => {
       prisma.course.findUnique.mockResolvedValue({ ownerId: teacherId });
       prisma.module.count.mockResolvedValue(1);
 

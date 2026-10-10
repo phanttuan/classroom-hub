@@ -38,13 +38,13 @@ const WD_MINI = ["T2", "T3", "T4", "T5", "T6", "T7", "CN"];
 const KIND_MAP: Record<string, ScheduleKind> = {
   "Bài tập": "assignment",
   "Kiểm tra": "quiz",
-  "Hoạt động lớp học": "class",
+  "Hoạt động khóa học": "class",
   "Sự kiện khác": "other",
 };
 const KIND_META: Record<ScheduleKind, { label: string; dot: string; pill: string; soft: string; text: string }> = {
   assignment: { label: "Bài tập", dot: "bg-red-500", pill: "bg-red-50 text-red-600", soft: "bg-red-50", text: "text-red-600" },
   quiz: { label: "Kiểm tra", dot: "bg-purple-600", pill: "bg-purple-50 text-purple-700", soft: "bg-purple-50", text: "text-purple-700" },
-  class: { label: "Hoạt động lớp học", dot: "bg-amber-500", pill: "bg-amber-50 text-amber-700", soft: "bg-amber-50", text: "text-amber-700" },
+  class: { label: "Hoạt động khóa học", dot: "bg-amber-500", pill: "bg-amber-50 text-amber-700", soft: "bg-amber-50", text: "text-amber-700" },
   other: { label: "Sự kiện khác", dot: "bg-green-500", pill: "bg-green-50 text-green-700", soft: "bg-green-50", text: "text-green-700" },
 };
 const isDone = (date: string) => date < SCHEDULE_TODAY;
@@ -97,7 +97,7 @@ function EventForm({
     <div className="space-y-3.5">
       <div>
         <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">Tên sự kiện *</label>
-        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="VD: Họp lớp"
+        <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="VD: Họp khóa học"
           className="h-11 w-full rounded-lg border border-slate-200 px-3.5 text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-100" />
       </div>
       <div className="grid grid-cols-2 gap-3">
@@ -126,7 +126,7 @@ function EventForm({
         </div>
       </div>
       <div>
-        <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">Lớp học</label>
+        <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">Khóa học</label>
         <select value={classCode} onChange={(e) => setClassCode(e.target.value)} className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none">
           {scheduleClassOptions.filter((o) => o.code !== "ALL").map((o) => (<option key={o.code} value={o.code}>{o.name} ({o.code})</option>))}
         </select>
@@ -179,7 +179,7 @@ export default function TeacherSchedulePage() {
     const q = topSearch.trim().toLowerCase();
     let list = [...events];
     if (classCode !== "ALL") list = list.filter((e) => e.classCode === classCode);
-    if (courseFilter !== "Tất cả lớp học") list = list.filter((e) => e.courseName === courseFilter);
+    if (courseFilter !== "Tất cả khóa học") list = list.filter((e) => e.courseName === courseFilter);
     if (typeFilter !== "Tất cả loại") list = list.filter((e) => e.kind === KIND_MAP[typeFilter]);
     if (statusFilter === "Sắp diễn ra") list = list.filter((e) => !isDone(e.date));
     if (statusFilter === "Đã kết thúc") list = list.filter((e) => isDone(e.date));
@@ -304,7 +304,7 @@ export default function TeacherSchedulePage() {
     { label: "Tổng sự kiện", value: stats.total, icon: CalendarDays, cls: "bg-blue-50 text-blue-600" },
     { label: "Hạn nộp bài tập", value: stats.assignment, icon: FileText, cls: "bg-red-50 text-red-500" },
     { label: "Hạn kiểm tra", value: stats.quiz, icon: FileText, cls: "bg-purple-50 text-purple-600" },
-    { label: "Hoạt động lớp học", value: stats.class, icon: Users, cls: "bg-orange-50 text-orange-500" },
+    { label: "Hoạt động khóa học", value: stats.class, icon: Users, cls: "bg-orange-50 text-orange-500" },
   ];
 
   const openDetail = (e: ScheduleItem) => {
@@ -326,11 +326,11 @@ export default function TeacherSchedulePage() {
   };
 
   return (
-    <TeacherShell activeId="schedule" searchPlaceholder="Tìm kiếm học sinh, lớp học, bài tập, kiểm tra..." searchValue={topSearch} onSearchChange={setTopSearch}>
+    <TeacherShell activeId="schedule" searchPlaceholder="Tìm kiếm học sinh, khóa học, bài tập, kiểm tra..." searchValue={topSearch} onSearchChange={setTopSearch}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-[26px] font-extrabold tracking-tight">Lịch</h1>
-          <p className="mt-0.5 text-[14px] text-slate-500">Xem và quản lý các sự kiện, thời hạn của bài tập, kiểm tra và các hoạt động lớp học</p>
+          <p className="mt-0.5 text-[14px] text-slate-500">Xem và quản lý các sự kiện, thời hạn của bài tập, kiểm tra và các hoạt động khóa học</p>
         </div>
         <div className="flex gap-2.5">
           <button onClick={() => { downloadICS(filtered); showToast(`Đã xuất ${filtered.length} sự kiện (ICS)`); }} className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-white px-4 py-2.5 text-[13.5px] font-semibold text-blue-600 hover:bg-blue-50">
@@ -354,10 +354,10 @@ export default function TeacherSchedulePage() {
       {/* Bộ lọc */}
       <div className="mt-4 grid grid-cols-1 gap-3 rounded-xl border border-slate-200/70 bg-white p-4 sm:grid-cols-2 xl:grid-cols-4">
         <span className="relative block">
-          <span className="mb-1 block text-[12.5px] text-slate-500">Lớp học</span>
+          <span className="mb-1 block text-[12.5px] text-slate-500">Khóa học</span>
           <button onClick={() => setClassOpen((v) => !v)} className="flex w-full items-center gap-2.5 rounded-lg border border-slate-200 px-3 py-2 text-left hover:border-blue-300">
             <span className="grid h-9 w-12 shrink-0 place-items-center rounded-md bg-gradient-to-br from-amber-100 to-stone-300 text-lg">💻</span>
-            <span className="min-w-0 flex-1"><b className="block truncate text-[13px]">{clsOpt.name}</b><span className="block truncate text-[11.5px] text-slate-400">{clsOpt.code === "ALL" ? "Mọi lớp" : clsOpt.desc}</span></span>
+            <span className="min-w-0 flex-1"><b className="block truncate text-[13px]">{clsOpt.name}</b><span className="block truncate text-[11.5px] text-slate-400">{clsOpt.code === "ALL" ? "Mọi khóa học" : clsOpt.desc}</span></span>
             <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" />
           </button>
           {classOpen && (
@@ -384,7 +384,7 @@ export default function TeacherSchedulePage() {
           )}
         </span>
         {([
-          ["Lớp học", courseFilter, setCourseFilter, scheduleCourseOptions],
+          ["Khóa học", courseFilter, setCourseFilter, scheduleCourseOptions],
           ["Loại sự kiện", typeFilter, setTypeFilter, scheduleTypeOptions],
           ["Trạng thái", statusFilter, setStatusFilter, scheduleStatusOptions],
         ] as const).map(([label, value, set, options]) => (
@@ -577,7 +577,7 @@ export default function TeacherSchedulePage() {
                           <b className="text-[13px] leading-snug">{e.title}</b>
                           <span className="shrink-0 text-[11.5px] text-slate-400">{e.startTime}{e.endTime ? ` - ${e.endTime}` : ""}</span>
                         </span>
-                        <span className="mt-0.5 block truncate text-[12px] text-slate-400">Lớp: {e.classCode} - {e.className}</span>
+                        <span className="mt-0.5 block truncate text-[12px] text-slate-400">Khóa học: {e.classCode} - {e.className}</span>
                         <span className={`mt-1 inline-block whitespace-nowrap rounded-md px-2 py-0.5 text-[11px] font-medium ${meta.pill}`}>{meta.label}</span>
                       </span>
                     </button>
@@ -628,7 +628,7 @@ export default function TeacherSchedulePage() {
             <div className="grid grid-cols-2 gap-2 pt-1">
               <div className="rounded-lg bg-slate-50 p-3"><p className="text-xs text-slate-500">Ngày</p><p className="font-bold">{fmtDMY(detail.date)}</p></div>
               <div className="rounded-lg bg-slate-50 p-3"><p className="text-xs text-slate-500">Giờ</p><p className="font-bold">{timeRange(detail)}</p></div>
-              <div className="rounded-lg bg-slate-50 p-3"><p className="text-xs text-slate-500">Lớp</p><p className="font-bold">{detail.classCode}</p></div>
+              <div className="rounded-lg bg-slate-50 p-3"><p className="text-xs text-slate-500">Khóa học</p><p className="font-bold">{detail.classCode}</p></div>
               <div className="rounded-lg bg-slate-50 p-3"><p className="text-xs text-slate-500">Địa điểm</p><p className="font-bold">{detail.location ?? "—"}</p></div>
             </div>
             {!confirmDelete ? (

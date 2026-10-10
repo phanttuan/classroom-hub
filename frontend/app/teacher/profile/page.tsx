@@ -230,7 +230,7 @@ export default function TeacherProfilePage() {
     <TeacherShell
       activeId="profile"
       userProfile={user}
-      searchPlaceholder="Tìm kiếm học sinh, lớp học, bài tập, kiểm tra..."
+      searchPlaceholder="Tìm kiếm học sinh, khóa học, bài tập, kiểm tra..."
       searchValue={topSearch}
       onSearchChange={setTopSearch}
     >

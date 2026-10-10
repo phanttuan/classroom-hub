@@ -205,7 +205,7 @@ export default function LessonView({ courseId, lessonId, role, backHref }: Lesso
     const updated = formatDate(lesson.updatedAt);
     if (updated) stats.push({ dot: "slate", label: `Cập nhật ${updated}` });
     if (role === "STUDENT" && isCompleted) stats.push({ icon: Check, highlight: true, label: "Đã hoàn thành" });
-    if (isArchived) stats.push({ dot: "slate", label: "Lớp đã lưu trữ (chỉ đọc)" });
+    if (isArchived) stats.push({ dot: "slate", label: "Khóa học đã lưu trữ (chỉ đọc)" });
     return stats;
   };
 
@@ -218,7 +218,7 @@ export default function LessonView({ courseId, lessonId, role, backHref }: Lesso
           </HeroButton>
         )}
         <HeroButton href={`${coursePath}#module-section-${lesson?.moduleId ?? ""}`}>
-          <ArrowLeft className="h-4 w-4" /> Về trang lớp học
+          <ArrowLeft className="h-4 w-4" /> Về trang khóa học
         </HeroButton>
       </>
     ) : (
@@ -521,7 +521,7 @@ export default function LessonView({ courseId, lessonId, role, backHref }: Lesso
             <CourseHero
               eyebrow={{
                 icon: meta.icon,
-                primary: course?.name ?? "Lớp học",
+                primary: course?.name ?? "Khóa học",
                 primaryHref: coursePath,
                 secondary: topic?.title,
                 secondaryHref: topic ? `${coursePath}#module-section-${topic.id}` : undefined,

@@ -36,7 +36,7 @@ export default function ProblemSection() {
             <ScrollReveal variant="fade-up" delay={240} duration={1000}>
               <p className="text-slate-600 text-[15px] sm:text-base leading-relaxed text-justify max-w-[395px]">
                 Giáo viên và học sinh thường phải sử dụng nhiều công cụ khác
-                nhau để quản lý lớp học, tài liệu, bài tập, điểm số và lịch
+                nhau để quản lý khóa học, tài liệu, bài tập, điểm số và lịch
                 học. Điều này gây tốn thời gian và dễ bỏ sót thông tin quan
                 trọng.
               </p>

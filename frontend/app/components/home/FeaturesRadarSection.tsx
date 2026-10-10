@@ -30,10 +30,10 @@ interface RadarFeature {
 const radarFeatures: RadarFeature[] = [
   {
     id: "class",
-    name: "Quản lý lớp học",
+    name: "Quản lý khóa học",
     desc: (
       <>
-        Tạo và vận hành lớp học
+        Tạo và vận hành khóa học
         <br />
         dễ dàng
       </>

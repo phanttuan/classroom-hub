@@ -13,7 +13,7 @@ export default function AdminTopbar({
   onMenu,
   onOpenNotifications,
   notifications,
-  placeholder = "Tìm kiếm người dùng, lớp học...",
+  placeholder = "Tìm kiếm người dùng, khóa học...",
 }: {
   searchQuery: string;
   onSearchChange: (v: string) => void;

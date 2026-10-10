@@ -219,7 +219,7 @@ describe('Resource Preview & Download Endpoints (E2E)', () => {
     expect(res.status).toBe(401);
   });
 
-  it('2. Sinh viên chưa tham gia lớp học -> 403 Forbidden', async () => {
+  it('2. Sinh viên chưa tham gia khóa học -> 403 Forbidden', async () => {
     const res = await request(app.getHttpServer())
       .get(`/resources/${publishedResourceId}/preview`)
       .set('Authorization', `Bearer ${unenrolledUser.token}`);

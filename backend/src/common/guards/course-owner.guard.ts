@@ -26,7 +26,7 @@ export class CourseOwnerGuard implements CanActivate {
 
     const courseId = extractCourseId(req);
     if (courseId === null) {
-      throw new BadRequestException('Mã lớp học (courseId) không hợp lệ hoặc bị thiếu');
+      throw new BadRequestException('Mã khóa học (courseId) không hợp lệ hoặc bị thiếu');
     }
 
     const course = await this.prisma.course.findUnique({
@@ -34,7 +34,7 @@ export class CourseOwnerGuard implements CanActivate {
     });
 
     if (!course) {
-      throw new NotFoundException('Lớp học không tồn tại');
+      throw new NotFoundException('Khóa học không tồn tại');
     }
 
     // Admin có quyền truy cập quản trị hệ thống
@@ -51,7 +51,7 @@ export class CourseOwnerGuard implements CanActivate {
     // Kiểm tra giáo viên sở hữu môn học
     const userIdBigInt = BigInt(user.id);
     if (course.ownerId !== userIdBigInt) {
-      throw new ForbiddenException('Bạn không phải là giáo viên sở hữu của lớp học này');
+      throw new ForbiddenException('Bạn không phải là giáo viên sở hữu của khóa học này');
     }
 
     req.course = course;

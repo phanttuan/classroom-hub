@@ -65,7 +65,7 @@ export class ResourceService {
     const course = resource.lesson.module?.course;
 
     if (!course) {
-      throw new NotFoundException('Lớp học chứa tài liệu không tồn tại');
+      throw new NotFoundException('Khóa học chứa tài liệu không tồn tại');
     }
 
     return {
@@ -100,7 +100,7 @@ export class ResourceService {
 
     const course = lesson.module?.course;
     if (!course) {
-      throw new NotFoundException('Lớp học chứa bài học không tồn tại');
+      throw new NotFoundException('Khóa học chứa bài học không tồn tại');
     }
 
     return {
@@ -132,7 +132,7 @@ export class ResourceService {
     if (user.role === UserRole.TEACHER) {
       if (course.ownerId !== user.id) {
         throw new ForbiddenException(
-          'Bạn không phải là giáo viên phụ trách lớp học này',
+          'Bạn không phải là giáo viên phụ trách khóa học này',
         );
       }
       return;
@@ -158,11 +158,11 @@ export class ResourceService {
       });
 
       if (!enrollment) {
-        throw new ForbiddenException('Bạn chưa tham gia lớp học này');
+        throw new ForbiddenException('Bạn chưa tham gia khóa học này');
       }
 
       if (enrollment.status !== EnrollmentStatus.ACTIVE) {
-        throw new ForbiddenException('Bạn đã bị gỡ khỏi lớp học này');
+        throw new ForbiddenException('Bạn đã bị gỡ khỏi khóa học này');
       }
 
       return;

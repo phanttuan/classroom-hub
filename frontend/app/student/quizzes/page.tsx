@@ -127,7 +127,7 @@ function QuizRunner({
 
 export default function StudentQuizzesPage() {
   const [topSearch, setTopSearch] = useState("");
-  const [classFilter, setClassFilter] = useState("Tất cả lớp học");
+  const [classFilter, setClassFilter] = useState("Tất cả khóa học");
   const [statusFilter, setStatusFilter] = useState("Tất cả trạng thái");
   const [kindFilter, setKindFilter] = useState("Tất cả loại kiểm tra");
   const [query, setQuery] = useState("");
@@ -167,7 +167,7 @@ export default function StudentQuizzesPage() {
     if (tab === "todo") list = list.filter((i) => i.status === "todo");
     if (tab === "done") list = list.filter((i) => i.status === "done" || i.status === "doing");
     if (tab === "overdue") list = list.filter((i) => i.status === "overdue");
-    if (classFilter !== "Tất cả lớp học") list = list.filter((i) => i.classCode === classFilter);
+    if (classFilter !== "Tất cả khóa học") list = list.filter((i) => i.classCode === classFilter);
     if (statusFilter !== "Tất cả trạng thái") {
       const map: Record<string, StudentQuiz["status"]> = { "Chưa làm": "todo", "Đang làm": "doing", "Đã làm": "done", "Quá hạn": "overdue" };
       list = list.filter((i) => (statusFilter === "Đã làm" ? i.status === "done" || i.status === "doing" : i.status === map[statusFilter]));
@@ -210,14 +210,14 @@ export default function StudentQuizzesPage() {
   };
 
   return (
-    <StudentShell activeId="quizzes" searchPlaceholder="Tìm kiếm bài kiểm tra, lớp học..." searchValue={topSearch} onSearchChange={setTopSearch}>
+    <StudentShell activeId="quizzes" searchPlaceholder="Tìm kiếm bài kiểm tra, khóa học..." searchValue={topSearch} onSearchChange={setTopSearch}>
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0">
           <h1 className="text-[26px] font-extrabold tracking-tight">Kiểm tra trắc nghiệm</h1>
           <p className="mt-0.5 text-[14px] text-slate-500">Làm bài kiểm tra và xem lại kết quả của bạn</p>
 
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_1fr_1.4fr]">
-            {[["Lớp học", classFilter, setClassFilter, ["Tất cả lớp học", "WEB301", "PY101", "DB201"]],
+            {[["Khóa học", classFilter, setClassFilter, ["Tất cả khóa học", "WEB301", "PY101", "DB201"]],
               ["Trạng thái", statusFilter, setStatusFilter, ["Tất cả trạng thái", "Chưa làm", "Đang làm", "Đã làm", "Quá hạn"]],
               ["Loại kiểm tra", kindFilter, setKindFilter, ["Tất cả loại kiểm tra", "Giữa kỳ", "Kiểm tra nhanh"]]].map(([label, val, set, opts]) => (
               <label key={label as string} className="block text-[12.5px] text-slate-500">{label as string}
@@ -291,7 +291,7 @@ export default function StudentQuizzesPage() {
                   <span className="flex flex-wrap justify-end gap-1">{selected.tags.map((t) => (<span key={t} className="rounded-md bg-blue-50 px-1.5 py-0.5 text-[11px] text-blue-600">{t}</span>))}</span>
                 </li>
                 <li className="flex justify-between gap-2"><span className="text-slate-400">📋 Hình thức</span><b className="text-right">Trắc nghiệm (1 đáp án đúng)</b></li>
-                <li className="flex justify-between gap-2"><span className="text-slate-400">🏫 Lớp học</span><b className="text-right">{selected.classCode} - {selected.courseName}</b></li>
+                <li className="flex justify-between gap-2"><span className="text-slate-400">🏫 Khóa học</span><b className="text-right">{selected.classCode} - {selected.courseName}</b></li>
                 <li className="flex justify-between gap-2"><span className="text-slate-400">👤 Giảng viên</span><b className="flex items-center gap-1.5"><span className="grid h-6 w-6 place-items-center rounded-full bg-slate-300 text-[10px] font-bold text-white">A</span> Nguyễn Văn A</b></li>
               </ul>
             </div>

@@ -153,7 +153,7 @@ export default function StudentProfilePage() {
     <StudentShell
       activeId="profile"
       userProfile={user}
-      searchPlaceholder="Tìm kiếm lớp học, bài giảng, tài liệu, bài tập..."
+      searchPlaceholder="Tìm kiếm khóa học, bài giảng, tài liệu, bài tập..."
       searchValue={topSearch}
       onSearchChange={setTopSearch}
     >

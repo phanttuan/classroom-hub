@@ -1,7 +1,7 @@
 /** Khung xương trang khóa học khi đang tải — giữ bố cục để không bị giật khi nội dung hiện ra */
 export default function CourseSkeleton() {
   return (
-    <div aria-busy="true" aria-label="Đang tải lớp học">
+    <div aria-busy="true" aria-label="Đang tải khóa học">
       <div className="mx-auto max-w-[1440px] px-4 pt-4 sm:px-6 lg:px-8">
         <div className="rounded-3xl bg-slate-800/90 p-6 sm:p-8 lg:p-9">
           <div className="skeleton h-4 w-56 !bg-white/15" />

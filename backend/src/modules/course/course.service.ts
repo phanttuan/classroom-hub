@@ -59,11 +59,11 @@ export class CourseService {
           error.code === 'P2002'
         ) {
           this.logger.warn(
-            `Trùng mã lớp học ${courseCode} ở lần thử ${attempt}. Đang sinh lại mã...`,
+            `Trùng mã khóa học ${courseCode} ở lần thử ${attempt}. Đang sinh lại mã...`,
           );
           if (attempt === maxRetries) {
             throw new InternalServerErrorException(
-              'Không thể khởi tạo mã lớp học duy nhất. Vui lòng thử lại.',
+              'Không thể khởi tạo mã khóa học duy nhất. Vui lòng thử lại.',
             );
           }
           continue;
@@ -73,7 +73,7 @@ export class CourseService {
     }
 
     throw new InternalServerErrorException(
-      'Không thể khởi tạo mã lớp học duy nhất. Vui lòng thử lại.',
+      'Không thể khởi tạo mã khóa học duy nhất. Vui lòng thử lại.',
     );
   }
 
@@ -87,12 +87,12 @@ export class CourseService {
     });
 
     if (!existing) {
-      throw new NotFoundException('Lớp học không tồn tại');
+      throw new NotFoundException('Khóa học không tồn tại');
     }
 
     if (existing.status === CourseStatus.ARCHIVED) {
       throw new ConflictException(
-        'Lớp học đã lưu trữ, không thể chỉnh sửa thông tin',
+        'Khóa học đã lưu trữ, không thể chỉnh sửa thông tin',
       );
     }
 
@@ -119,17 +119,17 @@ export class CourseService {
     });
 
     if (!existing) {
-      throw new NotFoundException('Lớp học không tồn tại');
+      throw new NotFoundException('Khóa học không tồn tại');
     }
 
     if (existing.status === dto.status) {
-      throw new ConflictException('Lớp học đã ở trạng thái này');
+      throw new ConflictException('Khóa học đã ở trạng thái này');
     }
 
     // Kiểm tra quy tắc chuyển trạng thái
     if (existing.status === CourseStatus.ARCHIVED && dto.status !== CourseStatus.ACTIVE) {
       throw new BadRequestException(
-        'Lớp học lưu trữ chỉ có thể khôi phục về trạng thái hoạt động',
+        'Khóa học lưu trữ chỉ có thể khôi phục về trạng thái hoạt động',
       );
     }
 
@@ -168,7 +168,7 @@ export class CourseService {
     });
 
     if (!course) {
-      throw new NotFoundException('Lớp học không tồn tại');
+      throw new NotFoundException('Khóa học không tồn tại');
     }
 
     return course;
@@ -210,7 +210,7 @@ export class CourseService {
     });
 
     if (!course) {
-      throw new NotFoundException('Lớp học không tồn tại');
+      throw new NotFoundException('Khóa học không tồn tại');
     }
 
     return {
@@ -444,7 +444,7 @@ export class CourseService {
     });
 
     if (!course) {
-      throw new NotFoundException('Mã lớp học không hợp lệ hoặc không tồn tại');
+      throw new NotFoundException('Mã khóa học không hợp lệ hoặc không tồn tại');
     }
 
     if (
@@ -452,7 +452,7 @@ export class CourseService {
       course.status === CourseStatus.ARCHIVED
     ) {
       throw new ForbiddenException(
-        'Lớp học đã đóng hoặc lưu trữ, không thể tham gia',
+        'Khóa học đã đóng hoặc lưu trữ, không thể tham gia',
       );
     }
 
@@ -468,7 +468,7 @@ export class CourseService {
 
     if (existingEnrollment) {
       if (existingEnrollment.status === EnrollmentStatus.ACTIVE) {
-        throw new ConflictException('Bạn đã là thành viên của lớp học này');
+        throw new ConflictException('Bạn đã là thành viên của khóa học này');
       }
 
       // Tái kích hoạt enrollment đã bị REMOVED
@@ -508,7 +508,7 @@ export class CourseService {
         error instanceof Prisma.PrismaClientKnownRequestError &&
         error.code === 'P2002'
       ) {
-        throw new ConflictException('Bạn đã là thành viên của lớp học này');
+        throw new ConflictException('Bạn đã là thành viên của khóa học này');
       }
       throw error;
     }

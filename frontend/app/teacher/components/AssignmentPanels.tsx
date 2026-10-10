@@ -37,7 +37,7 @@ export function PendingAssignments({
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-[13.5px] font-bold text-slate-900">{a.title}</p>
-              <p className="text-[12.5px] text-slate-500">Lớp: {a.classCode}</p>
+              <p className="text-[12.5px] text-slate-500">Khóa học: {a.classCode}</p>
             </div>
             <div className="shrink-0 text-center">
               <p className="text-[14px] font-extrabold text-slate-900">
@@ -75,7 +75,7 @@ export function RecentResults({ items }: { items: RecentResult[] }) {
             </span>
             <div className="min-w-0 flex-1">
               <p className="truncate text-[13.5px] font-bold text-slate-900">{r.title}</p>
-              <p className="text-[12.5px] text-slate-500">Lớp: {r.classCode}</p>
+              <p className="text-[12.5px] text-slate-500">Khóa học: {r.classCode}</p>
             </div>
             <div className="shrink-0 text-right">
               <p className="text-[12.5px] text-slate-500">{r.submissionCount} bài làm</p>

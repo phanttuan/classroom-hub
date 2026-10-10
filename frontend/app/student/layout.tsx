@@ -4,7 +4,7 @@ import { SidebarProvider } from "@/lib/context/sidebar-context";
 
 export const metadata: Metadata = {
   title: "EduLearn | Học sinh",
-  description: "Không gian học tập của học sinh: lớp học, bài tập, kiểm tra, điểm số và lịch học.",
+  description: "Không gian học tập của học sinh: khóa học, bài tập, kiểm tra, điểm số và lịch học.",
 };
 
 export default async function StudentLayout({ children }: { children: React.ReactNode }) {

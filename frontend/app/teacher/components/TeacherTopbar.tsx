@@ -19,7 +19,7 @@ export default function TeacherTopbar({
   onSearchChange,
   onMenu,
   onOpenNotifications,
-  placeholder = "Tìm kiếm lớp học, bài học, sinh viên...",
+  placeholder = "Tìm kiếm khóa học, bài học, sinh viên...",
   menuItems = DEFAULT_MENU,
   showLogo = false,
   logoHref = "/",
@@ -66,7 +66,7 @@ export default function TeacherTopbar({
           <Link
             href={logoHref}
             className="flex items-center gap-2 pr-3 sm:pr-4 mr-1 sm:mr-2 border-r border-slate-200 shrink-0 hover:opacity-90 transition"
-            title="Về danh sách lớp học"
+            title="Về danh sách khóa học"
           >
             <Image
               src="/images/logo.webp"

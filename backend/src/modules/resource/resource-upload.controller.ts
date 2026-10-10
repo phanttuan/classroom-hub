@@ -92,7 +92,7 @@ export class ResourceUploadController {
     @Param('courseId') courseIdParam: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
-    const courseId = parseBigIntParam(courseIdParam, 'Mã lớp học (courseId)');
+    const courseId = parseBigIntParam(courseIdParam, 'Mã khóa học (courseId)');
     const data = await this.uploadService.uploadContentImage(
       toUser(req),
       courseId,

@@ -55,7 +55,7 @@ export default function HeroSection() {
             {/* Subtitle */}
             <ScrollReveal variant="fade-up" delay={260} duration={1000}>
               <p className="mt-4 text-[15px] sm:text-base text-slate-200/90 max-w-[520px] font-normal leading-relaxed drop-shadow-[0_1px_8px_rgba(0,0,0,0.5)]">
-                Tạo lớp học, xây dựng nội dung, giao bài, tổ chức Quiz, quản lý
+                Tạo khóa học, xây dựng nội dung, giao bài, tổ chức Quiz, quản lý
                 điểm và theo dõi lịch học trên cùng một nền tảng.
               </p>
             </ScrollReveal>
@@ -140,7 +140,7 @@ export default function HeroSection() {
                   aria-hidden="true"
                 >
                   <p className="font-handwriting rotate-[4deg] text-center text-[20px] sm:text-[23px] lg:text-[25px] font-bold leading-[1.18] text-amber-50 drop-shadow-[0_2px_8px_rgba(0,0,0,0.8)]">
-                    Mọi lớp học
+                    Mọi khóa học
                     <br />
                     trong tầm tay
                   </p>

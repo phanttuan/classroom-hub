@@ -43,7 +43,7 @@ function LineChart({ data }: { data: { label: string; value: number | null }[] }
 export default function StudentGradesPage() {
   const [topSearch, setTopSearch] = useState("");
   const [semester, setSemester] = useState(SEMESTERS[0]);
-  const [classFilter, setClassFilter] = useState("Tất cả lớp học");
+  const [classFilter, setClassFilter] = useState("Tất cả khóa học");
   const [query, setQuery] = useState("");
   const [detailCode, setDetailCode] = useState("WEB301");
 
@@ -53,7 +53,7 @@ export default function StudentGradesPage() {
     if (!isHK1) return [];
     const q = (query || topSearch).trim().toLowerCase();
     return gradeRows.filter((r) => {
-      if (classFilter !== "Tất cả lớp học" && r.code !== classFilter) return false;
+      if (classFilter !== "Tất cả khóa học" && r.code !== classFilter) return false;
       if (q && !`${r.name} ${r.code}`.toLowerCase().includes(q)) return false;
       return true;
     });
@@ -72,7 +72,7 @@ export default function StudentGradesPage() {
   ];
 
   return (
-    <StudentShell activeId="grades" searchPlaceholder="Tìm kiếm lớp học, bài học, tài liệu, bài kiểm tra..." searchValue={topSearch} onSearchChange={setTopSearch}>
+    <StudentShell activeId="grades" searchPlaceholder="Tìm kiếm khóa học, bài học, tài liệu, bài kiểm tra..." searchValue={topSearch} onSearchChange={setTopSearch}>
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_330px]">
         <div className="min-w-0">
           <h1 className="text-[26px] font-extrabold tracking-tight">Sổ điểm</h1>
@@ -84,14 +84,14 @@ export default function StudentGradesPage() {
                 {SEMESTERS.map((o) => (<option key={o}>{o}</option>))}
               </select>
             </label>
-            <label className="block text-[12.5px] text-slate-500">Lớp học
+            <label className="block text-[12.5px] text-slate-500">Khóa học
               <select value={classFilter} onChange={(e) => setClassFilter(e.target.value)} className="mt-1 h-10 w-full rounded-lg bg-white px-2.5 text-[13px] outline-none ring-1 ring-slate-200">
-                {["Tất cả lớp học", "WEB301", "PY101", "DB201", "DSA201", "UI201", "BE301"].map((o) => (<option key={o}>{o}</option>))}
+                {["Tất cả khóa học", "WEB301", "PY101", "DB201", "DSA201", "UI201", "BE301"].map((o) => (<option key={o}>{o}</option>))}
               </select>
             </label>
             <span className="relative block self-end">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm kiếm lớp học..."
+              <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Tìm kiếm khóa học..."
                 className="h-10 w-full rounded-lg bg-white pl-9 pr-3 text-[13px] outline-none ring-1 ring-slate-200 placeholder:text-slate-400" />
             </span>
           </div>
@@ -100,20 +100,20 @@ export default function StudentGradesPage() {
             <>
               <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
                 <StatCard icon={<BarChart3 className="h-6 w-6" />} iconCls="bg-blue-50 text-blue-600" value={avg.toFixed(2)} label="Điểm trung bình học kỳ" />
-                <StatCard icon={<CheckCircle2 className="h-6 w-6" />} iconCls="bg-green-50 text-green-600" value="5 / 6" label="Lớp đã hoàn thành" />
+                <StatCard icon={<CheckCircle2 className="h-6 w-6" />} iconCls="bg-green-50 text-green-600" value="5 / 6" label="Khóa học đã hoàn thành" />
                 <StatCard icon={<Clock className="h-6 w-6" />} iconCls="bg-orange-50 text-orange-500" value="1" label="Đang học" />
                 <StatCard icon={<FileText className="h-6 w-6" />} iconCls="bg-red-50 text-red-500" value="0" label="Môn chưa đạt" />
               </div>
 
               <section className="mt-4 overflow-hidden rounded-xl border border-slate-200/70 bg-white">
-                <h2 className="px-4 pt-4 text-[15px] font-extrabold">Danh sách lớp học</h2>
+                <h2 className="px-4 pt-4 text-[15px] font-extrabold">Danh sách khóa học</h2>
                 <div className="overflow-x-auto">
                   <table className="mt-1 w-full min-w-[760px] text-left text-[13px]">
                     <thead>
                       <tr className="text-[12px] text-slate-400">
                         <th className="px-4 py-2.5 font-medium">#</th>
-                        <th className="font-medium">Lớp học</th>
-                        <th className="font-medium">Mã lớp</th>
+                        <th className="font-medium">Khóa học</th>
+                        <th className="font-medium">Mã khóa học</th>
                         <th className="text-center font-medium">Số tín chỉ</th>
                         <th className="text-center font-medium">Điểm quá trình (40%)</th>
                         <th className="text-center font-medium">Điểm cuối kỳ (60%)</th>
@@ -146,13 +146,13 @@ export default function StudentGradesPage() {
                     </tbody>
                   </table>
                 </div>
-                {rows.length === 0 && <p className="px-4 py-8 text-center text-sm text-slate-500">Không tìm thấy lớp học nào.</p>}
+                {rows.length === 0 && <p className="px-4 py-8 text-center text-sm text-slate-500">Không tìm thấy khóa học nào.</p>}
               </section>
 
               <section className="mt-4 rounded-xl border border-slate-200/70 bg-white p-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <h2 className="text-[15px] font-extrabold">🔷 Chi tiết điểm lớp học</h2>
-                  <select value={detailCode} onChange={(e) => setDetailCode(e.target.value)} className="h-10 rounded-lg bg-white px-3 text-[13px] outline-none ring-1 ring-slate-200" aria-label="Chọn lớp">
+                  <h2 className="text-[15px] font-extrabold">🔷 Chi tiết điểm khóa học</h2>
+                  <select value={detailCode} onChange={(e) => setDetailCode(e.target.value)} className="h-10 rounded-lg bg-white px-3 text-[13px] outline-none ring-1 ring-slate-200" aria-label="Chọn khóa học">
                     {gradeRows.map((r) => (<option key={r.code} value={r.code}>{r.name} ({r.code})</option>))}
                   </select>
                 </div>
@@ -217,7 +217,7 @@ export default function StudentGradesPage() {
               </div>
               <div className="rounded-xl border border-slate-100 p-2.5 text-center">
                 <p className="text-[16px] font-extrabold">3</p>
-                <p className="text-[11px] text-slate-400">Số lớp học</p>
+                <p className="text-[11px] text-slate-400">Số khóa học</p>
               </div>
             </div>
           </section>

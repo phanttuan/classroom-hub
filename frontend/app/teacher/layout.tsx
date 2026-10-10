@@ -4,7 +4,7 @@ import { SidebarProvider } from "@/lib/context/sidebar-context";
 
 export const metadata: Metadata = {
   title: "EduHub | Giáo viên",
-  description: "Tổng quan giảng dạy: lớp học, bài tập, kiểm tra, lịch và thông báo.",
+  description: "Tổng quan giảng dạy: khóa học, bài tập, kiểm tra, lịch và thông báo.",
 };
 
 export default async function TeacherLayout({ children }: { children: React.ReactNode }) {

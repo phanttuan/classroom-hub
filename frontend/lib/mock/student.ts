@@ -57,7 +57,7 @@ export const studentRecentScores: StudentRecentScore[] = [
 ];
 
 export const studentNotifs: StudentNotif[] = [
-  { id: "n1", title: "Giảng viên đã đăng bài tập mới", desc: "Bài tập 3: API với Node.js đã được đăng cho lớp WEB301.", timeAgo: "2 giờ trước", unread: true, tone: "red" },
+  { id: "n1", title: "Giảng viên đã đăng bài tập mới", desc: "Bài tập 3: API với Node.js đã được đăng cho khóa học WEB301.", timeAgo: "2 giờ trước", unread: true, tone: "red" },
   { id: "n2", title: "Lịch kiểm tra đã được cập nhật", desc: "Thời gian kiểm tra 1: Python cơ bản đã được điều chỉnh.", timeAgo: "5 giờ trước", unread: true, tone: "purple" },
   { id: "n3", title: "Thông báo từ giảng viên", desc: "Buổi học ngày mai sẽ được tổ chức qua Google Meet.", timeAgo: "1 ngày trước", unread: false, tone: "blue" },
 ];
@@ -69,9 +69,9 @@ export const studentDocs: StudentDoc[] = [
 ];
 
 export const daySchedule24: DayScheduleItem[] = [
-  { id: "e1", time: "08:00 - 09:00", title: "Kiểm tra 2: HTML & CSS", meta: "Lớp: WEB301 - Phòng thi trực tuyến", action: "quiz", tone: "purple" },
-  { id: "e2", time: "10:00 - 11:00", title: "Buổi học: Responsive Web Design", meta: "Lớp: WEB301 - Google Meet", action: "join", tone: "blue" },
-  { id: "e3", time: "14:00 - 15:30", title: "Thảo luận nhóm dự án", meta: "Lớp: WEB301 - Phòng 301", action: "none", tone: "orange" },
+  { id: "e1", time: "08:00 - 09:00", title: "Kiểm tra 2: HTML & CSS", meta: "Khóa học: WEB301 - Phòng thi trực tuyến", action: "quiz", tone: "purple" },
+  { id: "e2", time: "10:00 - 11:00", title: "Buổi học: Responsive Web Design", meta: "Khóa học: WEB301 - Google Meet", action: "join", tone: "blue" },
+  { id: "e3", time: "14:00 - 15:30", title: "Thảo luận nhóm dự án", meta: "Khóa học: WEB301 - Phòng 301", action: "none", tone: "orange" },
 ];
 
 /* ---------- Nội dung học tập ---------- */
@@ -194,7 +194,7 @@ export const studentAssignments: StudentAssignment[] = [
   {
     id: "sa10", title: "Bài tập 2: OOP Python", classCode: "PY101", courseName: "Lập trình Python cơ bản",
     filesLabel: "1 file", due: "18/09/2026 23:59", points: 100, status: "submitted", tone: "orange",
-    description: ["Cài đặt lớp Student/Course/Grade."],
+    description: ["Cài đặt khóa học Student/Course/Grade."],
     guide: ["Viết docstring đầy đủ."],
     submittedAt: "17/09/2026 19:11", fileName: "bt2_oop.py", fileSize: "18 KB",
   },
@@ -330,18 +330,18 @@ export const gradeRows: GradeRow[] = [
 
 /* ---------- Thông báo ---------- */
 export const studentInbox: StudentInboxItem[] = [
-  { id: "si1", title: "Hạn nộp bài tập 2: JavaScript cơ bản", desc: "Bài tập 2 của lớp Lập trình Web nâng cao sẽ hết hạn nộp vào 23:59 ngày 25/09/2026. Vui lòng nộp bài đúng hạn để tránh bị trừ điểm.", timeAgo: "2 giờ trước", unread: true, important: true, category: "assignment", tone: "red" },
-  { id: "si2", title: "Lịch học tuần này đã được cập nhật", desc: "Giảng viên đã cập nhật lịch học tuần 26/09 - 02/10/2026 cho lớp WEB301.", timeAgo: "5 giờ trước", unread: true, important: false, category: "schedule", tone: "blue" },
+  { id: "si1", title: "Hạn nộp bài tập 2: JavaScript cơ bản", desc: "Bài tập 2 của khóa học Lập trình Web nâng cao sẽ hết hạn nộp vào 23:59 ngày 25/09/2026. Vui lòng nộp bài đúng hạn để tránh bị trừ điểm.", timeAgo: "2 giờ trước", unread: true, important: true, category: "assignment", tone: "red" },
+  { id: "si2", title: "Lịch học tuần này đã được cập nhật", desc: "Giảng viên đã cập nhật lịch học tuần 26/09 - 02/10/2026 cho khóa học WEB301.", timeAgo: "5 giờ trước", unread: true, important: false, category: "schedule", tone: "blue" },
   { id: "si3", title: "Điểm kiểm tra 1: HTML & CSS đã được công bố", desc: "Giảng viên Nguyễn Văn A đã công bố điểm kiểm tra 1. Bạn có thể xem chi tiết trong mục Sổ điểm.", timeAgo: "1 ngày trước", unread: true, important: false, category: "grade", tone: "green" },
   { id: "si4", title: "Thông báo từ giảng viên", desc: "Buổi học ngày 28/09/2026 sẽ chuyển sang hình thức trực tuyến (Google Meet). Xem thêm thông tin trong mục Lịch.", timeAgo: "1 ngày trước", unread: true, important: false, category: "class", tone: "purple" },
   { id: "si5", title: "Tài liệu mới: Slide - Responsive Web Design", desc: "Giảng viên đã đăng tài liệu mới cho bài học Buổi 4: Responsive Web Design.", timeAgo: "2 ngày trước", unread: true, important: false, category: "assignment", tone: "orange" },
   { id: "si6", title: "Kết quả bài tập 1 đã được chấm", desc: "Giảng viên đã chấm bài tập 1: HTML & CSS. Bạn có thể xem điểm và nhận xét chi tiết.", timeAgo: "3 ngày trước", unread: true, important: false, category: "grade", tone: "red" },
   { id: "si7", title: "Bảo trì hệ thống", desc: "Hệ thống sẽ được bảo trì vào lúc 02:00 - 04:00 ngày 30/09/2026. Trong thời gian này, bạn có thể gặp khó khăn khi truy cập.", timeAgo: "3 ngày trước", unread: true, important: false, category: "system", tone: "blue" },
-  { id: "si8", title: "Có lớp học mới được thêm", desc: "Bạn đã được thêm vào lớp PY101 - Python cơ bản do giảng viên Trần Thị B phụ trách.", timeAgo: "4 ngày trước", unread: true, important: false, category: "class", tone: "purple" },
+  { id: "si8", title: "Có khóa học mới được thêm", desc: "Bạn đã được thêm vào khóa học PY101 - Python cơ bản do giảng viên Trần Thị B phụ trách.", timeAgo: "4 ngày trước", unread: true, important: false, category: "class", tone: "purple" },
   { id: "si9", title: "Nhắc nhở: Buổi kiểm tra 2", desc: "Buổi kiểm tra 2: JavaScript cơ bản sẽ diễn ra vào 26/09/2026 (08:00 - 09:00). Hãy ôn tập và chuẩn bị đầy đủ.", timeAgo: "5 ngày trước", unread: false, important: true, category: "schedule", tone: "green" },
-  { id: "si10", title: "Chúc mừng!", desc: "Bạn đã hoàn thành 50% tiến độ học tập của lớp Cơ sở dữ liệu.", timeAgo: "1 tuần trước", unread: false, important: false, category: "class", tone: "yellow" },
-  { id: "si11", title: "Buổi kiểm tra 2: JavaScript cơ bản", desc: "Lịch kiểm tra 2 lớp Web nâng cao đã được chốt: 26/09/2026 (08:00).", timeAgo: "5 ngày trước", unread: false, important: false, category: "class", tone: "red" },
-  { id: "si12", title: "Tài liệu ôn tập giữa kỳ", desc: "Đề cương ôn tập giữa kỳ lớp Python đã được đăng tải.", timeAgo: "6 ngày trước", unread: false, important: false, category: "class", tone: "orange" },
+  { id: "si10", title: "Chúc mừng!", desc: "Bạn đã hoàn thành 50% tiến độ học tập của khóa học Cơ sở dữ liệu.", timeAgo: "1 tuần trước", unread: false, important: false, category: "class", tone: "yellow" },
+  { id: "si11", title: "Buổi kiểm tra 2: JavaScript cơ bản", desc: "Lịch kiểm tra 2 khóa học Web nâng cao đã được chốt: 26/09/2026 (08:00).", timeAgo: "5 ngày trước", unread: false, important: false, category: "class", tone: "red" },
+  { id: "si12", title: "Tài liệu ôn tập giữa kỳ", desc: "Đề cương ôn tập giữa kỳ khóa học Python đã được đăng tải.", timeAgo: "6 ngày trước", unread: false, important: false, category: "class", tone: "orange" },
 ];
 
 /* ---------- Lịch học (tuần 22-28/09/2026) ---------- */

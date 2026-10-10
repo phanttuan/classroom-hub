@@ -96,7 +96,7 @@ export const assignmentList: TeacherAssignment[] = [
   {
     id: "bt-8",
     title: "Bài tập 8: Python OOP",
-    description: "Cài đặt các lớp đối tượng quản lý thư viện mini.",
+    description: "Cài đặt các khóa học đối tượng quản lý thư viện mini.",
     classCode: "PY101",
     courseName: "Lập trình Python cơ bản",
     dueDate: "28/09/2026",
@@ -160,9 +160,9 @@ export const assignmentList: TeacherAssignment[] = [
   },
 ];
 
-export const assignmentClassOptions = ["Tất cả lớp học", "WEB301", "PY101", "CS201"];
+export const assignmentClassOptions = ["Tất cả khóa học", "WEB301", "PY101", "CS201"];
 export const assignmentCourseOptions = [
-  "Tất cả lớp học",
+  "Tất cả khóa học",
   "Lập trình Web nâng cao",
   "Lập trình Python cơ bản",
   "Cấu trúc dữ liệu và giải thuật",

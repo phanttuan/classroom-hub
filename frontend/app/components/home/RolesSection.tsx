@@ -28,7 +28,7 @@ const roleData: Record<RoleKey, RoleContent> = {
     title: "Dành cho giáo viên, quản lý dễ dàng hơn",
     badge: "Dành cho giáo viên",
     checkpoints: [
-      "Tạo và quản lý lớp học linh hoạt với mã Class Code",
+      "Tạo và quản lý khóa học linh hoạt với mã Class Code",
       "Xây dựng cấu trúc bài giảng và tài liệu khóa học",
       "Giao bài tập đa dạng, tổ chức Quiz tự động chấm",
       "Chấm điểm trực quan, quản lý sổ điểm tập trung",
@@ -42,7 +42,7 @@ const roleData: Record<RoleKey, RoleContent> = {
     title: "Dành cho học sinh, chủ động học tập hiệu quả",
     badge: "Dành cho học sinh",
     checkpoints: [
-      "Gia nhập lớp học nhanh chóng chỉ với một mã code",
+      "Gia nhập khóa học nhanh chóng chỉ với một mã code",
       "Truy cập bài giảng và tải tài liệu học tập mọi lúc",
       "Nộp bài tập trực tuyến, làm Quiz nhận điểm tức thì",
       "Theo dõi điểm số cá nhân và nhận xét từ thầy cô",

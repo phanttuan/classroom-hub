@@ -127,12 +127,12 @@ export class ResourceUploadService {
       !(user.role === UserRole.TEACHER && course.ownerId === user.id)
     ) {
       throw new ForbiddenException(
-        'Bạn không phải giáo viên phụ trách lớp học này',
+        'Bạn không phải giáo viên phụ trách khóa học này',
       );
     }
     if (course.status === CourseStatus.ARCHIVED) {
       throw new BadRequestException(
-        'Lớp học đã lưu trữ (chỉ đọc), không thể thay đổi tài liệu',
+        'Khóa học đã lưu trữ (chỉ đọc), không thể thay đổi tài liệu',
       );
     }
   }
@@ -352,7 +352,7 @@ export class ResourceUploadService {
       where: { id: courseId },
       select: { ownerId: true, status: true },
     });
-    if (!course) throw new NotFoundException('Lớp học không tồn tại');
+    if (!course) throw new NotFoundException('Khóa học không tồn tại');
     this.assertCanManageCourse(user, course);
 
     if (!CONTENT_IMAGE_TYPES.has(file.mimetype)) {

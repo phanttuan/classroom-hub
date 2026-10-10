@@ -104,7 +104,7 @@ export default function StudentDashboardPage() {
   }, [search, classList]);
 
   return (
-    <StudentShell activeId="home" searchPlaceholder="Tìm kiếm lớp học, bài học, tài liệu..." searchValue={search} onSearchChange={setSearch}>
+    <StudentShell activeId="home" searchPlaceholder="Tìm kiếm khóa học, bài học, tài liệu..." searchValue={search} onSearchChange={setSearch}>
       {/* Banner chào (dùng chung 3 role) */}
       <GreetingHeader
         name={studentProfile.fullName}
@@ -114,7 +114,7 @@ export default function StudentDashboardPage() {
 
       {/* Stats */}
       <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard icon={<BookOpen className="h-6 w-6" />} iconCls="bg-blue-50 text-blue-600" value={loading ? "..." : classList.length.toString()} label="Lớp học đang tham gia" />
+        <StatCard icon={<BookOpen className="h-6 w-6" />} iconCls="bg-blue-50 text-blue-600" value={loading ? "..." : classList.length.toString()} label="Khóa học đang tham gia" />
         <StatCard icon={<FileText className="h-6 w-6" />} iconCls="bg-red-50 text-red-500" value="5" label="Bài tập cần nộp" />
         <StatCard icon={<CheckSquare className="h-6 w-6" />} iconCls="bg-purple-50 text-purple-600" value="2" label="Bài kiểm tra sắp tới" />
         <StatCard icon={<BarChart3 className="h-6 w-6" />} iconCls="bg-green-50 text-green-600" value="7.8" label="Điểm trung bình" />
@@ -124,23 +124,23 @@ export default function StudentDashboardPage() {
         {/* Cột trái */}
         <div className="min-w-0 space-y-5">
           <section className="rounded-xl border border-slate-200/70 bg-white p-4 sm:p-5">
-            <SectionHead title="Lớp học của tôi" onAction={() => router.push("/student/content")} />
+            <SectionHead title="Khóa học của tôi" onAction={() => router.push("/student/content")} />
             {loading ? (
               <div className="flex flex-col items-center justify-center py-12">
                 <Loader2 className="h-7 w-7 animate-spin text-blue-600" />
-                <p className="mt-2 text-[13px] text-slate-500">Đang tải lớp học...</p>
+                <p className="mt-2 text-[13px] text-slate-500">Đang tải khóa học...</p>
               </div>
             ) : classList.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-200 py-10 text-center">
                 <BookOpen className="mx-auto h-10 w-10 text-slate-300" />
-                <p className="mt-2 text-[14px] font-semibold text-slate-700">Chưa tham gia lớp học nào</p>
-                <p className="mt-0.5 text-[12.5px] text-slate-400">Tham gia lớp học bằng mã mời để bắt đầu học tập</p>
+                <p className="mt-2 text-[14px] font-semibold text-slate-700">Chưa tham gia khóa học nào</p>
+                <p className="mt-0.5 text-[12.5px] text-slate-400">Tham gia khóa học bằng mã mời để bắt đầu học tập</p>
                 <button
                   onClick={() => setJoinOpen(true)}
                   className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-3.5 py-2 text-[12.5px] font-semibold text-white hover:bg-blue-700"
                 >
                   <Plus className="h-3.5 w-3.5" />
-                  Tham gia lớp học
+                  Tham gia khóa học
                 </button>
               </div>
             ) : (
@@ -162,8 +162,8 @@ export default function StudentDashboardPage() {
                             <>
                               <button aria-label="Đóng" onClick={() => setMenuId(null)} className="fixed inset-0 z-10 cursor-default" />
                               <span className="absolute right-0 top-full z-20 w-40 overflow-hidden rounded-xl border bg-white py-1 text-left shadow-xl">
-                                <button onClick={() => { setMenuId(null); router.push(`/student/content/courses/${c.id}`); }} className="block w-full px-3.5 py-2 text-[12.5px] text-slate-600 hover:bg-slate-50">Vào lớp học</button>
-                                <button onClick={() => { setMenuId(null); showToast(`Đã ghim ${c.code} lên đầu`); }} className="block w-full px-3.5 py-2 text-[12.5px] text-slate-600 hover:bg-slate-50">Ghim lớp học</button>
+                                <button onClick={() => { setMenuId(null); router.push(`/student/content/courses/${c.id}`); }} className="block w-full px-3.5 py-2 text-[12.5px] text-slate-600 hover:bg-slate-50">Vào khóa học</button>
+                                <button onClick={() => { setMenuId(null); showToast(`Đã ghim ${c.code} lên đầu`); }} className="block w-full px-3.5 py-2 text-[12.5px] text-slate-600 hover:bg-slate-50">Ghim khóa học</button>
                               </span>
                             </>
                           )}
@@ -182,7 +182,7 @@ export default function StudentDashboardPage() {
                           onClick={() => router.push(`/student/content/courses/${c.id}`)}
                           className="font-medium text-blue-600 hover:underline cursor-pointer"
                         >
-                          Vào lớp →
+                          Vào khóa học →
                         </button>
                       </div>
                     </div>

@@ -26,15 +26,15 @@ function CreateCourseForm({
 
   const submit = () => {
     if (name.trim().length < 1) {
-      setError("Tên lớp học không được để trống.");
+      setError("Tên khóa học không được để trống.");
       return;
     }
     if (name.trim().length > 255) {
-      setError("Tên lớp học không được vượt quá 255 ký tự.");
+      setError("Tên khóa học không được vượt quá 255 ký tự.");
       return;
     }
     if (description.length > 2000) {
-      setError("Mô tả lớp học không được vượt quá 2000 ký tự.");
+      setError("Mô tả khóa học không được vượt quá 2000 ký tự.");
       return;
     }
     onSubmit({
@@ -49,13 +49,13 @@ function CreateCourseForm({
     <div className="space-y-3.5">
       {isArchived && (
         <div className="rounded-lg bg-amber-50 p-3 text-[13px] text-amber-700">
-          Lớp học này đã lưu trữ (chỉ đọc). Bạn không thể chỉnh sửa thông tin cho đến khi khôi phục lớp học.
+          Khóa học này đã lưu trữ (chỉ đọc). Bạn không thể chỉnh sửa thông tin cho đến khi khôi phục khóa học.
         </div>
       )}
 
       <div>
         <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
-          Tên lớp học *
+          Tên khóa học *
         </label>
         <input
           disabled={isArchived}
@@ -71,7 +71,7 @@ function CreateCourseForm({
 
       <div>
         <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">
-          Mô tả lớp học
+          Mô tả khóa học
         </label>
         <textarea
           disabled={isArchived}
@@ -81,20 +81,20 @@ function CreateCourseForm({
             if (error) setError("");
           }}
           rows={3}
-          placeholder="Giới thiệu mục tiêu lớp học, đề cương hoặc ghi chú cho sinh viên..."
+          placeholder="Giới thiệu mục tiêu khóa học, đề cương hoặc ghi chú cho sinh viên..."
           className="w-full rounded-lg border border-slate-200 px-3.5 py-2.5 text-sm outline-none transition focus:border-blue-400 focus:ring-4 focus:ring-blue-100 disabled:bg-slate-100 disabled:text-slate-500"
         />
       </div>
 
       {initial ? (
         <div className="rounded-lg bg-slate-50 p-3 text-[13px] text-slate-600">
-          <span className="font-semibold text-slate-700">Mã lớp học:</span>{" "}
+          <span className="font-semibold text-slate-700">Mã khóa học:</span>{" "}
           <span className="font-mono font-bold text-blue-600">{initial.code}</span>{" "}
           <span className="text-xs text-slate-400">(Mã do hệ thống cấp phát cố định)</span>
         </div>
       ) : (
         <p className="text-xs text-slate-500">
-          * Mã lớp học (8 ký tự duy nhất) sẽ được hệ thống sinh tự động sau khi tạo.
+          * Mã khóa học (8 ký tự duy nhất) sẽ được hệ thống sinh tự động sau khi tạo.
         </p>
       )}
 
@@ -116,7 +116,7 @@ function CreateCourseForm({
           onClick={submit}
           className="rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm shadow-blue-600/30 transition hover:bg-blue-700 disabled:opacity-50"
         >
-          {initial ? "Lưu thay đổi" : "Tạo lớp học"}
+          {initial ? "Lưu thay đổi" : "Tạo khóa học"}
         </button>
       </div>
     </div>
@@ -138,7 +138,7 @@ export function CreateCourseModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={initial ? "Chỉnh sửa lớp học" : "Tạo lớp học mới"}
+      title={initial ? "Chỉnh sửa khóa học" : "Tạo khóa học mới"}
     >
       <CreateCourseForm
         key={initial ? `edit-${initial.id}` : `create-${String(open)}`}
@@ -159,7 +159,7 @@ export function CourseDetailModal({
   onClose: () => void;
 }) {
   return (
-    <Modal open={!!classInfo} onClose={onClose} title="Chi tiết lớp học">
+    <Modal open={!!classInfo} onClose={onClose} title="Chi tiết khóa học">
       {classInfo && (
         <div className="space-y-3">
           <div className={`grid place-items-center rounded-xl bg-gradient-to-br py-8 text-5xl ${classInfo.coverGradient}`}>
@@ -171,7 +171,7 @@ export function CourseDetailModal({
           )}
           <dl className="grid grid-cols-2 gap-2 text-sm">
             <div className="rounded-lg bg-slate-50 p-3">
-              <dt className="text-xs text-slate-500">Mã lớp học</dt>
+              <dt className="text-xs text-slate-500">Mã khóa học</dt>
               <dd className="font-bold text-slate-900">{classInfo.code}</dd>
             </div>
             <div className="rounded-lg bg-slate-50 p-3">
@@ -221,20 +221,20 @@ export function ConfirmStatusChangeModal({
 
   const config = {
     closed: {
-      title: "Đóng lớp học?",
-      message: `Bạn có chắc muốn đóng lớp "${classInfo.name}" (${classInfo.code})? Lớp học sẽ ngừng tiếp nhận học sinh mới và không tạo thêm hoạt động mới.`,
-      btnText: "Đóng lớp học",
+      title: "Đóng khóa học?",
+      message: `Bạn có chắc muốn đóng khóa học "${classInfo.name}" (${classInfo.code})? Khóa học sẽ ngừng tiếp nhận học sinh mới và không tạo thêm hoạt động mới.`,
+      btnText: "Đóng khóa học",
       btnClass: "bg-amber-600 hover:bg-amber-700 text-white",
     },
     archived: {
-      title: "Lưu trữ lớp học?",
-      message: `Bạn có chắc muốn lưu trữ lớp "${classInfo.name}" (${classInfo.code})? Lớp học sẽ chuyển sang chế độ chỉ đọc. Toàn bộ tài liệu và kết quả học tập sẽ được bảo toàn.`,
-      btnText: "Lưu trữ lớp học",
+      title: "Lưu trữ khóa học?",
+      message: `Bạn có chắc muốn lưu trữ khóa học "${classInfo.name}" (${classInfo.code})? Khóa học sẽ chuyển sang chế độ chỉ đọc. Toàn bộ tài liệu và kết quả học tập sẽ được bảo toàn.`,
+      btnText: "Lưu trữ khóa học",
       btnClass: "bg-slate-700 hover:bg-slate-800 text-white",
     },
     active: {
-      title: "Khôi phục lớp học?",
-      message: `Bạn có chắc muốn mở lại hoạt động cho lớp "${classInfo.name}" (${classInfo.code})?`,
+      title: "Khôi phục khóa học?",
+      message: `Bạn có chắc muốn mở lại hoạt động cho khóa học "${classInfo.name}" (${classInfo.code})?`,
       btnText: "Khôi phục hoạt động",
       btnClass: "bg-blue-600 hover:bg-blue-700 text-white",
     },
@@ -276,12 +276,12 @@ export function ConfirmDeleteModal({
   onConfirm: () => void;
 }) {
   return (
-    <Modal open={!!classInfo} onClose={onClose} title="Lưu trữ lớp học?" widthClass="max-w-[420px]">
+    <Modal open={!!classInfo} onClose={onClose} title="Lưu trữ khóa học?" widthClass="max-w-[420px]">
       {classInfo && (
         <div className="space-y-4">
           <p className="text-sm leading-relaxed text-slate-600">
-            Theo chính sách hệ thống, lớp học không xóa vĩnh viễn để bảo tồn kết quả của sinh viên.
-            Bạn có muốn chuyển lớp <b className="text-slate-900">{classInfo.name}</b> sang trạng thái lưu trữ?
+            Theo chính sách hệ thống, khóa học không xóa vĩnh viễn để bảo tồn kết quả của sinh viên.
+            Bạn có muốn chuyển khóa học <b className="text-slate-900">{classInfo.name}</b> sang trạng thái lưu trữ?
           </p>
           <div className="flex justify-end gap-2">
             <button
@@ -320,7 +320,7 @@ function GradeForm({
           <div className="rounded-xl bg-slate-50 p-3.5 text-sm">
             <p className="font-bold text-slate-900">{assignment.title}</p>
             <p className="mt-0.5 text-slate-500">
-              Lớp: {assignment.classCode} • Đã nộp {assignment.submitted}/{assignment.total}
+              Khóa học: {assignment.classCode} • Đã nộp {assignment.submitted}/{assignment.total}
             </p>
             <div className="mt-2 h-2 overflow-hidden rounded-full bg-slate-200">
               <div

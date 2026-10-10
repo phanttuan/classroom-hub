@@ -38,7 +38,7 @@ export default function StudentContentPage() {
   // Tham gia lớp bằng mã → tải lại tiến độ (một request) để lớp mới hiện lên đầu danh sách
   const handleJoinSuccess = async (_joined: CourseDto, message: string) => {
     setJoinOpen(false);
-    toast.success("Tham gia lớp học thành công", message);
+    toast.success("Tham gia khóa học thành công", message);
     try {
       setCourses(await fetchMyCourseProgress());
     } catch {
@@ -101,7 +101,7 @@ export default function StudentContentPage() {
     <StudentShell
       activeId="content"
       activeHref="/student/content"
-      searchPlaceholder="Tìm kiếm lớp học..."
+      searchPlaceholder="Tìm kiếm khóa học..."
       searchValue={topSearch}
       onSearchChange={setTopSearch}
     >
@@ -110,17 +110,17 @@ export default function StudentContentPage() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h1 className="text-[26px] font-black tracking-tight text-slate-900">
-              Lớp học của tôi
+              Khóa học của tôi
             </h1>
             <p className="mt-0.5 text-[14px] text-slate-500">
-              Theo dõi và hoàn thành bài học trong các lớp học bạn đang tham gia
+              Theo dõi và hoàn thành bài học trong các khóa học bạn đang tham gia
             </p>
           </div>
           <button
             onClick={() => setJoinOpen(true)}
             className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-5 py-2.5 text-[14px] font-bold text-white shadow-md shadow-blue-600/20 transition hover:bg-blue-700"
           >
-            <Plus className="h-4 w-4" /> Tham gia lớp học
+            <Plus className="h-4 w-4" /> Tham gia khóa học
           </button>
         </div>
 
@@ -128,10 +128,10 @@ export default function StudentContentPage() {
         <div className="mt-6 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-[16px] font-bold text-slate-800">
-              Tổng quan về lớp học
+              Tổng quan về khóa học
             </h2>
             <div className="text-[12px] text-slate-500">
-              Bạn có <span className="font-bold text-slate-800">{filtered.length}</span> lớp học
+              Bạn có <span className="font-bold text-slate-800">{filtered.length}</span> khóa học
             </div>
           </div>
 
@@ -142,7 +142,7 @@ export default function StudentContentPage() {
               onChange={(e) => setStatusFilter(e.target.value)}
               className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-[13px] font-semibold text-slate-700 outline-none focus:border-blue-500"
             >
-              <option value="all">Tất cả lớp học</option>
+              <option value="all">Tất cả khóa học</option>
               <option value="in-progress">Đang học</option>
               <option value="completed">Đã hoàn thành</option>
             </select>
@@ -164,7 +164,7 @@ export default function StudentContentPage() {
               onChange={(e) => setSort(e.target.value as "name" | "progress")}
               className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-[13px] text-slate-700 outline-none focus:border-blue-500"
             >
-              <option value="name">Tên lớp (A → Z)</option>
+              <option value="name">Tên khóa học (A → Z)</option>
               <option value="progress">Tiến độ cao nhất</option>
             </select>
 
@@ -200,24 +200,24 @@ export default function StudentContentPage() {
         {loading ? (
           <div className="mt-12 flex flex-col items-center justify-center py-12 text-center">
             <div className="h-9 w-9 animate-spin rounded-full border-3 border-blue-600 border-t-transparent" />
-            <p className="mt-3 text-sm font-medium text-slate-500">Đang tải danh sách lớp học...</p>
+            <p className="mt-3 text-sm font-medium text-slate-500">Đang tải danh sách khóa học...</p>
           </div>
         ) : filtered.length === 0 ? (
           <div className="mt-8 flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 bg-white py-16 text-center">
             <div className="grid h-16 w-16 place-items-center rounded-2xl bg-blue-50 text-3xl">
               🎓
             </div>
-            <h3 className="mt-4 text-lg font-bold text-slate-800">Không có lớp học nào</h3>
+            <h3 className="mt-4 text-lg font-bold text-slate-800">Không có khóa học nào</h3>
             <p className="mt-1 max-w-sm text-sm text-slate-500">
               {query || statusFilter !== "all"
-                ? "Không tìm thấy lớp học phù hợp với bộ lọc hiện tại."
-                : "Bạn chưa tham gia lớp học nào. Nhập mã lớp do giảng viên cung cấp để bắt đầu."}
+                ? "Không tìm thấy khóa học phù hợp với bộ lọc hiện tại."
+                : "Bạn chưa tham gia khóa học nào. Nhập mã khóa học do giảng viên cung cấp để bắt đầu."}
             </p>
             <button
               onClick={() => setJoinOpen(true)}
               className="mt-5 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-500/20 hover:bg-blue-700"
             >
-              <Plus className="h-4 w-4" /> Tham gia lớp học bằng mã
+              <Plus className="h-4 w-4" /> Tham gia khóa học bằng mã
             </button>
           </div>
         ) : view === "grid" ? (

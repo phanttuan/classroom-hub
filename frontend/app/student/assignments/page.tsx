@@ -41,7 +41,7 @@ function StatusPill({ a }: { a: StudentAssignment }) {
 
 export default function StudentAssignmentsPage() {
   const [topSearch, setTopSearch] = useState("");
-  const [classFilter, setClassFilter] = useState("Tất cả lớp học");
+  const [classFilter, setClassFilter] = useState("Tất cả khóa học");
   const [statusFilter, setStatusFilter] = useState("Tất cả trạng thái");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState("Hạn nộp gần nhất");
@@ -77,7 +77,7 @@ export default function StudentAssignmentsPage() {
     const q = (query || topSearch).trim().toLowerCase();
     let list = [...items];
     if (tab !== "all") list = list.filter((i) => i.status === tab);
-    if (classFilter !== "Tất cả lớp học") list = list.filter((i) => i.classCode === classFilter);
+    if (classFilter !== "Tất cả khóa học") list = list.filter((i) => i.classCode === classFilter);
     if (statusFilter !== "Tất cả trạng thái") {
       const map: Record<string, Tab> = { "Chưa nộp": "pending", "Đã nộp": "submitted", "Quá hạn": "overdue" };
       list = list.filter((i) => i.status === map[statusFilter]);
@@ -120,16 +120,16 @@ export default function StudentAssignmentsPage() {
   };
 
   return (
-    <StudentShell activeId="assignments" searchPlaceholder="Tìm kiếm bài học, lớp học, tài liệu, bài tập..." searchValue={topSearch} onSearchChange={setTopSearch}>
+    <StudentShell activeId="assignments" searchPlaceholder="Tìm kiếm bài học, khóa học, tài liệu, bài tập..." searchValue={topSearch} onSearchChange={setTopSearch}>
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0">
           <h1 className="text-[26px] font-extrabold tracking-tight">Bài tập</h1>
           <p className="mt-0.5 text-[14px] text-slate-500">Xem và nộp các bài tập được giao từ giảng viên</p>
 
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            <label className="block text-[12.5px] text-slate-500">Lớp học
+            <label className="block text-[12.5px] text-slate-500">Khóa học
               <select value={classFilter} onChange={(e) => setClassFilter(e.target.value)} className="mt-1 h-10 w-full rounded-lg bg-white px-2.5 text-[13px] outline-none ring-1 ring-slate-200">
-                {["Tất cả lớp học", "WEB301", "PY101", "DB201", "SE102"].map((o) => (<option key={o}>{o}</option>))}
+                {["Tất cả khóa học", "WEB301", "PY101", "DB201", "SE102"].map((o) => (<option key={o}>{o}</option>))}
               </select>
             </label>
             <label className="block text-[12.5px] text-slate-500">Trạng thái

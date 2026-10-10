@@ -41,7 +41,7 @@ export class LearningContentController {
   async getMyCourseProgress(@Req() req: RequestWithUser) {
     const data = await this.learningContentService.getMyCourseProgress(BigInt(req.user!.id));
     return {
-      message: 'Lấy tiến độ các lớp học thành công',
+      message: 'Lấy tiến độ các khóa học thành công',
       data,
     };
   }
@@ -57,7 +57,7 @@ export class LearningContentController {
       BigInt(courseIdStr),
     );
     return {
-      message: 'Lấy nội dung lớp học thành công',
+      message: 'Lấy nội dung khóa học thành công',
       data: course,
     };
   }

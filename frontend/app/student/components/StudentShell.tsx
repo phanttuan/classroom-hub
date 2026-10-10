@@ -19,7 +19,7 @@ let cachedStudentProfile: TeacherProfile | null = null;
 export default function StudentShell({
   activeId,
   activeHref,
-  searchPlaceholder = "Tìm kiếm lớp học, bài học, tài liệu...",
+  searchPlaceholder = "Tìm kiếm khóa học, bài học, tài liệu...",
   searchValue,
   onSearchChange,
   userProfile,

@@ -41,13 +41,13 @@ export class LearningContentService {
       select: { ownerId: true, status: true },
     });
     if (!course) {
-      throw new NotFoundException('Lớp học không tồn tại');
+      throw new NotFoundException('Khóa học không tồn tại');
     }
     if (course.ownerId !== userId) {
-      throw new ForbiddenException('Bạn không phải giáo viên phụ trách lớp học này');
+      throw new ForbiddenException('Bạn không phải giáo viên phụ trách khóa học này');
     }
     if (course.status === CourseStatus.ARCHIVED) {
-      throw new BadRequestException('Lớp học đã lưu trữ (chỉ đọc), không thể chỉnh sửa nội dung');
+      throw new BadRequestException('Khóa học đã lưu trữ (chỉ đọc), không thể chỉnh sửa nội dung');
     }
   }
 
@@ -81,11 +81,11 @@ export class LearningContentService {
       select: { ownerId: true },
     });
     if (!course) {
-      throw new NotFoundException('Lớp học không tồn tại');
+      throw new NotFoundException('Khóa học không tồn tại');
     }
     if (role === UserRole.TEACHER) {
       if (course.ownerId !== userId) {
-        throw new ForbiddenException('Bạn không có quyền truy cập lớp học này');
+        throw new ForbiddenException('Bạn không có quyền truy cập khóa học này');
       }
       return;
     }
@@ -99,7 +99,7 @@ export class LearningContentService {
       },
     });
     if (!enrollment || enrollment.status !== EnrollmentStatus.ACTIVE) {
-      throw new ForbiddenException('Bạn không phải thành viên hoạt động của lớp học này');
+      throw new ForbiddenException('Bạn không phải thành viên hoạt động của khóa học này');
     }
   }
 
@@ -223,7 +223,7 @@ export class LearningContentService {
       },
     });
 
-    if (!course) throw new NotFoundException('Lớp học không tồn tại');
+    if (!course) throw new NotFoundException('Khóa học không tồn tại');
 
     let totalPublished = 0;
     let completedCount = 0;
@@ -360,7 +360,7 @@ export class LearningContentService {
       where: { id: { in: parsedIds }, courseId },
     });
     if (ownedCount !== parsedIds.length) {
-      throw new BadRequestException('Danh sách topic không hợp lệ hoặc không thuộc lớp học này');
+      throw new BadRequestException('Danh sách topic không hợp lệ hoặc không thuộc khóa học này');
     }
 
     await this.prisma.$transaction(async (tx) => {

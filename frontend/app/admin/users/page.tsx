@@ -188,7 +188,7 @@ export default function AdminUsersPage() {
   return (
     <AdminShell
       activeId="users"
-      searchPlaceholder="Tìm kiếm người dùng, lớp học..."
+      searchPlaceholder="Tìm kiếm người dùng, khóa học..."
       searchValue={topSearch}
       onSearchChange={handleTopSearch}
     >
@@ -540,10 +540,10 @@ export default function AdminUsersPage() {
                   <div className="mb-2 flex items-center justify-between">
                     <p className="flex items-center gap-1.5 text-[13.5px] font-bold text-slate-900">
                       <BookOpen className="h-4 w-4" />
-                      Lớp học đang tham gia ({selected.enrolled?.length ?? 0})
+                      Khóa học đang tham gia ({selected.enrolled?.length ?? 0})
                     </p>
                     <button
-                      onClick={() => showToast("Xem tất cả lớp đang tham gia (demo)")}
+                      onClick={() => showToast("Xem tất cả khóa học đang tham gia (demo)")}
                       className="text-[12.5px] font-medium text-blue-600 hover:text-blue-700"
                     >
                       Xem tất cả
@@ -567,7 +567,7 @@ export default function AdminUsersPage() {
                     ))}
                     {(selected.enrolled ?? []).length === 0 && (
                       <p className="rounded-xl bg-slate-50 px-3 py-3 text-[12.5px] text-slate-400">
-                        Chưa tham gia lớp học nào.
+                        Chưa tham gia khóa học nào.
                       </p>
                     )}
                   </div>

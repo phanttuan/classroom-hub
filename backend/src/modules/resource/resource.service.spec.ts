@@ -19,7 +19,7 @@ describe('ResourceService', () => {
     id: 10n,
     ownerId: 100n, // Teacher ID
     courseCode: 'CS101',
-    name: 'Nhập lớp lập trình',
+    name: 'Nhập khóa học lập trình',
   };
 
   const mockModule = {
@@ -108,7 +108,7 @@ describe('ResourceService', () => {
   });
 
   describe('getLessonResources', () => {
-    it('Giáo viên phụ trách lớp học xem được danh sách tài liệu', async () => {
+    it('Giáo viên phụ trách khóa học xem được danh sách tài liệu', async () => {
       prisma.lesson.findUnique.mockResolvedValue(mockPublishedLesson);
       prisma.resource.findMany.mockResolvedValue([mockResource]);
 
@@ -126,7 +126,7 @@ describe('ResourceService', () => {
       expect(result[0].fileName).toBe('nhap.pdf');
     });
 
-    it('Giáo viên không phụ trách lớp học bị chặn 403', async () => {
+    it('Giáo viên không phụ trách khóa học bị chặn 403', async () => {
       prisma.lesson.findUnique.mockResolvedValue(mockPublishedLesson);
 
       await expect(
@@ -166,7 +166,7 @@ describe('ResourceService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
 
-    it('Học sinh bị gỡ (REMOVED) khỏi lớp học bị chặn 403', async () => {
+    it('Học sinh bị gỡ (REMOVED) khỏi khóa học bị chặn 403', async () => {
       prisma.lesson.findUnique.mockResolvedValue(mockPublishedLesson);
       prisma.enrollment.findUnique.mockResolvedValue({
         id: 1n,

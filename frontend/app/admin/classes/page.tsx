@@ -163,14 +163,14 @@ export default function AdminClassesPage() {
     setClasses((prev) => prev.map((c) => (c.id === id ? { ...c, status: s } : c)));
     const c = classes.find((x) => x.id === id);
     const label = s === "active" ? "kích hoạt" : s === "paused" ? "tạm ngưng" : "vô hiệu hóa";
-    showToast(`Đã ${label} lớp ${c?.code ?? ""}`);
+    showToast(`Đã ${label} khóa học ${c?.code ?? ""}`);
     setOpenMenuId(null);
   };
 
   return (
     <AdminShell
       activeId="classes"
-      searchPlaceholder="Tìm kiếm lớp học, giảng viên, mã lớp..."
+      searchPlaceholder="Tìm kiếm khóa học, giảng viên, mã khóa học..."
       searchValue={topSearch}
       onSearchChange={handleTopSearch}
     >
@@ -179,10 +179,10 @@ export default function AdminClassesPage() {
         <div className="min-w-0">
           <div className="mb-4">
             <h1 className="text-[26px] font-extrabold tracking-tight sm:text-[30px]">
-              Giám sát lớp học
+              Giám sát khóa học
             </h1>
             <p className="mt-1 text-[14px] text-slate-500">
-              Xem danh sách lớp học trong hệ thống và theo dõi tình trạng hoạt động.
+              Xem danh sách khóa học trong hệ thống và theo dõi tình trạng hoạt động.
             </p>
           </div>
 
@@ -199,7 +199,7 @@ export default function AdminClassesPage() {
                     setQuery(e.target.value);
                     resetPage();
                   }}
-                  placeholder="Tìm kiếm theo tên lớp, mã lớp, giảng viên..."
+                  placeholder="Tìm kiếm theo tên khóa học, mã khóa học, giảng viên..."
                   className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50/60 pl-10 pr-3 text-[13px] outline-none placeholder:text-slate-400 focus:border-blue-300 focus:bg-white focus:ring-4 focus:ring-blue-100"
                 />
               </div>
@@ -237,7 +237,7 @@ export default function AdminClassesPage() {
                 </span>
               </label>
               <button
-                onClick={() => showToast(`Đã lọc: ${filtered.length} lớp học`)}
+                onClick={() => showToast(`Đã lọc: ${filtered.length} khóa học`)}
                 className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-blue-50 px-4 text-[13px] font-semibold text-blue-600 transition hover:bg-blue-100"
               >
                 <Filter className="h-4 w-4" /> Lọc
@@ -263,8 +263,8 @@ export default function AdminClassesPage() {
                       />
                     </th>
                     <th className="px-2 py-3 font-medium">#</th>
-                    <th className="whitespace-nowrap px-3 py-3 font-medium">Tên lớp học</th>
-                    <th className="whitespace-nowrap px-3 py-3 font-medium">Mã lớp</th>
+                    <th className="whitespace-nowrap px-3 py-3 font-medium">Tên khóa học</th>
+                    <th className="whitespace-nowrap px-3 py-3 font-medium">Mã khóa học</th>
                     <th className="whitespace-nowrap px-3 py-3 font-medium">Giảng viên</th>
                     <th className="whitespace-nowrap px-3 py-3 text-center font-medium">Số thành viên</th>
                     <th className="whitespace-nowrap px-3 py-3 font-medium">Trạng thái</th>
@@ -351,13 +351,13 @@ export default function AdminClassesPage() {
                               onClick={() => setClassStatus(c.id, "active")}
                               className="block w-full px-3.5 py-2 text-left text-[13px] text-green-700 hover:bg-green-50"
                             >
-                              Kích hoạt lớp
+                              Kích hoạt khóa học
                             </button>
                             <button
                               onClick={() => setClassStatus(c.id, "paused")}
                               className="block w-full px-3.5 py-2 text-left text-[13px] text-orange-600 hover:bg-orange-50"
                             >
-                              Tạm ngưng lớp
+                              Tạm ngưng khóa học
                             </button>
                             <button
                               onClick={() => setClassStatus(c.id, "inactive")}
@@ -374,7 +374,7 @@ export default function AdminClassesPage() {
               </table>
               {pageRows.length === 0 && (
                 <p className="px-4 py-10 text-center text-sm text-slate-500">
-                  Không tìm thấy lớp học nào. Thử đổi từ khóa hoặc bộ lọc.
+                  Không tìm thấy khóa học nào. Thử đổi từ khóa hoặc bộ lọc.
                 </p>
               )}
             </div>
@@ -382,7 +382,7 @@ export default function AdminClassesPage() {
             {/* Pagination */}
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-[13px] text-slate-500">
               <span>
-                Hiển thị {start} - {end} của {filtered.length} lớp học
+                Hiển thị {start} - {end} của {filtered.length} khóa học
                 <span className="hidden sm:inline"> (tổng 48)</span>
                 {checked.length > 0 && <span className="ml-2 font-semibold text-blue-600">• Đã chọn {checked.length}</span>}
               </span>
@@ -490,8 +490,8 @@ export default function AdminClassesPage() {
             {detailTab === "info" && (
               <div className="mt-3 space-y-0 text-[13px]">
                 {[
-                  { icon: BookOpen, label: "Tên lớp học", value: selected.name },
-                  { icon: GraduationCap, label: "Mã lớp", value: selected.code },
+                  { icon: BookOpen, label: "Tên khóa học", value: selected.name },
+                  { icon: GraduationCap, label: "Mã khóa học", value: selected.code },
                   {
                     icon: Users,
                     label: "Giảng viên",
@@ -596,7 +596,7 @@ export default function AdminClassesPage() {
                   </button>
                 )}
                 <button
-                  onClick={() => showToast(`Danh sách ${selected.memberCount} sinh viên lớp ${selected.code} (demo)`)}
+                  onClick={() => showToast(`Danh sách ${selected.memberCount} sinh viên khóa học ${selected.code} (demo)`)}
                   className="mt-3 w-full rounded-lg bg-blue-50 py-2.5 text-[13px] font-semibold text-blue-600 transition hover:bg-blue-100"
                 >
                   Xem danh sách tất cả sinh viên
@@ -607,7 +607,7 @@ export default function AdminClassesPage() {
             {detailTab === "history" && (
               <ul className="mt-3 space-y-2.5">
                 {[
-                  { text: `Lớp ${selected.code} được tạo`, time: `${selected.createdAt} 08:30` },
+                  { text: `Khóa học ${selected.code} được tạo`, time: `${selected.createdAt} 08:30` },
                   { text: `${selected.teacherName} được phân công giảng dạy`, time: `${selected.createdAt} 09:00` },
                   { text: "5 sinh viên mới tham gia", time: "24/09/2026 08:32" },
                 ].map((h, i) => (

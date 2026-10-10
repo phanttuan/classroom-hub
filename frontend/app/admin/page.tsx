@@ -91,7 +91,7 @@ export default function AdminDashboardPage() {
   return (
     <AdminShell
       activeId="home"
-      searchPlaceholder="Tìm kiếm người dùng, lớp học..."
+      searchPlaceholder="Tìm kiếm người dùng, khóa học..."
       searchValue={topSearch}
       onSearchChange={setTopSearch}
     >
@@ -182,7 +182,7 @@ export default function AdminDashboardPage() {
               <span className="text-blue-600">
                 <GraduationCap className="h-5 w-5" />
               </span>
-              Lớp học gần đây
+              Khóa học gần đây
             </h2>
             <Link
               href="/admin/classes"
@@ -196,7 +196,7 @@ export default function AdminDashboardPage() {
               <thead>
                 <tr className="text-[12px] font-medium text-slate-500">
                   <th className="rounded-l-lg bg-slate-50 px-3 py-2.5 font-medium">#</th>
-                  <th className="whitespace-nowrap bg-slate-50 px-3 py-2.5 font-medium">Tên lớp học</th>
+                  <th className="whitespace-nowrap bg-slate-50 px-3 py-2.5 font-medium">Tên khóa học</th>
                   <th className="whitespace-nowrap bg-slate-50 px-3 py-2.5 font-medium">Giảng viên</th>
                   <th className="whitespace-nowrap bg-slate-50 px-3 py-2.5 text-center font-medium">Số thành viên</th>
                   <th className="whitespace-nowrap rounded-r-lg bg-slate-50 px-3 py-2.5 font-medium">Ngày tạo</th>
@@ -206,7 +206,7 @@ export default function AdminDashboardPage() {
                 {recentClasses.map((c, i) => (
                   <tr
                     key={c.id}
-                    onClick={() => showToast(`Xem lớp ${c.code} (demo)`)}
+                    onClick={() => showToast(`Xem khóa học ${c.code} (demo)`)}
                     className="cursor-pointer border-b border-slate-50 transition last:border-0 hover:bg-blue-50/40"
                   >
                     <td className="px-3 py-3 text-slate-500">{i + 1}</td>
@@ -244,7 +244,7 @@ export default function AdminDashboardPage() {
             </table>
             {recentClasses.length === 0 && (
               <p className="py-6 text-center text-sm text-slate-400">
-                Không tìm thấy lớp học phù hợp “{topSearch}”.
+                Không tìm thấy khóa học phù hợp “{topSearch}”.
               </p>
             )}
           </div>
@@ -368,7 +368,7 @@ export default function AdminDashboardPage() {
           </ol>
           <div className="mt-4 flex items-center gap-2 rounded-xl bg-slate-50 px-4 py-3 text-[12.5px] text-slate-500">
             <AlertCircle className="h-4 w-4 shrink-0 text-slate-400" />
-            Tìm kiếm phía trên sẽ lọc nhanh cả hai bảng “Tài khoản” và “Lớp học”.
+            Tìm kiếm phía trên sẽ lọc nhanh cả hai bảng “Tài khoản” và “Khóa học”.
           </div>
         </section>
       </div>

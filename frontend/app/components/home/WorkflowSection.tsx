@@ -27,8 +27,8 @@ interface WorkflowStep {
 const steps: WorkflowStep[] = [
   {
     step: "01",
-    title: "Tạo lớp học",
-    desc: "Khởi tạo và quản lý lớp học",
+    title: "Tạo khóa học",
+    desc: "Khởi tạo và quản lý khóa học",
     icon: <Presentation className="w-5 h-5 sm:w-6 sm:h-6 text-white" />,
     color: "bg-blue-600",
     numColor: "text-blue-600",
@@ -116,7 +116,7 @@ export default function WorkflowSection() {
         <div className="text-center max-w-3xl mx-auto mb-6 sm:mb-8">
           <ScrollReveal variant="fade-up" delay={60} duration={800}>
             <h2 className="text-3xl sm:text-4xl lg:text-[40px] font-extrabold text-[#0B132B] tracking-tight leading-tight">
-              Từ lớp học đến kết quả,{" "}
+              Từ khóa học đến kết quả,{" "}
               <span className="text-blue-600">tất cả liền mạch</span>
             </h2>
           </ScrollReveal>

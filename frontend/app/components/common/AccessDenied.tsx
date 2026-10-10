@@ -14,7 +14,7 @@ export interface AccessDeniedProps {
 
 export default function AccessDenied({
   title = '403 – Quyền truy cập bị từ chối',
-  message = 'Bạn không có quyền truy cập vào tài nguyên hoặc lớp học này. Có thể bạn chưa tham gia lớp, tài khoản đã bị gỡ khỏi danh sách, hoặc liên kết không chính xác.',
+  message = 'Bạn không có quyền truy cập vào tài nguyên hoặc khóa học này. Có thể bạn chưa tham gia khóa học, tài khoản đã bị gỡ khỏi danh sách, hoặc liên kết không chính xác.',
   backHref,
   backLabel,
   showHomeButton = true,
