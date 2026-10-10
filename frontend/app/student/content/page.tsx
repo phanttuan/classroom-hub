@@ -11,9 +11,8 @@ import {
   Search,
 } from "lucide-react";
 import StudentShell from "../components/StudentShell";
-import type { CourseContentDto } from "@/lib/types/learning-content";
-import { fetchStudentCourses } from "@/lib/api/course-api";
-import { fetchCourseContent } from "@/lib/api/learning-content-api";
+import type { CourseProgressSummaryDto } from "@/lib/types/learning-content";
+import { fetchMyCourseProgress } from "@/lib/api/learning-content-api";
 import JoinCourseModal from "../components/JoinCourseModal";
 import { toast } from "@/app/components/common/Toast";
 import type { CourseDto } from "@/lib/types/course";
@@ -32,19 +31,18 @@ export default function StudentContentPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [sort, setSort] = useState<"name" | "progress">("name");
   const [view, setView] = useState<"grid" | "list">("grid");
-  const [courses, setCourses] = useState<CourseContentDto[]>([]);
+  const [courses, setCourses] = useState<CourseProgressSummaryDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [joinOpen, setJoinOpen] = useState(false);
 
-  // Tham gia lớp bằng mã → tải nội dung lớp vừa vào và đưa lên đầu danh sách
-  const handleJoinSuccess = async (joined: CourseDto, message: string) => {
+  // Tham gia lớp bằng mã → tải lại tiến độ (một request) để lớp mới hiện lên đầu danh sách
+  const handleJoinSuccess = async (_joined: CourseDto, message: string) => {
     setJoinOpen(false);
     toast.success("Tham gia lớp học thành công", message);
     try {
-      const content = await fetchCourseContent(String(joined.id));
-      setCourses((prev) => [content, ...prev.filter((c) => c.id !== content.id)]);
+      setCourses(await fetchMyCourseProgress());
     } catch {
-      // Lớp đã tham gia nhưng chưa tải được nội dung — lần tải trang sau sẽ hiện
+      // Lớp đã tham gia nhưng chưa tải được — lần tải trang sau sẽ hiện
     }
   };
 
@@ -54,19 +52,10 @@ export default function StudentContentPage() {
     async function loadData() {
       setLoading(true);
       try {
-        const courseRes = await fetchStudentCourses({ limit: 50 });
+        // Một request lấy tiến độ mọi lớp đang học (backend tổng hợp, không N+1)
+        const list = await fetchMyCourseProgress();
         if (!isActive) return;
-
-        // Mỗi môn học đã ghi danh → lấy cây nội dung kèm tiến độ học tập
-        const results = await Promise.allSettled(
-          (courseRes?.items ?? []).map((c) => fetchCourseContent(String(c.id)))
-        );
-        if (!isActive) return;
-        setCourses(
-          results
-            .filter((r): r is PromiseFulfilledResult<CourseContentDto> => r.status === "fulfilled")
-            .map((r) => r.value)
-        );
+        setCourses(list);
       } catch {
         if (!isActive) return;
         setCourses([]);

@@ -13,7 +13,7 @@ describe('LearningContentService', () => {
   let service: LearningContentService;
   let prisma: {
     course: { findUnique: ReturnType<typeof vi.fn> };
-    enrollment: { findUnique: ReturnType<typeof vi.fn> };
+    enrollment: { findUnique: ReturnType<typeof vi.fn>; findMany: ReturnType<typeof vi.fn> };
     module: {
       findUnique: ReturnType<typeof vi.fn>;
       findFirst: ReturnType<typeof vi.fn>;
@@ -24,17 +24,21 @@ describe('LearningContentService', () => {
     };
     lesson: {
       findUnique: ReturnType<typeof vi.fn>;
+      findMany: ReturnType<typeof vi.fn>;
       count: ReturnType<typeof vi.fn>;
+      update: ReturnType<typeof vi.fn>;
+      delete: ReturnType<typeof vi.fn>;
     };
     lessonProgress: {
       findUnique: ReturnType<typeof vi.fn>;
+      findMany: ReturnType<typeof vi.fn>;
       upsert: ReturnType<typeof vi.fn>;
     };
     resource: { findMany: ReturnType<typeof vi.fn> };
     $transaction: ReturnType<typeof vi.fn>;
   };
 
-  let cloudinary: { destroyMany: ReturnType<typeof vi.fn> };
+  let cloudinary: { destroyMany: ReturnType<typeof vi.fn>; destroyContentImages: ReturnType<typeof vi.fn> };
 
   const teacherId = 10n;
   const studentId = 20n;
@@ -43,7 +47,7 @@ describe('LearningContentService', () => {
   beforeEach(() => {
     prisma = {
       course: { findUnique: vi.fn() },
-      enrollment: { findUnique: vi.fn() },
+      enrollment: { findUnique: vi.fn(), findMany: vi.fn() },
       module: {
         findUnique: vi.fn(),
         findFirst: vi.fn(),
@@ -54,20 +58,75 @@ describe('LearningContentService', () => {
       },
       lesson: {
         findUnique: vi.fn(),
+        findMany: vi.fn().mockResolvedValue([]),
         count: vi.fn(),
+        update: vi.fn(),
+        delete: vi.fn(),
       },
       lessonProgress: {
         findUnique: vi.fn(),
+        findMany: vi.fn().mockResolvedValue([]),
         upsert: vi.fn(),
       },
       resource: { findMany: vi.fn().mockResolvedValue([]) },
       $transaction: vi.fn(),
     };
-    cloudinary = { destroyMany: vi.fn() };
+    cloudinary = { destroyMany: vi.fn(), destroyContentImages: vi.fn() };
     service = new LearningContentService(
       prisma as unknown as PrismaService,
       cloudinary as unknown as CloudinaryService,
     );
+  });
+
+  describe('getMyCourseProgress', () => {
+    const course = (id: bigint, modules: number) => ({
+      id,
+      courseCode: `C${id}`,
+      name: `Lớp ${id}`,
+      _count: { modules },
+    });
+    const ofCourse = (id: bigint) => ({ module: { courseId: id } });
+
+    it('tính tiến độ từng lớp chỉ với 3 truy vấn (không N+1)', async () => {
+      prisma.enrollment.findMany.mockResolvedValue([{ course: course(1n, 3) }, { course: course(2n, 1) }]);
+      // Lớp 1: 4 bài tính tiến độ, hoàn thành 3 — Lớp 2: 2 bài, chưa hoàn thành
+      prisma.lesson.findMany.mockResolvedValue([
+        ofCourse(1n),
+        ofCourse(1n),
+        ofCourse(1n),
+        ofCourse(1n),
+        ofCourse(2n),
+        ofCourse(2n),
+      ]);
+      prisma.lessonProgress.findMany.mockResolvedValue([
+        { lesson: ofCourse(1n) },
+        { lesson: ofCourse(1n) },
+        { lesson: ofCourse(1n) },
+      ]);
+
+      const result = await service.getMyCourseProgress(studentId);
+
+      expect(result).toEqual([
+        expect.objectContaining({ id: 1n, moduleCount: 3, totalLessons: 4, completedLessons: 3, progressPercent: 75 }),
+        expect.objectContaining({ id: 2n, moduleCount: 1, totalLessons: 2, completedLessons: 0, progressPercent: 0 }),
+      ]);
+      expect(result[0]).not.toHaveProperty('_count');
+      // Chỉ lớp đang học (ACTIVE) và chỉ bài đã công bố, không phải LABEL
+      expect(prisma.enrollment.findMany.mock.calls[0][0].where).toEqual({ studentId, status: EnrollmentStatus.ACTIVE });
+      expect(prisma.lesson.findMany.mock.calls[0][0].where).toMatchObject({
+        status: LessonStatus.PUBLISHED,
+        type: { not: LessonType.LABEL },
+        module: { courseId: { in: [1n, 2n] } },
+      });
+    });
+
+    it('trả về mảng rỗng và không truy vấn thêm khi chưa vào lớp nào', async () => {
+      prisma.enrollment.findMany.mockResolvedValue([]);
+
+      await expect(service.getMyCourseProgress(studentId)).resolves.toEqual([]);
+      expect(prisma.lesson.findMany).not.toHaveBeenCalled();
+      expect(prisma.lessonProgress.findMany).not.toHaveBeenCalled();
+    });
   });
 
   describe('getCourseContent', () => {
@@ -240,6 +299,57 @@ describe('LearningContentService', () => {
         { id: 102n, orderIndex: 2 },
         { id: 101n, orderIndex: 3 },
       ]);
+    });
+  });
+
+  describe('dọn ảnh trong nội dung trên Cloudinary', () => {
+    const img = (name: string) =>
+      `<img src="https://res.cloudinary.com/demo/image/upload/v1/classroom-hub/content-images/1/${name}.png">`;
+
+    beforeEach(() => {
+      prisma.course.findUnique.mockResolvedValue({ ownerId: teacherId });
+    });
+
+    it('xóa bài: chỉ xóa ảnh không còn bài nào khác dùng', async () => {
+      prisma.lesson.findUnique.mockResolvedValue({
+        id: 1000n,
+        content: img('a') + img('b'),
+        description: null,
+        module: { courseId },
+      });
+      // Ảnh "b" đã được dán sang một bài khác → vẫn còn 1 bài dùng
+      prisma.lesson.count.mockImplementation(async ({ where }: { where: { OR: { content: { contains: string } }[] } }) =>
+        where.OR[0].content.contains.endsWith('/b') ? 1 : 0,
+      );
+
+      await service.deleteLesson(teacherId, UserRole.TEACHER, 1000n);
+
+      expect(prisma.lesson.delete).toHaveBeenCalled();
+      expect(cloudinary.destroyContentImages).toHaveBeenCalledWith(['classroom-hub/content-images/1/a']);
+    });
+
+    it('sửa bài: chỉ dọn ảnh bị gỡ khỏi nội dung, giữ ảnh còn dùng', async () => {
+      prisma.lesson.findUnique.mockResolvedValue({
+        id: 1000n,
+        type: LessonType.PAGE,
+        title: 'Bài 1',
+        status: LessonStatus.PUBLISHED,
+        content: img('giu') + img('bo'),
+        description: null,
+        externalUrl: null,
+        settings: null,
+        module: { courseId },
+      });
+      prisma.lesson.update.mockImplementation(async ({ data }: { data: { content: string } }) => ({
+        id: 1000n,
+        content: data.content,
+        description: null,
+      }));
+      prisma.lesson.count.mockResolvedValue(0);
+
+      await service.updateLesson(teacherId, UserRole.TEACHER, 1000n, { content: '<p>x</p>' + img('giu') });
+
+      expect(cloudinary.destroyContentImages).toHaveBeenCalledWith(['classroom-hub/content-images/1/bo']);
     });
   });
 

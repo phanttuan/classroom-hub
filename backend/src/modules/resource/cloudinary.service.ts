@@ -1,6 +1,7 @@
 import { Injectable, Logger, ServiceUnavailableException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { v2 as cloudinary } from 'cloudinary';
+import { createReadStream } from 'node:fs';
 
 export interface GenerateSignedUrlOptions {
   isDownload?: boolean;
@@ -184,6 +185,41 @@ export class CloudinaryService {
   }
 
   /**
+   * Upload từ tệp tạm trên đĩa (multer diskStorage): đọc dạng stream và đẩy thẳng lên Cloudinary,
+   * không nạp cả tệp vào RAM như uploadBuffer — an toàn khi nhiều người tải tệp lớn cùng lúc.
+   */
+  async uploadFile(filePath: string, options: UploadBufferOptions): Promise<UploadResult> {
+    this.assertConfigured();
+
+    let result: { public_id: string; secure_url: string; bytes: number };
+    try {
+      result = await new Promise<{ public_id: string; secure_url: string; bytes: number }>((resolve, reject) => {
+        const upload = cloudinary.uploader.upload_stream(
+          {
+            public_id: options.publicId,
+            resource_type: options.resourceType,
+            type: options.deliveryType,
+            overwrite: false,
+          },
+          (error, res) => {
+            if (error || !res) return reject(error ?? new Error('Upload Cloudinary thất bại'));
+            resolve(res);
+          },
+        );
+        createReadStream(filePath).on('error', reject).pipe(upload);
+      });
+    } catch (error) {
+      throw this.toUploadException(error);
+    }
+
+    return {
+      storageKey: `${options.resourceType}:${result.public_id}`,
+      secureUrl: result.secure_url,
+      bytes: result.bytes,
+    };
+  }
+
+  /**
    * Cloudinary SDK reject bằng object thường ({ http_code, message, name }),
    * không phải Error → chuẩn hóa thành ServiceUnavailableException để
    * AllExceptionsFilter trả message rõ ràng thay vì 500 chung chung.
@@ -220,6 +256,20 @@ export class CloudinaryService {
 
   async destroyMany(storageKeys: string[]): Promise<void> {
     await Promise.all(storageKeys.map((key) => this.destroy(key)));
+  }
+
+  /** Xóa ảnh chèn trong nội dung (delivery type upload — công khai). Lỗi chỉ ghi log */
+  async destroyContentImages(publicIds: string[]): Promise<void> {
+    if (!this.configured || !publicIds.length) return;
+    await Promise.all(
+      publicIds.map(async (publicId) => {
+        try {
+          await cloudinary.uploader.destroy(publicId, { resource_type: 'image', type: 'upload', invalidate: true });
+        } catch (error) {
+          this.logger.warn(`Không xóa được ảnh nội dung ${publicId}: ${(error as Error).message}`);
+        }
+      }),
+    );
   }
 }
 

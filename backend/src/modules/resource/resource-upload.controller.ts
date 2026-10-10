@@ -19,7 +19,12 @@ import { RolesGuard } from '../../common/guards/roles.guard.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { UserRole } from '../../generated/prisma/enums.js';
 import type { RequestWithUser } from '../../common/interfaces/request-with-user.interface.js';
-import { MULTER_HARD_LIMIT_BYTES, ResourceUploadService } from './resource-upload.service.js';
+import {
+  CONTENT_IMAGE_MAX_BYTES,
+  LESSON_FILES_STORAGE,
+  MULTER_HARD_LIMIT_BYTES,
+  ResourceUploadService,
+} from './resource-upload.service.js';
 
 function parseBigIntParam(value: string, name: string): bigint {
   if (!value || !/^[1-9]\d*$/.test(value.trim())) {
@@ -42,34 +47,57 @@ export class ResourceUploadController {
   /** Tải tệp lên bài học FILE / FOLDER — multipart field `files` */
   @Post('lessons/:lessonId/resources')
   @HttpCode(HttpStatus.CREATED)
-  @UseInterceptors(FilesInterceptor('files', 20, { limits: { fileSize: MULTER_HARD_LIMIT_BYTES } }))
+  // Ghi tạm ra đĩa rồi stream lên Cloudinary — không giữ tệp lớn trong RAM
+  @UseInterceptors(
+    FilesInterceptor('files', 20, {
+      storage: LESSON_FILES_STORAGE,
+      limits: { fileSize: MULTER_HARD_LIMIT_BYTES },
+    }),
+  )
   async uploadLessonFiles(
     @Req() req: RequestWithUser,
     @Param('lessonId') lessonIdParam: string,
     @UploadedFiles() files: Express.Multer.File[],
   ) {
     const lessonId = parseBigIntParam(lessonIdParam, 'Mã bài học (lessonId)');
-    const data = await this.uploadService.uploadLessonFiles(toUser(req), lessonId, files);
+    const data = await this.uploadService.uploadLessonFiles(
+      toUser(req),
+      lessonId,
+      files,
+    );
     return { message: 'Tải tệp lên thành công', data };
   }
 
   @Delete('resources/:resourceId')
-  async deleteResource(@Req() req: RequestWithUser, @Param('resourceId') resourceIdParam: string) {
-    const resourceId = parseBigIntParam(resourceIdParam, 'Mã tài liệu (resourceId)');
+  async deleteResource(
+    @Req() req: RequestWithUser,
+    @Param('resourceId') resourceIdParam: string,
+  ) {
+    const resourceId = parseBigIntParam(
+      resourceIdParam,
+      'Mã tài liệu (resourceId)',
+    );
     return this.uploadService.deleteResource(toUser(req), resourceId);
   }
 
   /** Ảnh chèn trong trình soạn thảo — multipart field `file` */
   @Post('courses/:courseId/content-images')
   @HttpCode(HttpStatus.CREATED)
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MULTER_HARD_LIMIT_BYTES } }))
+  // Ảnh nội dung tối đa 5MB → giữ trong RAM là đủ, multer tự chặn ảnh lớn hơn
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: CONTENT_IMAGE_MAX_BYTES } }),
+  )
   async uploadContentImage(
     @Req() req: RequestWithUser,
     @Param('courseId') courseIdParam: string,
     @UploadedFile() file: Express.Multer.File,
   ) {
     const courseId = parseBigIntParam(courseIdParam, 'Mã lớp học (courseId)');
-    const data = await this.uploadService.uploadContentImage(toUser(req), courseId, file);
+    const data = await this.uploadService.uploadContentImage(
+      toUser(req),
+      courseId,
+      file,
+    );
     return { message: 'Tải ảnh lên thành công', data };
   }
 }

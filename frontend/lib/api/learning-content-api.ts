@@ -1,6 +1,7 @@
 import { apiFetch } from './http-client';
 import type {
   CourseContentDto,
+  CourseProgressSummaryDto,
   LessonDto,
   LessonPayload,
   LessonTypeKey,
@@ -26,6 +27,12 @@ function unwrap<T>(res: ApiEnvelope<T> | T): T {
 // COURSE CONTENT API
 // (Tạo / sửa / đổi trạng thái môn học dùng course-api.ts)
 // =========================================================================
+
+/** Tiến độ mọi lớp sinh viên đang học trong một request (thay cho gọi /content từng lớp) */
+export async function fetchMyCourseProgress(): Promise<CourseProgressSummaryDto[]> {
+  const res = await apiFetch<ApiEnvelope<CourseProgressSummaryDto[]> | CourseProgressSummaryDto[]>('/me/course-progress');
+  return unwrap(res);
+}
 
 export async function fetchCourseContent(courseId: string): Promise<CourseContentDto> {
   const res = await apiFetch<ApiEnvelope<CourseContentDto> | CourseContentDto>(`/courses/${courseId}/content`);

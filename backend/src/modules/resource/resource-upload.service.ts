@@ -1,4 +1,3 @@
-/// <reference types="multer" />
 import {
   BadRequestException,
   ForbiddenException,
@@ -7,8 +6,11 @@ import {
   PayloadTooLargeException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
+import { rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { extname } from 'node:path';
+import { diskStorage } from 'multer';
 import { PrismaService } from '../../database/prisma.service.js';
 import { CloudinaryService } from './cloudinary.service.js';
 import {
@@ -21,13 +23,52 @@ import type { UserContext } from './resource.service.js';
 
 /** Đuôi tệp bị chặn (thực thi được / chạy script khi mở trên trình duyệt) */
 const BLOCKED_EXTENSIONS = new Set([
-  '.exe', '.msi', '.bat', '.cmd', '.com', '.scr', '.ps1', '.vbs', '.sh', '.jar', '.apk',
-  '.js', '.mjs', '.html', '.htm', '.xhtml', '.svg', '.php',
+  '.exe',
+  '.msi',
+  '.bat',
+  '.cmd',
+  '.com',
+  '.scr',
+  '.ps1',
+  '.vbs',
+  '.sh',
+  '.jar',
+  '.apk',
+  '.js',
+  '.mjs',
+  '.html',
+  '.htm',
+  '.xhtml',
+  '.svg',
+  '.php',
 ]);
 
-const CONTENT_IMAGE_TYPES = new Set(['image/png', 'image/jpeg', 'image/gif', 'image/webp']);
-const CONTENT_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+const CONTENT_IMAGE_TYPES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+]);
+export const CONTENT_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 const MAX_FILES_PER_FOLDER = 50;
+
+/**
+ * Tệp bài học được multer ghi tạm ra đĩa (thư mục tạm của hệ điều hành) thay vì giữ trong RAM,
+ * sau đó stream lên Cloudinary và luôn bị xóa khi xử lý xong (thành công hay lỗi).
+ */
+export const LESSON_FILES_STORAGE = diskStorage({
+  destination: tmpdir(),
+  filename: (_req, _file, cb) =>
+    cb(null, `classroom-hub-upload-${randomUUID()}`),
+});
+
+async function removeTempFiles(files: Express.Multer.File[] | undefined) {
+  await Promise.all(
+    (files ?? []).map((f) =>
+      f.path ? rm(f.path, { force: true }) : undefined,
+    ),
+  );
+}
 
 /** Giới hạn cứng cho multer (giới hạn thật lấy từ UPLOAD_MAX_FILE_MB) */
 export const MULTER_HARD_LIMIT_BYTES = 100 * 1024 * 1024;
@@ -81,11 +122,18 @@ export class ResourceUploadService {
     user: UserContext,
     course: { ownerId: bigint; status: CourseStatus },
   ) {
-    if (user.role !== UserRole.ADMIN && !(user.role === UserRole.TEACHER && course.ownerId === user.id)) {
-      throw new ForbiddenException('Bạn không phải giáo viên phụ trách lớp học này');
+    if (
+      user.role !== UserRole.ADMIN &&
+      !(user.role === UserRole.TEACHER && course.ownerId === user.id)
+    ) {
+      throw new ForbiddenException(
+        'Bạn không phải giáo viên phụ trách lớp học này',
+      );
     }
     if (course.status === CourseStatus.ARCHIVED) {
-      throw new BadRequestException('Lớp học đã lưu trữ (chỉ đọc), không thể thay đổi tài liệu');
+      throw new BadRequestException(
+        'Lớp học đã lưu trữ (chỉ đọc), không thể thay đổi tài liệu',
+      );
     }
   }
 
@@ -97,11 +145,17 @@ export class ResourceUploadService {
       );
     }
     if (BLOCKED_EXTENSIONS.has(extname(fileName).toLowerCase())) {
-      throw new BadRequestException(`Không cho phép tải lên loại tệp "${extname(fileName)}"`);
+      throw new BadRequestException(
+        `Không cho phép tải lên loại tệp "${extname(fileName)}"`,
+      );
     }
   }
 
-  private buildPublicId(folder: string, fileName: string, keepExtension: boolean) {
+  private buildPublicId(
+    folder: string,
+    fileName: string,
+    keepExtension: boolean,
+  ) {
     const ext = extname(fileName).toLowerCase();
     const base = slugify(ext ? fileName.slice(0, -ext.length) : fileName);
     const unique = `${Date.now()}-${randomBytes(3).toString('hex')}`;
@@ -111,7 +165,23 @@ export class ResourceUploadService {
   /**
    * Tải tệp lên bài học FILE (1 tệp — tệp mới thay thế tệp cũ) hoặc FOLDER (nhiều tệp).
    */
-  async uploadLessonFiles(user: UserContext, lessonId: bigint, files: Express.Multer.File[]) {
+  async uploadLessonFiles(
+    user: UserContext,
+    lessonId: bigint,
+    files: Express.Multer.File[],
+  ) {
+    try {
+      return await this.storeLessonFiles(user, lessonId, files);
+    } finally {
+      await removeTempFiles(files);
+    }
+  }
+
+  private async storeLessonFiles(
+    user: UserContext,
+    lessonId: bigint,
+    files: Express.Multer.File[],
+  ) {
     if (!files?.length) throw new BadRequestException('Chưa chọn tệp nào');
 
     const lesson = await this.prisma.lesson.findUnique({
@@ -119,7 +189,11 @@ export class ResourceUploadService {
       select: {
         id: true,
         type: true,
-        module: { select: { course: { select: { id: true, ownerId: true, status: true } } } },
+        module: {
+          select: {
+            course: { select: { id: true, ownerId: true, status: true } },
+          },
+        },
         _count: { select: { resources: true } },
       },
     });
@@ -129,16 +203,26 @@ export class ResourceUploadService {
     this.assertCanManageCourse(user, course);
 
     if (lesson.type !== LessonType.FILE && lesson.type !== LessonType.FOLDER) {
-      throw new BadRequestException('Chỉ tài nguyên Tệp hoặc Thư mục mới có tệp đính kèm');
+      throw new BadRequestException(
+        'Chỉ tài nguyên Tệp hoặc Thư mục mới có tệp đính kèm',
+      );
     }
     if (lesson.type === LessonType.FILE && files.length > 1) {
       throw new BadRequestException('Tài nguyên Tệp chỉ chứa 1 tệp');
     }
-    if (lesson.type === LessonType.FOLDER && lesson._count.resources + files.length > MAX_FILES_PER_FOLDER) {
-      throw new BadRequestException(`Thư mục chứa tối đa ${MAX_FILES_PER_FOLDER} tệp`);
+    if (
+      lesson.type === LessonType.FOLDER &&
+      lesson._count.resources + files.length > MAX_FILES_PER_FOLDER
+    ) {
+      throw new BadRequestException(
+        `Thư mục chứa tối đa ${MAX_FILES_PER_FOLDER} tệp`,
+      );
     }
 
-    const named = files.map((file) => ({ file, fileName: decodeOriginalName(file.originalname) }));
+    const named = files.map((file) => ({
+      file,
+      fileName: decodeOriginalName(file.originalname),
+    }));
     named.forEach(({ file, fileName }) => this.validateFile(file, fileName));
 
     const previous =
@@ -150,12 +234,23 @@ export class ResourceUploadService {
         : [];
 
     const folder = `classroom-hub/lessons/${course.id}/${lesson.id}`;
-    const uploaded: { storageKey: string; fileName: string; size: number; mimeType: string }[] = [];
+    const uploaded: {
+      storageKey: string;
+      fileName: string;
+      size: number;
+      mimeType: string;
+    }[] = [];
     try {
       for (const { file, fileName } of named) {
-        const resourceType = CloudinaryService.resolveResourceType(file.mimetype);
-        const result = await this.cloudinary.uploadBuffer(file.buffer, {
-          publicId: this.buildPublicId(folder, fileName, resourceType === 'raw'),
+        const resourceType = CloudinaryService.resolveResourceType(
+          file.mimetype,
+        );
+        const result = await this.cloudinary.uploadFile(file.path, {
+          publicId: this.buildPublicId(
+            folder,
+            fileName,
+            resourceType === 'raw',
+          ),
           resourceType,
           deliveryType: 'authenticated',
         });
@@ -172,35 +267,43 @@ export class ResourceUploadService {
       throw error;
     }
 
-    const created = await this.prisma.$transaction(async (tx) => {
-      if (previous.length) {
-        await tx.resource.deleteMany({ where: { id: { in: previous.map((r) => r.id) } } });
-      }
-      return Promise.all(
-        uploaded.map((u) =>
-          tx.resource.create({
-            data: {
-              parentType: ResourceParent.LESSON,
-              lessonId,
-              uploadedBy: user.id,
-              fileName: u.fileName,
-              storageKey: u.storageKey,
-              fileSizeBytes: BigInt(u.size),
-              mimeType: u.mimeType,
-            },
-            select: {
-              id: true,
-              parentType: true,
-              lessonId: true,
-              fileName: true,
-              fileSizeBytes: true,
-              mimeType: true,
-              createdAt: true,
-            },
-          }),
-        ),
-      );
-    });
+    const created = await this.prisma
+      .$transaction(async (tx) => {
+        if (previous.length) {
+          await tx.resource.deleteMany({
+            where: { id: { in: previous.map((r) => r.id) } },
+          });
+        }
+        return Promise.all(
+          uploaded.map((u) =>
+            tx.resource.create({
+              data: {
+                parentType: ResourceParent.LESSON,
+                lessonId,
+                uploadedBy: user.id,
+                fileName: u.fileName,
+                storageKey: u.storageKey,
+                fileSizeBytes: BigInt(u.size),
+                mimeType: u.mimeType,
+              },
+              select: {
+                id: true,
+                parentType: true,
+                lessonId: true,
+                fileName: true,
+                fileSizeBytes: true,
+                mimeType: true,
+                createdAt: true,
+              },
+            }),
+          ),
+        );
+      })
+      .catch(async (error: unknown) => {
+        // Lưu DB lỗi → tệp vừa tải lên Cloudinary thành mồ côi, dọn ngay
+        await this.cloudinary.destroyMany(uploaded.map((u) => u.storageKey));
+        throw error;
+      });
 
     await this.cloudinary.destroyMany(previous.map((r) => r.storageKey));
     return created;
@@ -214,11 +317,19 @@ export class ResourceUploadService {
         storageKey: true,
         parentType: true,
         lesson: {
-          select: { module: { select: { course: { select: { ownerId: true, status: true } } } } },
+          select: {
+            module: {
+              select: { course: { select: { ownerId: true, status: true } } },
+            },
+          },
         },
       },
     });
-    if (!resource || resource.parentType !== ResourceParent.LESSON || !resource.lesson) {
+    if (
+      !resource ||
+      resource.parentType !== ResourceParent.LESSON ||
+      !resource.lesson
+    ) {
       throw new NotFoundException('Tài liệu không tồn tại');
     }
 
@@ -230,7 +341,11 @@ export class ResourceUploadService {
   }
 
   /** Ảnh chèn trong trình soạn thảo — công khai để nhúng trực tiếp vào HTML */
-  async uploadContentImage(user: UserContext, courseId: bigint, file: Express.Multer.File) {
+  async uploadContentImage(
+    user: UserContext,
+    courseId: bigint,
+    file: Express.Multer.File,
+  ) {
     if (!file) throw new BadRequestException('Chưa chọn ảnh');
 
     const course = await this.prisma.course.findUnique({
@@ -249,7 +364,11 @@ export class ResourceUploadService {
 
     const fileName = decodeOriginalName(file.originalname);
     const result = await this.cloudinary.uploadBuffer(file.buffer, {
-      publicId: this.buildPublicId(`classroom-hub/content-images/${courseId}`, fileName, false),
+      publicId: this.buildPublicId(
+        `classroom-hub/content-images/${courseId}`,
+        fileName,
+        false,
+      ),
       resourceType: 'image',
       deliveryType: 'upload',
     });

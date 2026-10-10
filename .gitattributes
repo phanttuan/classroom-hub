@@ -1,0 +1,16 @@
+# Chuẩn hóa line ending: mọi tệp văn bản được lưu dạng LF trong repo,
+# bất kể cấu hình core.autocrlf trên máy từng thành viên (Windows / macOS / Linux).
+# Bản trên máy vẫn theo cấu hình của mỗi người nên không làm thay đổi tệp đang mở.
+* text=auto
+
+# Tệp nhị phân — không bao giờ chuyển đổi line ending / không diff dạng văn bản
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary

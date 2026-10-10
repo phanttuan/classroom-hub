@@ -93,3 +93,18 @@ export interface CourseContentDto {
   completedLessons?: number;
   progressPercent?: number;
 }
+
+/** Tiến độ tổng hợp một lớp sinh viên đang học — GET /me/course-progress */
+export interface CourseProgressSummaryDto {
+  id: string;
+  courseCode: string;
+  name: string;
+  description?: string | null;
+  status: 'ACTIVE' | 'CLOSED' | 'ARCHIVED';
+  updatedAt: string;
+  owner?: { id: string; fullName: string; avatarUrl?: string | null };
+  moduleCount: number;
+  totalLessons: number;
+  completedLessons: number;
+  progressPercent: number;
+}

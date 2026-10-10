@@ -34,6 +34,18 @@ export class LearningContentController {
   // (Tạo / sửa / đổi trạng thái môn học nằm ở CourseController: /courses)
   // =========================================================================
 
+  /** Tiến độ tổng hợp các lớp sinh viên đang học (một request cho cả danh sách) */
+  @Get('me/course-progress')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.STUDENT)
+  async getMyCourseProgress(@Req() req: RequestWithUser) {
+    const data = await this.learningContentService.getMyCourseProgress(BigInt(req.user!.id));
+    return {
+      message: 'Lấy tiến độ các lớp học thành công',
+      data,
+    };
+  }
+
   @Get('courses/:courseId/content')
   async getCourseContent(
     @Req() req: RequestWithUser,

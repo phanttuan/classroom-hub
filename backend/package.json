@@ -25,7 +25,8 @@
     "db:sync": "node ../scripts/sync-deps.mjs && prisma migrate deploy && prisma generate && tsx prisma/seed.ts --if-changed",
     "db:reset": "prisma migrate reset --force && prisma generate && tsx prisma/seed.ts",
     "seed": "tsx prisma/seed.ts",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "cleanup:content-images": "tsx scripts/cleanup-content-images.ts"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.1",
@@ -44,6 +45,7 @@
     "cloudinary": "^2.11.0",
     "cookie-parser": "^1.4.7",
     "google-auth-library": "^11.1.0",
+    "multer": "^2.2.0",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1",
     "pg": "^8.23.1",

@@ -10,6 +10,7 @@ import { UserRole, LessonStatus, LessonType, EnrollmentStatus, CourseStatus } fr
 import { Prisma } from '../../generated/prisma/client.js';
 import { CloudinaryService } from '../resource/cloudinary.service.js';
 import { buildLessonFields } from './utils/lesson-fields.js';
+import { difference, extractContentImageIds } from './utils/content-images.js';
 import { CreateModuleDto } from './dto/create-module.dto.js';
 import { UpdateModuleDto } from './dto/update-module.dto.js';
 import { CreateLessonDto } from './dto/create-lesson.dto.js';
@@ -50,6 +51,23 @@ export class LearningContentService {
     }
   }
 
+  /**
+   * Xóa trên Cloudinary các ảnh nội dung không còn bài nào dùng.
+   * Gọi SAU khi đã lưu / xóa trong DB; kiểm tra lại toàn bộ bài vì cùng một ảnh có thể được dán sang bài khác.
+   */
+  private async cleanupContentImages(candidates: Iterable<string>) {
+    const ids = [...candidates];
+    if (!ids.length) return;
+    const usage = await Promise.all(
+      ids.map((id) =>
+        this.prisma.lesson.count({
+          where: { OR: [{ content: { contains: id } }, { description: { contains: id } }] },
+        }),
+      ),
+    );
+    await this.cloudinary.destroyContentImages(ids.filter((_, i) => usage[i] === 0));
+  }
+
   /** Lấy storageKey các tệp đính kèm để dọn trên Cloudinary sau khi xóa trong DB */
   private async collectStorageKeys(where: Prisma.ResourceWhereInput) {
     const resources = await this.prisma.resource.findMany({ where, select: { storageKey: true } });
@@ -83,6 +101,76 @@ export class LearningContentService {
     if (!enrollment || enrollment.status !== EnrollmentStatus.ACTIVE) {
       throw new ForbiddenException('Bạn không phải thành viên hoạt động của lớp học này');
     }
+  }
+
+  // =========================================================================
+  // 0. TIẾN ĐỘ TỔNG HỢP CÁC LỚP CỦA SINH VIÊN
+  // =========================================================================
+
+  /**
+   * Tiến độ của mọi lớp sinh viên đang học (ghi danh ACTIVE) — dùng cho trang "Lớp học" của sinh viên.
+   * Cố định 3 truy vấn bất kể số lớp (thay cho gọi /courses/:id/content từng lớp — N+1).
+   * Chỉ tính bài đã công bố và không phải "Văn bản và phương tiện" (khớp getCourseContent).
+   */
+  async getMyCourseProgress(studentId: bigint) {
+    const enrollments = await this.prisma.enrollment.findMany({
+      where: { studentId, status: EnrollmentStatus.ACTIVE },
+      orderBy: { joinedAt: 'desc' },
+      select: {
+        course: {
+          select: {
+            id: true,
+            courseCode: true,
+            name: true,
+            description: true,
+            status: true,
+            updatedAt: true,
+            owner: { select: { id: true, fullName: true, avatarUrl: true } },
+            _count: { select: { modules: true } },
+          },
+        },
+      },
+    });
+    const courses = enrollments.map((e) => e.course);
+    if (!courses.length) return [];
+
+    const courseIds = courses.map((c) => c.id);
+    const trackableLesson = {
+      status: LessonStatus.PUBLISHED,
+      type: { not: LessonType.LABEL },
+      module: { courseId: { in: courseIds } },
+    } satisfies Prisma.LessonWhereInput;
+
+    const [lessons, completed] = await Promise.all([
+      this.prisma.lesson.findMany({
+        where: trackableLesson,
+        select: { module: { select: { courseId: true } } },
+      }),
+      this.prisma.lessonProgress.findMany({
+        where: { studentId, isCompleted: true, lesson: trackableLesson },
+        select: { lesson: { select: { module: { select: { courseId: true } } } } },
+      }),
+    ]);
+
+    const countBy = (ids: bigint[]) => {
+      const map = new Map<bigint, number>();
+      for (const id of ids) map.set(id, (map.get(id) ?? 0) + 1);
+      return map;
+    };
+    const totals = countBy(lessons.map((l) => l.module.courseId));
+    const done = countBy(completed.map((p) => p.lesson.module.courseId));
+
+    return courses.map(({ _count, ...course }) => {
+      const totalLessons = totals.get(course.id) ?? 0;
+      const completedLessons = done.get(course.id) ?? 0;
+      return {
+        ...course,
+        moduleCount: _count.modules,
+        totalLessons,
+        completedLessons,
+        progressPercent: totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0,
+      };
+    });
   }
 
   // =========================================================================
@@ -242,10 +330,16 @@ export class LearningContentService {
     }
 
     const storageKeys = await this.collectStorageKeys({ lesson: { moduleId } });
+    const lessons = await this.prisma.lesson.findMany({
+      where: { moduleId },
+      select: { content: true, description: true },
+    });
+    const imageIds = extractContentImageIds(...lessons.flatMap((l) => [l.content, l.description]));
     await this.prisma.module.delete({
       where: { id: moduleId },
     });
     await this.cloudinary.destroyMany(storageKeys);
+    await this.cleanupContentImages(imageIds);
 
     return { message: 'Đã xóa topic thành công' };
   }
@@ -393,11 +487,20 @@ export class LearningContentService {
       }
     }
 
-    return this.prisma.lesson.update({
+    const updated = await this.prisma.lesson.update({
       where: { id: lessonId },
       data: updateData,
       include: { resources: true },
     });
+
+    // Ảnh bị gỡ khỏi nội dung / mô tả → dọn trên Cloudinary nếu không bài nào khác còn dùng
+    await this.cleanupContentImages(
+      difference(
+        extractContentImageIds(lesson.content, lesson.description),
+        extractContentImageIds(updated.content, updated.description),
+      ),
+    );
+    return updated;
   }
 
   async deleteLesson(userId: bigint, role: UserRole, lessonId: bigint) {
@@ -410,10 +513,12 @@ export class LearningContentService {
     await this.verifyCourseTeacherAccess(lesson.module.courseId, userId, role);
 
     const storageKeys = await this.collectStorageKeys({ lessonId });
+    const imageIds = extractContentImageIds(lesson.content, lesson.description);
     await this.prisma.lesson.delete({
       where: { id: lessonId },
     });
     await this.cloudinary.destroyMany(storageKeys);
+    await this.cleanupContentImages(imageIds);
 
     return { message: 'Đã xóa bài học thành công' };
   }
