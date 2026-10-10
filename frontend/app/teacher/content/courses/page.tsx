@@ -11,6 +11,7 @@ import {
   Plus,
   Search,
   Archive,
+  ArrowLeft,
   AlertCircle,
   Lock,
   RotateCcw,
@@ -35,9 +36,12 @@ const GRADIENTS = [
   "from-amber-600 via-orange-600 to-rose-700",
 ];
 
+/** "current" = mọi khóa học chưa lưu trữ (Đang mở + Ngừng nhận sinh viên) — mặc định, giống "All (except removed)" của Moodle */
+type CourseFilter = "current" | BackendCourseStatus;
+
 const STATUS_LABEL: Record<BackendCourseStatus, string> = {
-  ACTIVE: "Đang hoạt động",
-  CLOSED: "Đã đóng",
+  ACTIVE: "Đang mở",
+  CLOSED: "Ngừng nhận sinh viên",
   ARCHIVED: "Đã lưu trữ",
 };
 
@@ -54,8 +58,8 @@ function buildCourseActions(
   return [
     { label: "Vào khóa học", icon: Eye, onClick: () => h.open(course) },
     { label: "Chỉnh sửa", icon: Pencil, onClick: () => h.edit(course), hidden: archived },
-    { label: "Đóng khóa học", icon: Lock, onClick: () => h.changeStatus(course, "CLOSED"), hidden: course.status !== "ACTIVE" },
-    { label: "Mở lại khóa học", icon: RotateCcw, onClick: () => h.changeStatus(course, "ACTIVE"), hidden: course.status !== "CLOSED" },
+    { label: "Ngừng nhận sinh viên", icon: Lock, onClick: () => h.changeStatus(course, "CLOSED"), hidden: course.status !== "ACTIVE" },
+    { label: "Nhận sinh viên trở lại", icon: RotateCcw, onClick: () => h.changeStatus(course, "ACTIVE"), hidden: course.status !== "CLOSED" },
     { label: "Lưu trữ", icon: Archive, tone: "warning", onClick: () => h.changeStatus(course, "ARCHIVED"), hidden: archived },
     { label: "Khôi phục khóa học", icon: RotateCcw, tone: "success", onClick: () => h.changeStatus(course, "ACTIVE"), hidden: !archived },
   ];
@@ -66,7 +70,7 @@ export default function TeacherCoursesPage() {
   const confirm = useConfirm();
   const [topSearch, setTopSearch] = useState("");
   const [query, setQuery] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | BackendCourseStatus>("all");
+  const [statusFilter, setStatusFilter] = useState<CourseFilter>("current");
   const [sort, setSort] = useState<"name" | "newest">("name");
   const [view, setView] = useState<"grid" | "list">("grid");
 
@@ -109,7 +113,8 @@ export default function TeacherCoursesPage() {
 
   // Tải danh sách môn học (Course) của giáo viên từ Backend
   const loadCourses = async () => {
-    const res = await fetchTeacherCourses({ limit: 50 });
+    // status "all": backend mặc định ẩn khóa học đã lưu trữ → phải lấy cả để xem / khôi phục
+    const res = await fetchTeacherCourses({ status: "all", limit: 50 });
     return res?.items ?? [];
   };
 
@@ -144,7 +149,9 @@ export default function TeacherCoursesPage() {
   const filtered = useMemo(() => {
     const q = (query || topSearch).trim().toLowerCase();
     let list = [...courses];
-    if (statusFilter !== "all") {
+    if (statusFilter === "current") {
+      list = list.filter((c) => c.status !== "ARCHIVED");
+    } else {
       list = list.filter((c) => c.status === statusFilter);
     }
     if (q) {
@@ -162,6 +169,9 @@ export default function TeacherCoursesPage() {
     }
     return list;
   }, [courses, query, topSearch, statusFilter, sort]);
+
+  const archivedCount = courses.filter((c) => c.status === "ARCHIVED").length;
+  const viewingArchived = statusFilter === "ARCHIVED";
 
   // Lưu tạo mới hoặc chỉnh sửa khóa học
   const handleSaveCourse = async () => {
@@ -202,14 +212,14 @@ export default function TeacherCoursesPage() {
       CLOSED: {
         tone: "warning",
         icon: Lock,
-        title: "Đóng khóa học?",
+        title: "Ngừng nhận sinh viên mới?",
         message: (
           <>
             {name} sẽ ngừng nhận sinh viên mới tham gia bằng mã. Sinh viên hiện tại vẫn học và xem nội dung bình thường.
           </>
         ),
-        confirmText: "Đóng khóa học",
-        done: "Đã đóng khóa học",
+        confirmText: "Ngừng nhận sinh viên",
+        done: "Đã ngừng nhận sinh viên mới",
       },
       ARCHIVED: {
         tone: "warning",
@@ -221,7 +231,7 @@ export default function TeacherCoursesPage() {
           </>
         ),
         confirmText: "Lưu trữ",
-        done: "Đã lưu trữ khóa học",
+        done: "Đã lưu trữ — chọn bộ lọc \"Đã lưu trữ\" để xem lại hoặc khôi phục",
       },
       ACTIVE:
         course.status === "ARCHIVED"
@@ -236,10 +246,10 @@ export default function TeacherCoursesPage() {
           : {
               tone: "primary",
               icon: RotateCcw,
-              title: "Mở lại khóa học?",
+              title: "Nhận sinh viên trở lại?",
               message: <>Sinh viên có thể tham gia lại {name} bằng mã khóa học.</>,
-              confirmText: "Mở lại",
-              done: "Đã mở lại khóa học",
+              confirmText: "Nhận sinh viên",
+              done: "Sinh viên đã có thể tham gia bằng mã khóa học",
             },
     };
     const { done, ...dialog } = dialogs[target];
@@ -308,15 +318,15 @@ export default function TeacherCoursesPage() {
             {/* Filter trạng thái môn học */}
             <select
               value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as "all" | BackendCourseStatus)}
+              onChange={(e) => setStatusFilter(e.target.value as CourseFilter)}
               className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-[13px] font-semibold text-slate-700 outline-none focus:border-blue-500"
             >
-              <option value="all">Tất cả trạng thái</option>
-              {(Object.keys(STATUS_LABEL) as BackendCourseStatus[]).map((st) => (
-                <option key={st} value={st}>
-                  {STATUS_LABEL[st]}
-                </option>
-              ))}
+              <option value="current">Tất cả (trừ đã lưu trữ)</option>
+              <option value="ACTIVE">{STATUS_LABEL.ACTIVE}</option>
+              <option value="CLOSED">{STATUS_LABEL.CLOSED}</option>
+              <option value="ARCHIVED">
+                {STATUS_LABEL.ARCHIVED} ({archivedCount})
+              </option>
             </select>
 
             {/* Ô tìm kiếm */}
@@ -369,6 +379,24 @@ export default function TeacherCoursesPage() {
         </div>
 
         {/* Trạng thái tải dữ liệu */}
+        {viewingArchived && !loading && (
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-300 bg-slate-100 px-4 py-3">
+            <p className="flex items-center gap-2.5 text-[13.5px] text-slate-700">
+              <Archive className="h-5 w-5 shrink-0 text-slate-500" />
+              <span>
+                <strong className="text-slate-900">Khóa học đã lưu trữ</strong> ở chế độ chỉ đọc, nội dung và điểm số
+                vẫn được giữ nguyên. Chọn <strong>⋮ → Khôi phục khóa học</strong> để dùng lại.
+              </span>
+            </p>
+            <button
+              onClick={() => setStatusFilter("current")}
+              className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-[13px] font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              <ArrowLeft className="h-4 w-4" /> Quay lại danh sách khóa học
+            </button>
+          </div>
+        )}
+
         {loading ? (
           <div className="mt-12 flex flex-col items-center justify-center py-12 text-center">
             <div className="h-9 w-9 animate-spin rounded-full border-3 border-blue-600 border-t-transparent" />
@@ -379,13 +407,20 @@ export default function TeacherCoursesPage() {
             <div className="grid h-16 w-16 place-items-center rounded-2xl bg-blue-50 text-3xl">
               📚
             </div>
-            <h3 className="mt-4 text-lg font-bold text-slate-800">Không có khóa học nào</h3>
+            <h3 className="mt-4 text-lg font-bold text-slate-800">
+              {viewingArchived ? "Chưa có khóa học nào được lưu trữ" : "Không có khóa học nào"}
+            </h3>
             <p className="mt-1 max-w-sm text-sm text-slate-500">
-              {query || statusFilter !== "all"
-                ? "Không tìm thấy khóa học phù hợp với bộ lọc hiện tại."
-                : "Chưa có khóa học nào được tạo. Hãy tạo khóa học đầu tiên để bắt đầu xây dựng bài học."}
+              {viewingArchived
+                ? "Khóa học bạn lưu trữ sẽ xuất hiện ở đây và có thể khôi phục bất cứ lúc nào."
+                : query
+                  ? "Không tìm thấy khóa học phù hợp với bộ lọc hiện tại."
+                  : courses.length > 0
+                    ? "Không có khóa học nào ở trạng thái này."
+                    : "Chưa có khóa học nào được tạo. Hãy tạo khóa học đầu tiên để bắt đầu xây dựng bài học."}
             </p>
             <button
+              hidden={viewingArchived}
               onClick={handleOpenCreateModal}
               className="mt-5 inline-flex items-center gap-2 rounded-xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-500/20 hover:bg-blue-700"
             >
@@ -408,7 +443,9 @@ export default function TeacherCoursesPage() {
                   >
                     {/* Ảnh avatar thương hiệu EduHub */}
                     <div
-                      className="absolute inset-0 bg-cover bg-center transition-transform duration-500 ease-out group-hover:scale-105"
+                      className={`absolute inset-0 bg-cover bg-center transition-transform duration-500 ease-out group-hover:scale-105 ${
+                        course.status === "ARCHIVED" ? "grayscale opacity-70" : ""
+                      }`}
                       style={{ backgroundImage: `url('/images/course-default-avatar.jpg')` }}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/25 to-slate-950/40" />
@@ -483,7 +520,9 @@ export default function TeacherCoursesPage() {
               >
                 <div className="flex items-center gap-3.5">
                   <div
-                    className="h-12 w-16 shrink-0 rounded-lg bg-cover bg-center border border-slate-200 shadow-2xs"
+                    className={`h-12 w-16 shrink-0 rounded-lg bg-cover bg-center border border-slate-200 shadow-2xs ${
+                      course.status === "ARCHIVED" ? "grayscale opacity-70" : ""
+                    }`}
                     style={{ backgroundImage: `url('/images/course-default-avatar.jpg')` }}
                   />
                   <div>

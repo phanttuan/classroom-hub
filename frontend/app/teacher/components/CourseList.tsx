@@ -106,9 +106,9 @@ export default function CourseList({
                 }`}
               />
               {c.status === "active"
-                ? "Đang hoạt động"
+                ? "Đang mở"
                 : c.status === "closed"
-                ? "Đã đóng"
+                ? "Ngừng nhận sinh viên"
                 : "Đã lưu trữ"}
             </span>
 
@@ -151,7 +151,7 @@ export default function CourseList({
                       }}
                       className="flex w-full items-center gap-2 px-3.5 py-2 text-left text-[13px] text-amber-600 hover:bg-amber-50"
                     >
-                      <Lock className="h-4 w-4" /> Đóng khóa học
+                      <Lock className="h-4 w-4" /> Ngừng nhận sinh viên
                     </button>
                   )}
                   {c.status === "closed" && (
@@ -162,7 +162,7 @@ export default function CourseList({
                       }}
                       className="flex w-full items-center gap-2 px-3.5 py-2 text-left text-[13px] text-blue-600 hover:bg-blue-50"
                     >
-                      <RotateCcw className="h-4 w-4" /> Mở lại khóa học
+                      <RotateCcw className="h-4 w-4" /> Nhận sinh viên trở lại
                     </button>
                   )}
                   {c.status !== "archived" && (

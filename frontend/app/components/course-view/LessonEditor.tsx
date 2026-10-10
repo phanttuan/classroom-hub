@@ -8,6 +8,8 @@ import {
   ChevronDown,
   ChevronRight,
   Eye,
+  EyeOff,
+  FilePen,
   Lightbulb,
   PencilLine,
   RefreshCw,
@@ -40,6 +42,7 @@ import { CHOOSER_ITEMS, DISPLAY_OPTIONS, LESSON_TYPE_META, formatFileSize } from
 import RichContent from "@/components/content/RichContent";
 import RichTextEditor from "@/components/editor/RichTextEditor";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { toast } from "@/app/components/common/Toast";
 import CourseShell, { coursePathOf, useCourseContent } from "./CourseShell";
 import ActivityChooser from "./ActivityChooser";
 import CourseHero, { HeroButton } from "./CourseHero";
@@ -237,7 +240,7 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [saving, setSaving] = useState<null | "course" | "view">(null);
+  const [saving, setSaving] = useState<null | "course" | "draft">(null);
   const [submitError, setSubmitError] = useState("");
   const [dirty, setDirty] = useState(false);
   const [previewContent, setPreviewContent] = useState(false);
@@ -333,9 +336,27 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
     return Object.keys(next).length === 0;
   };
 
-  const handleSave = async (after: "course" | "view") => {
+  /**
+   * course: lưu theo "Khả năng hiển thị" rồi quay về khóa học.
+   * draft : lưu ở trạng thái ẩn với sinh viên rồi quay về khóa học.
+   */
+  const handleSave = async (mode: "course" | "draft") => {
     if (!type || !validate()) return;
-    setSaving(after);
+
+    // Hệ thống không giữ song song bản công khai + bản nháp → lưu nháp sẽ ẩn mục đang hiển thị
+    if (mode === "draft" && isEdit && lesson?.status === "PUBLISHED") {
+      const ok = await confirm({
+        tone: "warning",
+        icon: EyeOff,
+        title: "Chuyển mục này về bản nháp?",
+        message: "Mục đang hiển thị với sinh viên. Lưu bản nháp sẽ ẩn mục khỏi sinh viên cho đến khi bạn công bố lại.",
+        confirmText: "Lưu bản nháp",
+        cancelText: "Giữ hiển thị",
+      });
+      if (!ok) return;
+    }
+
+    setSaving(mode);
     setSubmitError("");
 
     const payload: LessonPayload = {
@@ -344,7 +365,7 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
       content: type === "PAGE" || type === "LABEL" ? content : undefined,
       externalUrl: type === "URL" ? externalUrl.trim() : undefined,
       settings,
-      status: visible ? "PUBLISHED" : "DRAFT",
+      status: mode === "draft" ? "DRAFT" : visible ? "PUBLISHED" : "DRAFT",
     };
 
     let createdId: string | null = null;
@@ -360,9 +381,11 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
         await uploadLessonFiles(saved.id, pendingFiles);
       }
       setDirty(false);
-      router.push(
-        after === "view" ? `${coursePath}/lessons/${saved.id}` : `${coursePath}#module-section-${targetModuleId}`,
-      );
+
+      if (mode === "draft") {
+        toast.success("Đã lưu bản nháp", "Mục đang ẩn với sinh viên cho đến khi bạn công bố.");
+      }
+      router.push(`${coursePath}#module-section-${targetModuleId}`);
     } catch (err) {
       // Tạo mới nhưng tải tệp lỗi → xóa bản ghi vừa tạo để không còn tài nguyên rỗng
       if (createdId) await deleteLesson(createdId).catch(() => {});
@@ -829,17 +852,16 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
                   {saving === "course" && <Loader2 className="h-4 w-4 animate-spin" />}
                   Lưu và quay lại khóa học
                 </button>
-                {type !== "LABEL" && (
-                  <button
-                    type="button"
-                    disabled={!!saving}
-                    onClick={() => handleSave("view")}
-                    className="flex items-center gap-2 rounded-lg border border-[#0f6cbf] bg-white px-5 py-2.5 text-[14px] font-semibold text-[#0f6cbf] hover:bg-blue-50 disabled:opacity-60"
-                  >
-                    {saving === "view" && <Loader2 className="h-4 w-4 animate-spin" />}
-                    Lưu và hiển thị
-                  </button>
-                )}
+                <button
+                  type="button"
+                  disabled={!!saving}
+                  onClick={() => handleSave("draft")}
+                  title="Lưu ở trạng thái ẩn với sinh viên rồi quay lại khóa học"
+                  className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-[14px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                >
+                  {saving === "draft" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FilePen className="h-4 w-4" />}
+                  Lưu bản nháp
+                </button>
                 <button
                   type="button"
                   disabled={!!saving}
@@ -890,7 +912,9 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
               <section className="space-y-2.5 rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
                 <p className="text-[13.5px] font-bold text-slate-800">Lưu thay đổi</p>
                 <p className="text-[12.5px] text-slate-500">
-                  {visible ? "Sinh viên sẽ thấy mục này ngay sau khi lưu." : "Mục này đang ẩn với sinh viên."}
+                  {visible
+                    ? "Lưu và quay lại: sinh viên thấy mục này ngay sau khi lưu."
+                    : "Mục này đang ẩn với sinh viên."}
                 </p>
                 <button
                   type="button"
@@ -901,17 +925,19 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
                   {saving === "course" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
                   Lưu và quay lại khóa học
                 </button>
-                {type !== "LABEL" && (
-                  <button
-                    type="button"
-                    disabled={!!saving}
-                    onClick={() => handleSave("view")}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#0f6cbf] px-4 py-2.5 text-[14px] font-semibold text-[#0f6cbf] hover:bg-blue-50 disabled:opacity-60"
-                  >
-                    {saving === "view" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Eye className="h-4 w-4" />}
-                    Lưu và hiển thị
-                  </button>
-                )}
+                <button
+                  type="button"
+                  disabled={!!saving}
+                  onClick={() => handleSave("draft")}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-[14px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                >
+                  {saving === "draft" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FilePen className="h-4 w-4" />}
+                  Lưu bản nháp
+                </button>
+                <p className="flex items-start gap-1.5 text-[12px] leading-relaxed text-slate-400">
+                  <EyeOff className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  Bản nháp được lưu ở trạng thái ẩn với sinh viên, có thể công bố sau.
+                </p>
                 {submitError && (
                   <p className="flex items-start gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-[12.5px] font-medium text-red-700">
                     <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {submitError}

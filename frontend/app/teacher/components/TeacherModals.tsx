@@ -178,9 +178,9 @@ export function CourseDetailModal({
               <dt className="text-xs text-slate-500">Trạng thái</dt>
               <dd className="font-bold text-slate-900">
                 {classInfo.status === "active"
-                  ? "Đang hoạt động"
+                  ? "Đang mở"
                   : classInfo.status === "closed"
-                  ? "Đã đóng"
+                  ? "Ngừng nhận sinh viên"
                   : "Đã lưu trữ"}
               </dd>
             </div>
@@ -221,9 +221,9 @@ export function ConfirmStatusChangeModal({
 
   const config = {
     closed: {
-      title: "Đóng khóa học?",
-      message: `Bạn có chắc muốn đóng khóa học "${classInfo.name}" (${classInfo.code})? Khóa học sẽ ngừng tiếp nhận học sinh mới và không tạo thêm hoạt động mới.`,
-      btnText: "Đóng khóa học",
+      title: "Ngừng nhận sinh viên mới?",
+      message: `Khóa học "${classInfo.name}" (${classInfo.code}) sẽ không nhận sinh viên mới tham gia bằng mã. Sinh viên hiện tại vẫn học và bạn vẫn chỉnh sửa nội dung bình thường.`,
+      btnText: "Ngừng nhận sinh viên",
       btnClass: "bg-amber-600 hover:bg-amber-700 text-white",
     },
     archived: {
@@ -232,12 +232,20 @@ export function ConfirmStatusChangeModal({
       btnText: "Lưu trữ khóa học",
       btnClass: "bg-slate-700 hover:bg-slate-800 text-white",
     },
-    active: {
-      title: "Khôi phục khóa học?",
-      message: `Bạn có chắc muốn mở lại hoạt động cho khóa học "${classInfo.name}" (${classInfo.code})?`,
-      btnText: "Khôi phục hoạt động",
-      btnClass: "bg-blue-600 hover:bg-blue-700 text-white",
-    },
+    active:
+      classInfo.status === "archived"
+        ? {
+            title: "Khôi phục khóa học?",
+            message: `Khóa học "${classInfo.name}" (${classInfo.code}) sẽ hoạt động trở lại: chỉnh sửa được nội dung và nhận sinh viên tham gia bằng mã.`,
+            btnText: "Khôi phục khóa học",
+            btnClass: "bg-blue-600 hover:bg-blue-700 text-white",
+          }
+        : {
+            title: "Nhận sinh viên trở lại?",
+            message: `Sinh viên có thể tham gia khóa học "${classInfo.name}" (${classInfo.code}) bằng mã khóa học.`,
+            btnText: "Nhận sinh viên",
+            btnClass: "bg-blue-600 hover:bg-blue-700 text-white",
+          },
   }[targetStatus];
 
   return (

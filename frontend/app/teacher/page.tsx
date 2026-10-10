@@ -202,11 +202,11 @@ export default function TeacherDashboardPage() {
       setClasses((prev) => prev.map((c) => (c.id === classInfo.id ? updated : c)));
 
       const labelMap = {
-        active: "khôi phục",
-        closed: "đóng",
-        archived: "lưu trữ",
+        active: classInfo.status === "archived" ? "Đã khôi phục khóa học" : "Đã mở lại cho sinh viên tham gia khóa học",
+        closed: "Đã ngừng nhận sinh viên mới cho khóa học",
+        archived: "Đã lưu trữ khóa học",
       };
-      showToast(`Đã ${labelMap[targetStatus]} khóa học ${res.courseCode}`);
+      showToast(`${labelMap[targetStatus]} ${res.courseCode}`);
     } catch (err: unknown) {
       const error = err as { message?: string };
       showToast(error?.message || "Không thể thay đổi trạng thái khóa học");

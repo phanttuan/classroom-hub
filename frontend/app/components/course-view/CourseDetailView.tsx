@@ -47,8 +47,8 @@ import CourseHero, { type HeroStatusTone } from "./CourseHero";
 import CourseSkeleton from "./CourseSkeleton";
 
 const COURSE_STATUS: Record<string, { caption: string; label: string; tone: HeroStatusTone }> = {
-  ACTIVE: { caption: "Trạng thái khóa học", label: "Đang giảng dạy", tone: "emerald" },
-  CLOSED: { caption: "Trạng thái khóa học", label: "Đã kết thúc", tone: "amber" },
+  ACTIVE: { caption: "Trạng thái khóa học", label: "Đang mở", tone: "emerald" },
+  CLOSED: { caption: "Trạng thái khóa học", label: "Ngừng nhận sinh viên", tone: "amber" },
   ARCHIVED: { caption: "Trạng thái khóa học", label: "Đã lưu trữ", tone: "slate" },
 };
 
