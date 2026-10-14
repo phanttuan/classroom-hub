@@ -409,6 +409,7 @@ export class LearningContentService {
     return this.prisma.lesson.create({
       data: {
         moduleId,
+        createdBy: userId,
         type: dto.type,
         ...fields,
         settings: fields.settings as Prisma.InputJsonValue,

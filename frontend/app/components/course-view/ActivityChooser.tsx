@@ -12,7 +12,13 @@ const TABS = [
 ] as const;
 
 /** Bộ chọn "Thêm hoạt động hoặc tài nguyên" — theo activity chooser của Moodle */
-export default function ActivityChooser({ onSelect }: { onSelect: (type: LessonTypeKey) => void }) {
+interface ActivityChooserProps {
+  onSelect: (type: LessonTypeKey) => void;
+  onSelectAssign?: () => void;
+}
+
+/** Bộ chọn "Thêm hoạt động hoặc tài nguyên" — theo activity chooser của Moodle */
+export default function ActivityChooser({ onSelect, onSelectAssign }: ActivityChooserProps) {
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("all");
   const [query, setQuery] = useState("");
   const [info, setInfo] = useState<ChooserItem | null>(null);
@@ -54,7 +60,17 @@ export default function ActivityChooser({ onSelect }: { onSelect: (type: LessonT
       <div className="grid grid-cols-2 gap-3 p-5 sm:grid-cols-3 lg:grid-cols-4">
         {items.map((item) => {
           const Icon = item.icon;
-          const disabled = !item.type;
+          const isAssign = item.key === "assign";
+          const disabled = isAssign ? !onSelectAssign : !item.type;
+
+          const handleItemClick = () => {
+            if (isAssign && onSelectAssign) {
+              onSelectAssign();
+            } else if (item.type) {
+              onSelect(item.type);
+            }
+          };
+
           return (
             <div
               key={item.key}
@@ -63,13 +79,13 @@ export default function ActivityChooser({ onSelect }: { onSelect: (type: LessonT
                   ? "cursor-not-allowed border-slate-100 bg-slate-50/60"
                   : "cursor-pointer border-slate-200 hover:border-[#0f6cbf] hover:shadow-md"
               }`}
-              onClick={() => item.type && onSelect(item.type)}
+              onClick={disabled ? undefined : handleItemClick}
               role={disabled ? undefined : "button"}
               tabIndex={disabled ? -1 : 0}
               onKeyDown={(e) => {
-                if (item.type && (e.key === "Enter" || e.key === " ")) {
+                if (!disabled && (e.key === "Enter" || e.key === " ")) {
                   e.preventDefault();
-                  onSelect(item.type);
+                  handleItemClick();
                 }
               }}
             >
@@ -90,7 +106,7 @@ export default function ActivityChooser({ onSelect }: { onSelect: (type: LessonT
                   e.stopPropagation();
                   setInfo(info?.key === item.key ? null : item);
                 }}
-                className="mt-2 text-[12px] font-medium text-slate-400 hover:text-[#0f6cbf]"
+                className="mt-2 text-[12.5px] font-medium text-slate-400 hover:text-[#0f6cbf]"
               >
                 Thông tin
               </button>
@@ -116,6 +132,13 @@ export default function ActivityChooser({ onSelect }: { onSelect: (type: LessonT
                 className="mt-2.5 rounded-lg bg-[#0f6cbf] px-4 py-1.5 text-[13px] font-semibold text-white hover:bg-[#0c599e]"
               >
                 Thêm
+              </button>
+            ) : info.key === "assign" && onSelectAssign ? (
+              <button
+                onClick={() => onSelectAssign()}
+                className="mt-2.5 rounded-lg bg-[#0f6cbf] px-4 py-1.5 text-[13px] font-semibold text-white hover:bg-[#0c599e]"
+              >
+                Tạo bài tập
               </button>
             ) : (
               <p className="mt-2 text-[12.5px] font-medium text-slate-500">Chức năng này đang được phát triển.</p>

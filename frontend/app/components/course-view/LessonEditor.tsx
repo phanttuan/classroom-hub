@@ -7,6 +7,7 @@ import {
   Archive,
   ChevronDown,
   ChevronRight,
+  ClipboardList,
   Eye,
   EyeOff,
   FilePen,
@@ -35,10 +36,24 @@ import {
   deleteResource,
   fetchLessonDetail,
   updateLesson,
+  uploadContentAttachment,
   uploadContentImage,
   uploadLessonFiles,
 } from "@/lib/api/learning-content-api";
-import { CHOOSER_ITEMS, DISPLAY_OPTIONS, LESSON_TYPE_META, formatFileSize } from "@/lib/lesson-types";
+import {
+  createAssignment,
+  fetchAssignmentDetail,
+  formatAssignmentApiError,
+  publishAssignment,
+  updateAssignment,
+} from "@/lib/api/assignment-api";
+import {
+  CHOOSER_ITEMS,
+  DISPLAY_OPTIONS,
+  LESSON_TYPE_META,
+  formatFileSize,
+  type ChooserItem,
+} from "@/lib/lesson-types";
 import RichContent from "@/components/content/RichContent";
 import RichTextEditor from "@/components/editor/RichTextEditor";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
@@ -47,8 +62,38 @@ import CourseShell, { coursePathOf, useCourseContent } from "./CourseShell";
 import ActivityChooser from "./ActivityChooser";
 import CourseHero, { HeroButton } from "./CourseHero";
 
+export type EditorActivityType = LessonTypeKey | "ASSIGNMENT";
+
+const ASSIGNMENT_ITEM: ChooserItem = {
+  key: "assign",
+  type: null,
+  category: "activity",
+  label: "Bài tập",
+  summary:
+    "Giao bài, nhận bài nộp của sinh viên dưới dạng tệp hoặc trực tuyến, chấm điểm và gửi phản hồi.",
+  icon: ClipboardList,
+  iconClass: "bg-pink-50 text-pink-600",
+};
+
+function toDatetimeLocalValue(iso?: string | null): string {
+  const date = iso ? new Date(iso) : new Date();
+  if (Number.isNaN(date.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+function defaultOpenAtLocal(): string {
+  return toDatetimeLocalValue(new Date().toISOString());
+}
+
+function defaultDueAtLocal(): string {
+  const due = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  due.setHours(23, 59, 0, 0);
+  return toDatetimeLocalValue(due.toISOString());
+}
+
 /** Gợi ý soạn thảo theo từng loại (giống phần trợ giúp trong form của Moodle) */
-const TYPE_TIPS: Record<LessonTypeKey, string[]> = {
+const TYPE_TIPS: Record<EditorActivityType, string[]> = {
   PAGE: [
     'Dùng Tiêu đề 1–3 để chia mục — trang xem sẽ tự tạo mục lục "Trong trang này".',
     "Dán hoặc kéo thả ảnh trực tiếp vào khung soạn thảo để tải lên.",
@@ -74,6 +119,12 @@ const TYPE_TIPS: Record<LessonTypeKey, string[]> = {
     "Nội dung hiển thị trực tiếp trên trang khóa học, giữa các hoạt động.",
     "Phù hợp cho lời chào, thông báo ngắn, ảnh minh họa hoặc video giới thiệu.",
     "Nên viết ngắn gọn để trang khóa học không bị dài.",
+  ],
+  ASSIGNMENT: [
+    "Hạn nộp bài phải sau thời gian mở bài tập.",
+    "Điểm tối đa mặc định là 10. Điểm này sẽ tự động được đưa vào Sổ điểm (Gradebook) của khóa học.",
+    "Chọn 'Lưu bản nháp' nếu bài tập chưa sẵn sàng hiển thị cho sinh viên.",
+    "Chọn 'Lưu và quay lại khóa học' (hoặc xuất bản) để sinh viên có thể xem và nộp bài.",
   ],
 };
 
@@ -119,9 +170,10 @@ interface LessonEditorProps {
   courseId: string;
   /** Tạo mới: topic đích + loại (chưa có loại → hiện bộ chọn) */
   sectionId?: string;
-  type?: LessonTypeKey;
+  type?: EditorActivityType;
   /** Chỉnh sửa */
   lessonId?: string;
+  assignmentId?: string;
 }
 
 /** Nhóm trường có thể thu gọn — giống fieldset trong form của Moodle */
@@ -207,16 +259,27 @@ function Checkbox({ checked, onChange, label }: { checked: boolean; onChange: (v
 const selectClass =
   "h-10 w-full max-w-sm rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#0f6cbf] focus:ring-4 focus:ring-blue-100";
 
-export default function LessonEditor({ courseId, sectionId, type: typeFromQuery, lessonId }: LessonEditorProps) {
+export default function LessonEditor({
+  courseId,
+  sectionId,
+  type: typeFromQuery,
+  lessonId,
+  assignmentId,
+}: LessonEditorProps) {
   const router = useRouter();
   const confirm = useConfirm();
-  const isEdit = Boolean(lessonId);
+  const isAssignment = typeFromQuery === "ASSIGNMENT" || Boolean(assignmentId);
+  const isEdit = Boolean(lessonId) || Boolean(assignmentId);
   const coursePath = coursePathOf("TEACHER", courseId);
   const { course } = useCourseContent(courseId);
 
   const [lesson, setLesson] = useState<LessonDto | null>(null);
   const [loadError, setLoadError] = useState("");
-  const type: LessonTypeKey | undefined = isEdit ? lesson?.type : typeFromQuery;
+  const type: EditorActivityType | undefined = isAssignment
+    ? "ASSIGNMENT"
+    : isEdit
+      ? lesson?.type
+      : typeFromQuery;
 
   // Giá trị form
   const [moduleId, setModuleId] = useState(sectionId ?? "");
@@ -233,6 +296,11 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
   });
   const [visible, setVisible] = useState(true);
 
+  // Trường riêng cho Bài tập
+  const [maxScore, setMaxScore] = useState<string>("10");
+  const [openAt, setOpenAt] = useState<string>(() => defaultOpenAtLocal());
+  const [dueAt, setDueAt] = useState<string>(() => defaultDueAtLocal());
+
   // Tệp
   const [existingFiles, setExistingFiles] = useState<ResourceDto[]>([]);
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
@@ -247,7 +315,7 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
 
   const markDirty = () => setDirty(true);
 
-  // Tải bài cần chỉnh sửa
+  // Tải bài học cần chỉnh sửa
   useEffect(() => {
     if (!lessonId) return;
     let active = true;
@@ -270,6 +338,27 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
     };
   }, [lessonId]);
 
+  // Tải bài tập cần chỉnh sửa
+  useEffect(() => {
+    if (!assignmentId) return;
+    let active = true;
+    fetchAssignmentDetail(courseId, assignmentId)
+      .then((a) => {
+        if (!active) return;
+        setModuleId(a.moduleId);
+        setTitle(a.title);
+        setDescription(a.description ?? "");
+        setMaxScore(String(Number(a.maxScore) || a.maxScore));
+        setOpenAt(toDatetimeLocalValue(a.openAt));
+        setDueAt(toDatetimeLocalValue(a.dueAt));
+        setVisible(a.status === "PUBLISHED");
+      })
+      .catch((err) => active && setLoadError((err as Error)?.message || "Không tải được thông tin bài tập"));
+    return () => {
+      active = false;
+    };
+  }, [courseId, assignmentId]);
+
   // Cảnh báo khi rời trang mà chưa lưu
   useEffect(() => {
     if (!dirty) return;
@@ -280,7 +369,7 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
 
   const targetModuleId = moduleId || course?.modules[0]?.id || "";
   const targetModule = course?.modules.find((m) => m.id === targetModuleId);
-  const meta = type ? LESSON_TYPE_META[type] : undefined;
+  const meta = type === "ASSIGNMENT" ? ASSIGNMENT_ITEM : type ? LESSON_TYPE_META[type] : undefined;
   const backToCourse = `${coursePath}#module-section-${targetModuleId}`;
 
   const updateSetting = <K extends keyof LessonSettings>(key: K, value: LessonSettings[K]) => {
@@ -336,12 +425,83 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
     return Object.keys(next).length === 0;
   };
 
+  const handleSaveAssignment = async (mode: "course" | "draft") => {
+    setSubmitError("");
+    const nextErrors: Record<string, string> = {};
+    if (!title.trim()) nextErrors.title = "Vui lòng nhập tên bài tập";
+    else if (title.trim().length > 255) nextErrors.title = "Tên bài tập không được vượt quá 255 ký tự";
+
+    const parsedScore = Number(maxScore.trim());
+    if (!Number.isFinite(parsedScore) || parsedScore < 0.01) {
+      nextErrors.maxScore = "Điểm tối đa phải là số lớn hơn hoặc bằng 0.01";
+    }
+
+    const openDate = new Date(openAt);
+    const dueDate = new Date(dueAt);
+    if (Number.isNaN(openDate.getTime())) {
+      nextErrors.openAt = "Vui lòng chọn thời gian mở bài tập";
+    }
+    if (Number.isNaN(dueDate.getTime())) {
+      nextErrors.dueAt = "Vui lòng chọn hạn nộp bài tập";
+    }
+    if (!Number.isNaN(openDate.getTime()) && !Number.isNaN(dueDate.getTime()) && dueDate <= openDate) {
+      nextErrors.dueAt = "Hạn nộp phải sau thời gian mở bài tập";
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors);
+      return;
+    }
+
+    const targetMod = moduleId || targetModuleId;
+    if (!targetMod) {
+      setSubmitError("Vui lòng chọn topic cho bài tập");
+      return;
+    }
+
+    setSaving(mode);
+    try {
+      if (assignmentId) {
+        await updateAssignment(courseId, assignmentId, {
+          moduleId: targetMod,
+          title: title.trim(),
+          description: description.trim() || undefined,
+          maxScore: parsedScore,
+          openAt: openDate.toISOString(),
+          dueAt: dueDate.toISOString(),
+        });
+        toast.success("Đã cập nhật bài tập");
+      } else {
+        const created = await createAssignment(courseId, {
+          moduleId: targetMod,
+          title: title.trim(),
+          description: description.trim() || undefined,
+          maxScore: parsedScore,
+          openAt: openDate.toISOString(),
+          dueAt: dueDate.toISOString(),
+        });
+        if (mode === "course") {
+          await publishAssignment(courseId, created.id);
+          toast.success("Đã tạo và xuất bản bài tập");
+        } else {
+          toast.success("Đã lưu bài tập ở trạng thái bản nháp");
+        }
+      }
+      setDirty(false);
+      router.push(`${coursePath}#module-section-${targetMod}`);
+    } catch (err) {
+      setSubmitError(formatAssignmentApiError(err, "Không thể lưu bài tập"));
+    } finally {
+      setSaving(null);
+    }
+  };
+
   /**
    * course: lưu theo "Khả năng hiển thị" rồi quay về khóa học.
    * draft : lưu ở trạng thái ẩn với sinh viên rồi quay về khóa học.
    */
   const handleSave = async (mode: "course" | "draft") => {
-    if (!type || !validate()) return;
+    if (!type || type === "ASSIGNMENT" || !validate()) return;
 
     // Hệ thống không giữ song song bản công khai + bản nháp → lưu nháp sẽ ẩn mục đang hiển thị
     if (mode === "draft" && isEdit && lesson?.status === "PUBLISHED") {
@@ -411,7 +571,7 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
   };
   const handleCancel = () => leaveTo(isEdit && lessonId ? `${coursePath}/lessons/${lessonId}` : backToCourse);
 
-  const typeInfo = type ? CHOOSER_ITEMS.find((i) => i.type === type) : undefined;
+  const typeInfo = type === "ASSIGNMENT" ? ASSIGNMENT_ITEM : type ? CHOOSER_ITEMS.find((i) => i.type === type) : undefined;
 
   return (
     <CourseShell
@@ -435,7 +595,7 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
             !type
               ? "Thêm hoạt động hoặc tài nguyên"
               : isEdit
-                ? title || lesson?.title || "Chỉnh sửa"
+                ? title || (isAssignment ? "Chỉnh sửa Bài tập" : lesson?.title) || "Chỉnh sửa"
                 : `Thêm ${meta?.label ?? ""} mới`
           }
           stats={
@@ -457,7 +617,7 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
                     ? { dot: "rose", label: "Có thay đổi chưa lưu" }
                     : {
                         dot: "emerald",
-                        label: isEdit ? "Chưa có thay đổi" : "Bản mới",
+                        label: isEdit ? "Đang chỉnh sửa" : "Bản mới",
                       },
                 ]
           }
@@ -471,6 +631,10 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
             isEdit && lesson ? (
               <HeroButton href={`${coursePath}/lessons/${lesson.id}`}>
                 <Eye className="h-4 w-4" /> Xem trang hiện tại
+              </HeroButton>
+            ) : isEdit && assignmentId ? (
+              <HeroButton href={backToCourse}>
+                <ExternalLink className="h-4 w-4" /> Về khóa học
               </HeroButton>
             ) : type ? (
               <HeroButton href={`/teacher/content/courses/${courseId}/lessons/new?section=${targetModuleId}`}>
@@ -503,7 +667,7 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
           </div>
         ) : loadError ? (
           <div className="rounded-xl border border-red-200 bg-red-50 p-6 text-red-700">{loadError}</div>
-        ) : isEdit && !lesson ? (
+        ) : isEdit && !isAssignment && !lesson ? (
           <div className="grid place-items-center rounded-2xl bg-white py-20">
             <Loader2 className="h-6 w-6 animate-spin text-[#0f6cbf]" />
           </div>
@@ -512,20 +676,24 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
             onSelect={(t) =>
               router.replace(`/teacher/content/courses/${courseId}/lessons/new?section=${targetModuleId}&type=${t}`)
             }
+            onSelectAssign={() =>
+              router.replace(`/teacher/content/courses/${courseId}/lessons/new?section=${targetModuleId}&type=ASSIGNMENT`)
+            }
           />
         ) : (
           <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_320px]">
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                void handleSave("course");
-              }}
-              className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs"
-            >
-              {/* ============ CHUNG ============ */}
-              <Fieldset title="Chung">
-                {type !== "LABEL" && (
-                  <Field label="Tên" required error={errors.title}>
+            {isAssignment ? (
+              <form
+                noValidate
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void handleSaveAssignment("course");
+                }}
+                className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs"
+              >
+                {/* ============ CHUNG ============ */}
+                <Fieldset title="Chung">
+                  <Field label="Tên bài tập" required error={errors.title}>
                     <input
                       value={title}
                       onChange={(e) => {
@@ -534,347 +702,508 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
                         markDirty();
                       }}
                       maxLength={255}
-                      placeholder={
-                        type === "URL"
-                          ? "VD: Nhóm Zalo khóa học"
-                          : type === "FILE"
-                            ? "VD: Slide bài giảng Chương 1"
-                            : "VD: Bài 1 — Giới thiệu khóa học"
-                      }
+                      placeholder="VD: Bài tập lớn — Thiết kế cơ sở dữ liệu"
                       className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-[#0f6cbf] focus:ring-4 focus:ring-blue-100"
                     />
                   </Field>
+
+                  {course && (
+                    <Field label="Topic" required>
+                      <select
+                        value={targetModuleId}
+                        onChange={(e) => {
+                          setModuleId(e.target.value);
+                          markDirty();
+                        }}
+                        className={selectClass}
+                      >
+                        {course.modules.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.title}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                  )}
+
+                  <Field label="Mô tả & Hướng dẫn">
+                    <RichTextEditor
+                      value={description}
+                      onChange={(html) => {
+                        setDescription(html);
+                        markDirty();
+                      }}
+                      onUploadImage={(file) => uploadContentImage(courseId, file)}
+                      onUploadAttachment={(file) => uploadContentAttachment(courseId, file)}
+                      placeholder="Nhập hướng dẫn làm bài tập, yêu cầu định dạng nộp bài, rubric chấm điểm..."
+                      minHeight={180}
+                    />
+                  </Field>
+                </Fieldset>
+
+                {/* ============ THỜI GIAN & ĐIỂM SỐ ============ */}
+                <Fieldset title="Thời gian & Điểm số">
+                  <Field
+                    label="Điểm tối đa"
+                    required
+                    error={errors.maxScore}
+                    hint="Thang điểm đánh giá cho bài nộp (ví dụ: 10 hoặc 100)"
+                  >
+                    <input
+                      type="number"
+                      step="any"
+                      min="0.01"
+                      value={maxScore}
+                      onChange={(e) => {
+                        setMaxScore(e.target.value);
+                        setErrors((er) => ({ ...er, maxScore: "" }));
+                        markDirty();
+                      }}
+                      className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-[#0f6cbf] focus:ring-4 focus:ring-blue-100"
+                    />
+                  </Field>
+
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field
+                      label="Thời gian mở"
+                      required
+                      error={errors.openAt}
+                      hint="Sinh viên bắt đầu nộp bài từ thời điểm này"
+                    >
+                      <input
+                        type="datetime-local"
+                        value={openAt}
+                        onChange={(e) => {
+                          setOpenAt(e.target.value);
+                          setErrors((er) => ({ ...er, openAt: "" }));
+                          markDirty();
+                        }}
+                        className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-[#0f6cbf] focus:ring-4 focus:ring-blue-100"
+                      />
+                    </Field>
+
+                    <Field
+                      label="Hạn nộp"
+                      required
+                      error={errors.dueAt}
+                      hint="Hạn cuối cùng để sinh viên nộp bài"
+                    >
+                      <input
+                        type="datetime-local"
+                        value={dueAt}
+                        onChange={(e) => {
+                          setDueAt(e.target.value);
+                          setErrors((er) => ({ ...er, dueAt: "" }));
+                          markDirty();
+                        }}
+                        className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-[#0f6cbf] focus:ring-4 focus:ring-blue-100"
+                      />
+                    </Field>
+                  </div>
+                </Fieldset>
+
+                {/* ============ NÚT LƯU ============ */}
+                <div className="flex flex-wrap items-center gap-2.5 border-t border-slate-200 bg-slate-50/70 px-6 py-4">
+                  {submitError && (
+                    <p className="mb-1 flex w-full items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] font-medium text-red-700">
+                      <AlertCircle className="h-4 w-4 shrink-0" /> {submitError}
+                    </p>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={!!saving}
+                    className="flex items-center gap-2 rounded-lg bg-[#0f6cbf] px-5 py-2.5 text-[14px] font-semibold text-white shadow-xs hover:bg-[#0c599e] disabled:opacity-60"
+                  >
+                    {saving === "course" && <Loader2 className="h-4 w-4 animate-spin" />}
+                    {isEdit ? "Lưu thay đổi" : "Lưu và xuất bản"}
+                  </button>
+                  {!isEdit && (
+                    <button
+                      type="button"
+                      disabled={!!saving}
+                      onClick={() => void handleSaveAssignment("draft")}
+                      title="Lưu ở trạng thái bản nháp (DRAFT) rồi quay lại khóa học"
+                      className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-[14px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                    >
+                      {saving === "draft" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FilePen className="h-4 w-4" />}
+                      Lưu bản nháp
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    disabled={!!saving}
+                    onClick={handleCancel}
+                    className="rounded-lg px-5 py-2.5 text-[14px] font-semibold text-slate-600 hover:bg-slate-200/60 disabled:opacity-60"
+                  >
+                    Hủy
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form
+                noValidate
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void handleSave("course");
+                }}
+                className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs"
+              >
+                {/* ============ CHUNG ============ */}
+                <Fieldset title="Chung">
+                  {type !== "LABEL" && (
+                    <Field label="Tên" required error={errors.title}>
+                      <input
+                        value={title}
+                        onChange={(e) => {
+                          setTitle(e.target.value);
+                          setErrors((er) => ({ ...er, title: "" }));
+                          markDirty();
+                        }}
+                        maxLength={255}
+                        placeholder={
+                          type === "URL"
+                            ? "VD: Nhóm Zalo khóa học"
+                            : type === "FILE"
+                              ? "VD: Slide bài giảng Chương 1"
+                              : "VD: Bài 1 — Giới thiệu khóa học"
+                        }
+                        className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-[#0f6cbf] focus:ring-4 focus:ring-blue-100"
+                      />
+                    </Field>
+                  )}
+
+                  {type === "LABEL" ? (
+                    <Field label="Văn bản và phương tiện" required error={errors.content}>
+                      <ModeSwitch preview={previewContent} onChange={setPreviewContent} />
+                      {previewContent ? (
+                        <PreviewBox html={content} minHeight={260} />
+                      ) : (
+                        <RichTextEditor
+                          value={content}
+                          onChange={(html) => {
+                            setContent(html);
+                            setErrors((er) => ({ ...er, content: "" }));
+                            markDirty();
+                          }}
+                          onUploadImage={(file) => uploadContentImage(courseId, file)}
+                          onUploadAttachment={(file) => uploadContentAttachment(courseId, file)}
+                          placeholder="Nội dung sẽ hiển thị trực tiếp trên trang khóa học..."
+                          minHeight={260}
+                        />
+                      )}
+                    </Field>
+                  ) : (
+                    <>
+                      <Field label="Mô tả">
+                        <RichTextEditor
+                          value={description}
+                          onChange={(html) => {
+                            setDescription(html);
+                            markDirty();
+                          }}
+                          placeholder="Giới thiệu ngắn (không bắt buộc)"
+                          minHeight={110}
+                          compact
+                        />
+                        <div className="mt-2.5">
+                          <Checkbox
+                            checked={!!settings.showDescription}
+                            onChange={(v) => updateSetting("showDescription", v)}
+                            label="Hiển thị mô tả trên trang khóa học"
+                          />
+                        </div>
+                      </Field>
+                    </>
+                  )}
+                </Fieldset>
+
+                {/* ============ NỘI DUNG THEO LOẠI ============ */}
+                {type === "PAGE" && (
+                  <Fieldset title="Nội dung">
+                    <Field label="Nội dung trang" required error={errors.content}>
+                      <ModeSwitch preview={previewContent} onChange={setPreviewContent} />
+                      {previewContent ? (
+                        <PreviewBox html={content} minHeight={420} />
+                      ) : (
+                        <RichTextEditor
+                          value={content}
+                          onChange={(html) => {
+                            setContent(html);
+                            setErrors((er) => ({ ...er, content: "" }));
+                            markDirty();
+                          }}
+                          onUploadImage={(file) => uploadContentImage(courseId, file)}
+                          onUploadAttachment={(file) => uploadContentAttachment(courseId, file)}
+                          placeholder="Soạn nội dung bài giảng..."
+                          minHeight={520}
+                        />
+                      )}
+                    </Field>
+                  </Fieldset>
                 )}
 
-                {type === "LABEL" ? (
-                  <Field label="Văn bản và phương tiện" required error={errors.content}>
-                    <ModeSwitch preview={previewContent} onChange={setPreviewContent} />
-                    {previewContent ? (
-                      <PreviewBox html={content} minHeight={260} />
-                    ) : (
-                      <RichTextEditor
-                        value={content}
-                        onChange={(html) => {
-                          setContent(html);
-                          setErrors((er) => ({ ...er, content: "" }));
-                          markDirty();
-                        }}
-                        onUploadImage={(file) => uploadContentImage(courseId, file)}
-                        placeholder="Nội dung sẽ hiển thị trực tiếp trên trang khóa học..."
-                        minHeight={260}
-                      />
-                    )}
-                  </Field>
-                ) : (
-                  <>
-                    <Field label="Mô tả">
-                      <RichTextEditor
-                        value={description}
-                        onChange={(html) => {
-                          setDescription(html);
-                          markDirty();
-                        }}
-                        placeholder="Giới thiệu ngắn (không bắt buộc)"
-                        minHeight={110}
-                        compact
-                      />
-                      <div className="mt-2.5">
-                        <Checkbox
-                          checked={!!settings.showDescription}
-                          onChange={(v) => updateSetting("showDescription", v)}
-                          label="Hiển thị mô tả trên trang khóa học"
+                {type === "URL" && (
+                  <Fieldset title="URL">
+                    <Field
+                      label="URL ngoài"
+                      required
+                      error={errors.externalUrl}
+                      hint="Đường dẫn tới trang web, tài liệu online, nhóm Zalo, phòng họp…"
+                    >
+                      <div className="flex gap-2">
+                        <input
+                          value={externalUrl}
+                          onChange={(e) => {
+                            setExternalUrl(e.target.value);
+                            setErrors((er) => ({ ...er, externalUrl: "" }));
+                            markDirty();
+                          }}
+                          placeholder="https://..."
+                          className="h-10 w-full rounded-lg border border-slate-300 px-3 font-mono text-sm outline-none focus:border-[#0f6cbf] focus:ring-4 focus:ring-blue-100"
                         />
+                        <a
+                          href={/^https?:\/\//i.test(externalUrl) ? externalUrl : `https://${externalUrl}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          aria-disabled={!externalUrl.trim()}
+                          className={`flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-300 px-3 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 ${
+                            externalUrl.trim() ? "" : "pointer-events-none opacity-50"
+                          }`}
+                        >
+                          <ExternalLink className="h-4 w-4" /> Mở thử
+                        </a>
                       </div>
                     </Field>
-                  </>
+                  </Fieldset>
                 )}
-              </Fieldset>
 
-              {/* ============ NỘI DUNG THEO LOẠI ============ */}
-              {type === "PAGE" && (
-                <Fieldset title="Nội dung">
-                  <Field label="Nội dung trang" required error={errors.content}>
-                    <ModeSwitch preview={previewContent} onChange={setPreviewContent} />
-                    {previewContent ? (
-                      <PreviewBox html={content} minHeight={420} />
-                    ) : (
-                      <RichTextEditor
-                        value={content}
-                        onChange={(html) => {
-                          setContent(html);
-                          setErrors((er) => ({ ...er, content: "" }));
-                          markDirty();
+                {(type === "FILE" || type === "FOLDER") && (
+                  <Fieldset title={type === "FILE" ? "Chọn tệp" : "Nội dung thư mục"}>
+                    <Field
+                      label={type === "FILE" ? "Tệp" : "Các tệp"}
+                      required
+                      error={errors.files}
+                      hint={
+                        type === "FILE"
+                          ? "Chỉ 1 tệp — chọn tệp mới sẽ thay thế tệp hiện tại khi lưu."
+                          : "Có thể chọn nhiều tệp cùng lúc."
+                      }
+                    >
+                      <div
+                        onDragOver={(e) => {
+                          e.preventDefault();
+                          setDragOver(true);
                         }}
-                        onUploadImage={(file) => uploadContentImage(courseId, file)}
-                        placeholder="Soạn nội dung bài giảng..."
-                        minHeight={520}
-                      />
-                    )}
-                  </Field>
-                </Fieldset>
-              )}
-
-              {type === "URL" && (
-                <Fieldset title="URL">
-                  <Field
-                    label="URL ngoài"
-                    required
-                    error={errors.externalUrl}
-                    hint="Đường dẫn tới trang web, tài liệu online, nhóm Zalo, phòng họp…"
-                  >
-                    <div className="flex gap-2">
-                      <input
-                        value={externalUrl}
-                        onChange={(e) => {
-                          setExternalUrl(e.target.value);
-                          setErrors((er) => ({ ...er, externalUrl: "" }));
-                          markDirty();
+                        onDragLeave={() => setDragOver(false)}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          setDragOver(false);
+                          addFiles(e.dataTransfer.files);
                         }}
-                        placeholder="https://..."
-                        className="h-10 w-full rounded-lg border border-slate-300 px-3 font-mono text-sm outline-none focus:border-[#0f6cbf] focus:ring-4 focus:ring-blue-100"
-                      />
-                      <a
-                        href={/^https?:\/\//i.test(externalUrl) ? externalUrl : `https://${externalUrl}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        aria-disabled={!externalUrl.trim()}
-                        className={`flex shrink-0 items-center gap-1.5 rounded-lg border border-slate-300 px-3 text-[13px] font-semibold text-slate-700 hover:bg-slate-50 ${
-                          externalUrl.trim() ? "" : "pointer-events-none opacity-50"
+                        onClick={() => fileInputRef.current?.click()}
+                        className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-8 text-center transition ${
+                          dragOver
+                            ? "border-[#0f6cbf] bg-blue-50"
+                            : "border-slate-300 bg-slate-50/50 hover:border-[#0f6cbf] hover:bg-blue-50/40"
                         }`}
                       >
-                        <ExternalLink className="h-4 w-4" /> Mở thử
-                      </a>
-                    </div>
-                  </Field>
-                </Fieldset>
-              )}
-
-              {(type === "FILE" || type === "FOLDER") && (
-                <Fieldset title={type === "FILE" ? "Chọn tệp" : "Nội dung thư mục"}>
-                  <Field
-                    label={type === "FILE" ? "Tệp" : "Các tệp"}
-                    required
-                    error={errors.files}
-                    hint={
-                      type === "FILE"
-                        ? "Chỉ 1 tệp — chọn tệp mới sẽ thay thế tệp hiện tại khi lưu."
-                        : "Có thể chọn nhiều tệp cùng lúc."
-                    }
-                  >
-                    <div
-                      onDragOver={(e) => {
-                        e.preventDefault();
-                        setDragOver(true);
-                      }}
-                      onDragLeave={() => setDragOver(false)}
-                      onDrop={(e) => {
-                        e.preventDefault();
-                        setDragOver(false);
-                        addFiles(e.dataTransfer.files);
-                      }}
-                      onClick={() => fileInputRef.current?.click()}
-                      className={`flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-8 text-center transition ${
-                        dragOver
-                          ? "border-[#0f6cbf] bg-blue-50"
-                          : "border-slate-300 bg-slate-50/50 hover:border-[#0f6cbf] hover:bg-blue-50/40"
-                      }`}
-                    >
-                      <UploadCloud className="h-9 w-9 text-[#0f6cbf]" />
-                      <p className="mt-2 text-[14px] font-semibold text-slate-800">
-                        Kéo thả tệp vào đây hoặc bấm để chọn
-                      </p>
-                      <p className="mt-0.5 text-[12.5px] text-slate-500">
-                        PDF, Word, Excel, PowerPoint, ảnh, video, ZIP…
-                      </p>
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        hidden
-                        multiple={type === "FOLDER"}
-                        onChange={(e) => {
-                          if (e.target.files) addFiles(e.target.files);
-                          e.target.value = "";
-                        }}
-                      />
-                    </div>
-
-                    {(existingFiles.length > 0 || pendingFiles.length > 0) && (
-                      <ul className="mt-3 divide-y divide-slate-100 rounded-xl border border-slate-200">
-                        {existingFiles.map((r) => {
-                          const replaced = type === "FILE" && pendingFiles.length > 0;
-                          return (
-                            <li
-                              key={r.id}
-                              className={`flex items-center gap-3 px-4 py-2.5 ${replaced ? "opacity-50" : ""}`}
-                            >
-                              <FileText className="h-5 w-5 shrink-0 text-sky-600" />
-                              <span
-                                className={`min-w-0 flex-1 truncate text-[13.5px] ${replaced ? "line-through" : ""}`}
-                              >
-                                {r.fileName}
-                              </span>
-                              <span className="text-[12px] text-slate-400">{formatFileSize(r.fileSizeBytes)}</span>
-                              {replaced ? (
-                                <span className="text-[11.5px] text-amber-600">Sẽ được thay thế</span>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => removeExistingFile(r)}
-                                  aria-label={`Xóa ${r.fileName}`}
-                                  className="grid h-7 w-7 place-items-center rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
-                              )}
-                            </li>
-                          );
-                        })}
-                        {pendingFiles.map((f, i) => (
-                          <li key={`${f.name}-${i}`} className="flex items-center gap-3 bg-blue-50/40 px-4 py-2.5">
-                            <FileText className="h-5 w-5 shrink-0 text-[#0f6cbf]" />
-                            <span className="min-w-0 flex-1 truncate text-[13.5px]">{f.name}</span>
-                            <span className="text-[12px] text-slate-400">{formatFileSize(f.size)}</span>
-                            <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
-                              Mới
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setPendingFiles((prev) => prev.filter((_, idx) => idx !== i))}
-                              aria-label={`Bỏ ${f.name}`}
-                              className="grid h-7 w-7 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700"
-                            >
-                              <X className="h-4 w-4" />
-                            </button>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </Field>
-                </Fieldset>
-              )}
-
-              {/* ============ GIAO DIỆN ============ */}
-              {(type === "FILE" || type === "URL") && (
-                <Fieldset title="Giao diện" defaultOpen={false}>
-                  <Field
-                    label="Hiển thị"
-                    hint="Cách sinh viên mở tài nguyên. 'Tự động' chọn cách phù hợp theo loại tệp / trang."
-                  >
-                    <select
-                      value={settings.display ?? "AUTO"}
-                      onChange={(e) => updateSetting("display", e.target.value as LessonDisplayMode)}
-                      className={selectClass}
-                    >
-                      {DISPLAY_OPTIONS[type].map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                  {type === "FILE" && (
-                    <Field label="Thông tin tệp">
-                      <div className="space-y-2 pt-2">
-                        <Checkbox
-                          checked={settings.showSize !== false}
-                          onChange={(v) => updateSetting("showSize", v)}
-                          label="Hiển thị kích thước"
-                        />
-                        <Checkbox
-                          checked={settings.showType !== false}
-                          onChange={(v) => updateSetting("showType", v)}
-                          label="Hiển thị loại tệp"
+                        <UploadCloud className="h-9 w-9 text-[#0f6cbf]" />
+                        <p className="mt-2 text-[14px] font-semibold text-slate-800">
+                          Kéo thả tệp vào đây hoặc bấm để chọn
+                        </p>
+                        <p className="mt-0.5 text-[12.5px] text-slate-500">
+                          PDF, Word, Excel, PowerPoint, ảnh, video, ZIP…
+                        </p>
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          hidden
+                          multiple={type === "FOLDER"}
+                          onChange={(e) => {
+                            if (e.target.files) addFiles(e.target.files);
+                            e.target.value = "";
+                          }}
                         />
                       </div>
+
+                      {(existingFiles.length > 0 || pendingFiles.length > 0) && (
+                        <ul className="mt-3 divide-y divide-slate-100 rounded-xl border border-slate-200">
+                          {existingFiles.map((r) => {
+                            const replaced = type === "FILE" && pendingFiles.length > 0;
+                            return (
+                              <li
+                                key={r.id}
+                                className={`flex items-center gap-3 px-4 py-2.5 ${replaced ? "opacity-50" : ""}`}
+                              >
+                                <FileText className="h-5 w-5 shrink-0 text-sky-600" />
+                                <span
+                                  className={`min-w-0 flex-1 truncate text-[13.5px] ${replaced ? "line-through" : ""}`}
+                                >
+                                  {r.fileName}
+                                </span>
+                                <span className="text-[12px] text-slate-400">{formatFileSize(r.fileSizeBytes)}</span>
+                                {replaced ? (
+                                  <span className="text-[11.5px] text-amber-600">Sẽ được thay thế</span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => removeExistingFile(r)}
+                                    aria-label={`Xóa ${r.fileName}`}
+                                    className="grid h-7 w-7 place-items-center rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </button>
+                                )}
+                              </li>
+                            );
+                          })}
+                          {pendingFiles.map((f, i) => (
+                            <li key={`${f.name}-${i}`} className="flex items-center gap-3 bg-blue-50/40 px-4 py-2.5">
+                              <FileText className="h-5 w-5 shrink-0 text-[#0f6cbf]" />
+                              <span className="min-w-0 flex-1 truncate text-[13.5px]">{f.name}</span>
+                              <span className="text-[12px] text-slate-400">{formatFileSize(f.size)}</span>
+                              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-[11px] font-semibold text-blue-700">
+                                Mới
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setPendingFiles((prev) => prev.filter((_, idx) => idx !== i))}
+                                aria-label={`Bỏ ${f.name}`}
+                                className="grid h-7 w-7 place-items-center rounded-md text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                              >
+                                <X className="h-4 w-4" />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </Field>
+                  </Fieldset>
+                )}
+
+                {/* ============ GIAO DIỆN ============ */}
+                {(type === "FILE" || type === "URL") && (
+                  <Fieldset title="Giao diện" defaultOpen={false}>
+                    <Field
+                      label="Hiển thị"
+                      hint="Cách sinh viên mở tài nguyên. 'Tự động' chọn cách phù hợp theo loại tệp / trang."
+                    >
+                      <select
+                        value={settings.display ?? "AUTO"}
+                        onChange={(e) => updateSetting("display", e.target.value as LessonDisplayMode)}
+                        className={selectClass}
+                      >
+                        {DISPLAY_OPTIONS[type].map((o) => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    </Field>
+                    {type === "FILE" && (
+                      <Field label="Thông tin tệp">
+                        <div className="space-y-2 pt-2">
+                          <Checkbox
+                            checked={settings.showSize !== false}
+                            onChange={(v) => updateSetting("showSize", v)}
+                            label="Hiển thị kích thước"
+                          />
+                          <Checkbox
+                            checked={settings.showType !== false}
+                            onChange={(v) => updateSetting("showType", v)}
+                            label="Hiển thị loại tệp"
+                          />
+                        </div>
+                      </Field>
+                    )}
+                  </Fieldset>
+                )}
+                {type === "FOLDER" && (
+                  <Fieldset title="Giao diện" defaultOpen={false}>
+                    <Field label="Hiển thị nội dung thư mục">
+                      <select
+                        value={settings.folderDisplay ?? "PAGE"}
+                        onChange={(e) => updateSetting("folderDisplay", e.target.value as "PAGE" | "INLINE")}
+                        className={selectClass}
+                      >
+                        <option value="PAGE">Trên một trang riêng</option>
+                        <option value="INLINE">Ngay trên trang khóa học</option>
+                      </select>
+                    </Field>
+                  </Fieldset>
+                )}
+
+                {/* ============ CÀI ĐẶT CHUNG ============ */}
+                <Fieldset title="Cài đặt chung">
+                  <Field label="Khả năng hiển thị">
+                    <select
+                      value={visible ? "show" : "hide"}
+                      onChange={(e) => {
+                        setVisible(e.target.value === "show");
+                        markDirty();
+                      }}
+                      className={selectClass}
+                    >
+                      <option value="show">Hiện với sinh viên</option>
+                      <option value="hide">Ẩn với sinh viên</option>
+                    </select>
+                  </Field>
+                  {!isEdit && course && (
+                    <Field label="Topic">
+                      <select
+                        value={targetModuleId}
+                        onChange={(e) => setModuleId(e.target.value)}
+                        className={selectClass}
+                      >
+                        {course.modules.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.title}
+                          </option>
+                        ))}
+                      </select>
                     </Field>
                   )}
                 </Fieldset>
-              )}
-              {type === "FOLDER" && (
-                <Fieldset title="Giao diện" defaultOpen={false}>
-                  <Field label="Hiển thị nội dung thư mục">
-                    <select
-                      value={settings.folderDisplay ?? "PAGE"}
-                      onChange={(e) => updateSetting("folderDisplay", e.target.value as "PAGE" | "INLINE")}
-                      className={selectClass}
-                    >
-                      <option value="PAGE">Trên một trang riêng</option>
-                      <option value="INLINE">Ngay trên trang khóa học</option>
-                    </select>
-                  </Field>
-                </Fieldset>
-              )}
 
-              {/* ============ CÀI ĐẶT CHUNG ============ */}
-              <Fieldset title="Cài đặt chung">
-                <Field label="Khả năng hiển thị">
-                  <select
-                    value={visible ? "show" : "hide"}
-                    onChange={(e) => {
-                      setVisible(e.target.value === "show");
-                      markDirty();
-                    }}
-                    className={selectClass}
+                {/* ============ NÚT LƯU ============ */}
+                <div className="flex flex-wrap items-center gap-2.5 border-t border-slate-200 bg-slate-50/70 px-6 py-4">
+                  {submitError && (
+                    <p className="mb-1 flex w-full items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] font-medium text-red-700">
+                      <AlertCircle className="h-4 w-4 shrink-0" /> {submitError}
+                    </p>
+                  )}
+                  <button
+                    type="submit"
+                    disabled={!!saving}
+                    className="flex items-center gap-2 rounded-lg bg-[#0f6cbf] px-5 py-2.5 text-[14px] font-semibold text-white shadow-xs hover:bg-[#0c599e] disabled:opacity-60"
                   >
-                    <option value="show">Hiện với sinh viên</option>
-                    <option value="hide">Ẩn với sinh viên</option>
-                  </select>
-                </Field>
-                {!isEdit && course && (
-                  <Field label="Topic">
-                    <select
-                      value={targetModuleId}
-                      onChange={(e) => setModuleId(e.target.value)}
-                      className={selectClass}
-                    >
-                      {course.modules.map((m) => (
-                        <option key={m.id} value={m.id}>
-                          {m.title}
-                        </option>
-                      ))}
-                    </select>
-                  </Field>
-                )}
-              </Fieldset>
-
-              {/* ============ NÚT LƯU ============ */}
-              <div className="flex flex-wrap items-center gap-2.5 border-t border-slate-200 bg-slate-50/70 px-6 py-4">
-                {submitError && (
-                  <p className="mb-1 flex w-full items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] font-medium text-red-700">
-                    <AlertCircle className="h-4 w-4 shrink-0" /> {submitError}
-                  </p>
-                )}
-                <button
-                  type="submit"
-                  disabled={!!saving}
-                  className="flex items-center gap-2 rounded-lg bg-[#0f6cbf] px-5 py-2.5 text-[14px] font-semibold text-white shadow-xs hover:bg-[#0c599e] disabled:opacity-60"
-                >
-                  {saving === "course" && <Loader2 className="h-4 w-4 animate-spin" />}
-                  Lưu và quay lại khóa học
-                </button>
-                <button
-                  type="button"
-                  disabled={!!saving}
-                  onClick={() => handleSave("draft")}
-                  title="Lưu ở trạng thái ẩn với sinh viên rồi quay lại khóa học"
-                  className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-[14px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                >
-                  {saving === "draft" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FilePen className="h-4 w-4" />}
-                  Lưu bản nháp
-                </button>
-                <button
-                  type="button"
-                  disabled={!!saving}
-                  onClick={handleCancel}
-                  className="rounded-lg px-5 py-2.5 text-[14px] font-semibold text-slate-600 hover:bg-slate-200/60 disabled:opacity-60"
-                >
-                  Hủy
-                </button>
-                {saving && pendingFiles.length > 0 && (
-                  <span className="text-[12.5px] text-slate-500">Đang tải {pendingFiles.length} tệp lên…</span>
-                )}
-              </div>
-            </form>
+                    {saving === "course" && <Loader2 className="h-4 w-4 animate-spin" />}
+                    Lưu và quay lại khóa học
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!!saving}
+                    onClick={() => handleSave("draft")}
+                    title="Lưu ở trạng thái ẩn với sinh viên rồi quay lại khóa học"
+                    className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-[14px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                  >
+                    {saving === "draft" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FilePen className="h-4 w-4" />}
+                    Lưu bản nháp
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!!saving}
+                    onClick={handleCancel}
+                    className="rounded-lg px-5 py-2.5 text-[14px] font-semibold text-slate-600 hover:bg-slate-200/60 disabled:opacity-60"
+                  >
+                    Hủy
+                  </button>
+                  {saving && pendingFiles.length > 0 && (
+                    <span className="text-[12.5px] text-slate-500">Đang tải {pendingFiles.length} tệp lên…</span>
+                  )}
+                </div>
+              </form>
+            )}
 
             {/* Cột phải: loại, gợi ý, lưu nhanh */}
             <aside className="space-y-4 xl:sticky xl:top-20">
@@ -885,7 +1214,9 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
                       <typeInfo.icon className="h-6 w-6" />
                     </div>
                     <div>
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Tài nguyên</p>
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                        {typeInfo.category === "activity" ? "Hoạt động" : "Tài nguyên"}
+                      </p>
                       <p className="text-[16px] font-bold text-slate-900">{typeInfo.label}</p>
                     </div>
                   </div>
@@ -911,33 +1242,65 @@ export default function LessonEditor({ courseId, sectionId, type: typeFromQuery,
 
               <section className="space-y-2.5 rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs">
                 <p className="text-[13.5px] font-bold text-slate-800">Lưu thay đổi</p>
-                <p className="text-[12.5px] text-slate-500">
-                  {visible
-                    ? "Lưu và quay lại: sinh viên thấy mục này ngay sau khi lưu."
-                    : "Mục này đang ẩn với sinh viên."}
-                </p>
-                <button
-                  type="button"
-                  disabled={!!saving}
-                  onClick={() => handleSave("course")}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0f6cbf] px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-[#0c599e] disabled:opacity-60"
-                >
-                  {saving === "course" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                  Lưu và quay lại khóa học
-                </button>
-                <button
-                  type="button"
-                  disabled={!!saving}
-                  onClick={() => handleSave("draft")}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-[14px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                >
-                  {saving === "draft" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FilePen className="h-4 w-4" />}
-                  Lưu bản nháp
-                </button>
-                <p className="flex items-start gap-1.5 text-[12px] leading-relaxed text-slate-400">
-                  <EyeOff className="mt-0.5 h-3.5 w-3.5 shrink-0" />
-                  Bản nháp được lưu ở trạng thái ẩn với sinh viên, có thể công bố sau.
-                </p>
+                {isAssignment ? (
+                  <>
+                    <p className="text-[12.5px] text-slate-500">
+                      {isEdit
+                        ? "Cập nhật bài tập trong topic đã chọn."
+                        : "Lưu bài tập vào khóa học. Sinh viên có thể nộp bài khi đến thời gian mở."}
+                    </p>
+                    <button
+                      type="button"
+                      disabled={!!saving}
+                      onClick={() => void handleSaveAssignment("course")}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0f6cbf] px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-[#0c599e] disabled:opacity-60"
+                    >
+                      {saving === "course" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      {isEdit ? "Lưu thay đổi" : "Lưu và xuất bản"}
+                    </button>
+                    {!isEdit && (
+                      <button
+                        type="button"
+                        disabled={!!saving}
+                        onClick={() => void handleSaveAssignment("draft")}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-[14px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                      >
+                        {saving === "draft" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FilePen className="h-4 w-4" />}
+                        Lưu bản nháp
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p className="text-[12.5px] text-slate-500">
+                      {visible
+                        ? "Lưu và quay lại: sinh viên thấy mục này ngay sau khi lưu."
+                        : "Mục này đang ẩn với sinh viên."}
+                    </p>
+                    <button
+                      type="button"
+                      disabled={!!saving}
+                      onClick={() => handleSave("course")}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0f6cbf] px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-[#0c599e] disabled:opacity-60"
+                    >
+                      {saving === "course" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                      Lưu và quay lại khóa học
+                    </button>
+                    <button
+                      type="button"
+                      disabled={!!saving}
+                      onClick={() => handleSave("draft")}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-[14px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                    >
+                      {saving === "draft" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FilePen className="h-4 w-4" />}
+                      Lưu bản nháp
+                    </button>
+                    <p className="flex items-start gap-1.5 text-[12px] leading-relaxed text-slate-400">
+                      <EyeOff className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                      Bản nháp được lưu ở trạng thái ẩn với sinh viên, có thể công bố sau.
+                    </p>
+                  </>
+                )}
                 {submitError && (
                   <p className="flex items-start gap-1.5 rounded-lg bg-red-50 px-3 py-2 text-[12.5px] font-medium text-red-700">
                     <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" /> {submitError}

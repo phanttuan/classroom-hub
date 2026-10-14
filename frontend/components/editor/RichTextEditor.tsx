@@ -34,6 +34,7 @@ import {
   Minus,
   Outdent,
   Palette,
+  Paperclip,
   Quote,
   Redo2,
   RemoveFormatting,
@@ -47,6 +48,14 @@ import {
   Unlink,
   MonitorPlay as YoutubeIcon,
 } from "lucide-react";
+import { formatFileSize } from "@/lib/lesson-types";
+
+export interface AttachmentUploadResult {
+  url: string;
+  fileName: string;
+  fileSizeBytes?: number;
+  mimeType?: string;
+}
 
 interface RichTextEditorProps {
   value: string;
@@ -54,6 +63,8 @@ interface RichTextEditorProps {
   placeholder?: string;
   /** Upload ảnh (dán / kéo thả / chọn tệp) → trả về URL. Không truyền thì chỉ chèn ảnh bằng URL */
   onUploadImage?: (file: File) => Promise<string>;
+  /** Upload tệp đính kèm (PDF, Word, Excel, PPT, ZIP...) → trả về { url, fileName, fileSizeBytes } */
+  onUploadAttachment?: (file: File) => Promise<AttachmentUploadResult>;
   minHeight?: number;
   /** Bản rút gọn cho ô mô tả (ẩn bảng, video, ảnh…) */
   compact?: boolean;
@@ -351,19 +362,44 @@ export default function RichTextEditor({
   onChange,
   placeholder = "Nhập nội dung...",
   onUploadImage,
+  onUploadAttachment,
   minHeight = 320,
   compact = false,
 }: RichTextEditorProps) {
   const [fullscreen, setFullscreen] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [uploadError, setUploadError] = useState("");
   const [popover, setPopover] = useState<null | "color" | "highlight" | "link" | "image" | "youtube" | "table">(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const attachmentInputRef = useRef<HTMLInputElement>(null);
   const uploadRef = useRef(onUploadImage);
+  const uploadAttachmentRef = useRef(onUploadAttachment);
   const editorRef = useRef<Editor | null>(null);
   useEffect(() => {
     uploadRef.current = onUploadImage;
   }, [onUploadImage]);
+  useEffect(() => {
+    uploadAttachmentRef.current = onUploadAttachment;
+  }, [onUploadAttachment]);
+
+  const handleAttachmentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !uploadAttachmentRef.current || !editorRef.current) return;
+    e.target.value = "";
+    setUploadingAttachment(true);
+    setUploadError("");
+    try {
+      const res = await uploadAttachmentRef.current(file);
+      const sizeStr = res.fileSizeBytes ? ` (${formatFileSize(res.fileSizeBytes)})` : "";
+      const linkHtml = `<p><a href="${res.url}" target="_blank" rel="noopener noreferrer" download="${res.fileName}" class="attachment-link">📎 ${res.fileName}${sizeStr}</a></p>`;
+      editorRef.current.chain().focus().insertContent(linkHtml).run();
+    } catch (err) {
+      setUploadError((err as Error)?.message || "Tải tệp đính kèm thất bại");
+    } finally {
+      setUploadingAttachment(false);
+    }
+  };
 
   const insertImageFiles = async (editor: Editor, files: File[], pos?: number) => {
     const upload = uploadRef.current;
@@ -655,6 +691,29 @@ export default function RichTextEditor({
 
         {!compact && (
           <>
+            {onUploadAttachment && (
+              <>
+                <input
+                  ref={attachmentInputRef}
+                  type="file"
+                  hidden
+                  onChange={handleAttachmentUpload}
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.rar,.7z,.txt,.csv"
+                />
+                <ToolbarButton
+                  title="Đính kèm tệp (PDF, Word, Excel, PPT, ZIP...)"
+                  disabled={uploadingAttachment}
+                  onClick={() => attachmentInputRef.current?.click()}
+                >
+                  {uploadingAttachment ? (
+                    <Loader2 className="h-4 w-4 animate-spin text-[#0f6cbf]" />
+                  ) : (
+                    <Paperclip className="h-4 w-4" />
+                  )}
+                </ToolbarButton>
+              </>
+            )}
+
             <Popover
               open={popover === "image"}
               onOpenChange={(o) => setPopover(o ? "image" : null)}

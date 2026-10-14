@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -22,9 +22,11 @@ import {
   RotateCcw,
   FileText,
   Download,
+  ClipboardList,
 } from "lucide-react";
 import type { LessonDto, ModuleDto, ResourceDto } from "@/lib/types/learning-content";
 import type { CourseMembersResponse } from "@/lib/types/course";
+import type { AssignmentDto } from "@/lib/types/assignment";
 import {
   createModule,
   updateModule,
@@ -37,6 +39,11 @@ import {
 } from "@/lib/api/learning-content-api";
 import { triggerResourceDownload } from "@/lib/api/resource-api";
 import { updateCourseStatus, fetchCourseMembers } from "@/lib/api/course-api";
+import {
+  fetchCourseAssignments,
+  publishAssignment,
+  closeAssignment,
+} from "@/lib/api/assignment-api";
 import DocumentPreview from "@/components/resource/DocumentPreview";
 import RichContent from "@/components/content/RichContent";
 import KebabMenu from "@/components/ui/KebabMenu";
@@ -92,7 +99,9 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
   useEffect(() => {
     if (activeTab !== "members" || members || membersError) return;
     let active = true;
-    setMembersLoading(true);
+    void Promise.resolve().then(() => {
+      if (active) setMembersLoading(true);
+    });
     fetchCourseMembers(courseId)
       .then((data) => active && setMembers(data))
       .catch((err) => active && setMembersError((err as Error)?.message || "Không tải được danh sách thành viên"))
@@ -101,6 +110,29 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
       active = false;
     };
   }, [activeTab, courseId, members, membersError]);
+
+  // Danh sách bài tập trong khóa học
+  const [assignments, setAssignments] = useState<AssignmentDto[]>([]);
+  const refreshAssignments = useCallback(async () => {
+    try {
+      const data = await fetchCourseAssignments(courseId);
+      setAssignments(data);
+    } catch {
+      // Bỏ qua lỗi tải bài tập phụ
+    }
+  }, [courseId]);
+
+  useEffect(() => {
+    let active = true;
+    fetchCourseAssignments(courseId)
+      .then((data) => {
+        if (active) setAssignments(data);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [courseId]);
 
   // Toast
   const [toastMessage, setToastMessage] = useState("");
@@ -531,6 +563,109 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
     );
   };
 
+  /** Một dòng bài tập trong topic */
+  const renderAssignment = (assignment: AssignmentDto) => {
+    const hidden = assignment.status === "DRAFT";
+    const editHref = `/teacher/content/courses/${courseId}/lessons/new?section=${assignment.moduleId}&type=ASSIGNMENT&assignmentId=${assignment.id}`;
+    const formatDue = (iso: string) => {
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return iso;
+      const pad = (n: number) => String(n).padStart(2, "0");
+      return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    };
+
+    return (
+      <div
+        key={`assignment-${assignment.id}`}
+        className={`group flex items-start gap-3 rounded-lg px-4 py-3.5 transition hover:bg-slate-50/80 ${hidden ? "bg-slate-50/60" : ""}`}
+      >
+        <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-pink-50 text-pink-600 ${hidden ? "opacity-60" : ""}`}>
+          <ClipboardList className="h-5 w-5" />
+        </div>
+        <div className={`min-w-0 flex-1 ${hidden ? "opacity-70" : ""}`}>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-pink-600">Bài tập</p>
+          <span className="text-[15px] font-semibold leading-snug text-slate-900">
+            {assignment.title}
+          </span>
+          <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[12px] text-slate-500">
+            <span>Hạn nộp: {formatDue(assignment.dueAt)}</span>
+            <span>·</span>
+            <span>Điểm tối đa: {assignment.maxScore}</span>
+            {assignment.status === "CLOSED" && (
+              <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
+                Đã đóng
+              </span>
+            )}
+          </div>
+          {assignment.description && (
+            <RichContent
+              html={assignment.description}
+              className="mt-1.5 !text-[13px] text-slate-600 line-clamp-3"
+            />
+          )}
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1.5">
+          {role === "TEACHER" && (
+            <>
+              {hidden && (
+                <span className="inline-flex select-none items-center gap-1.5 rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-[11.5px] font-semibold text-slate-600">
+                  <EyeOff className="h-3.5 w-3.5" /> Bản nháp
+                </span>
+              )}
+
+              {editMode && (
+                <KebabMenu
+                  items={[
+                    {
+                      label: "Chỉnh sửa bài tập",
+                      icon: Pencil,
+                      onClick: () => router.push(editHref),
+                    },
+                    ...(assignment.status === "DRAFT"
+                      ? [
+                          {
+                            label: "Xuất bản bài tập",
+                            icon: Eye,
+                            onClick: async () => {
+                              try {
+                                await publishAssignment(courseId, assignment.id);
+                                showToast("Đã xuất bản bài tập");
+                                void refreshAssignments();
+                              } catch (e) {
+                                showToast((e as Error)?.message || "Không thể xuất bản");
+                              }
+                            },
+                          },
+                        ]
+                      : []),
+                    ...(assignment.status === "PUBLISHED"
+                      ? [
+                          {
+                            label: "Đóng bài tập",
+                            icon: EyeOff,
+                            onClick: async () => {
+                              try {
+                                await closeAssignment(courseId, assignment.id);
+                                showToast("Đã đóng bài tập");
+                                void refreshAssignments();
+                              } catch (e) {
+                                showToast((e as Error)?.message || "Không thể đóng bài tập");
+                              }
+                            },
+                          },
+                        ]
+                      : []),
+                  ]}
+                />
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <CourseShell
       course={course}
@@ -779,11 +914,18 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
 
                     {expanded && (
                       <div className="divide-y divide-slate-100 px-2 py-1">
-                        {m.lessons && m.lessons.length > 0 ? (
-                          m.lessons.map((lesson, lIdx) => renderLesson(m, lesson, lIdx))
-                        ) : (
-                          <div className="py-6 text-center text-xs text-slate-400">Chưa có nội dung trong topic này.</div>
-                        )}
+                        {m.lessons && m.lessons.length > 0
+                          ? m.lessons.map((lesson, lIdx) => renderLesson(m, lesson, lIdx))
+                          : null}
+                        {assignments
+                          .filter((a) => a.moduleId === m.id)
+                          .map((assignment) => renderAssignment(assignment))}
+                        {(!m.lessons || m.lessons.length === 0) &&
+                          assignments.filter((a) => a.moduleId === m.id).length === 0 && (
+                            <div className="py-6 text-center text-xs text-slate-400">
+                              Chưa có nội dung trong topic này.
+                            </div>
+                          )}
                       </div>
                     )}
                   </section>

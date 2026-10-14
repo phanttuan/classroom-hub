@@ -17,7 +17,7 @@ const OPTIONS: sanitizeHtml.IOptions = {
   allowedAttributes: {
     '*': ['style', 'data-type', 'data-checked'],
     div: ['data-youtube-video'],
-    a: ['href', 'target', 'rel', 'title'],
+    a: ['href', 'target', 'rel', 'title', 'download', 'class'],
     img: ['src', 'alt', 'title', 'width', 'height'],
     iframe: ['src', 'width', 'height', 'allowfullscreen', 'frameborder', 'allow'],
     input: ['type', 'checked', 'disabled'],
