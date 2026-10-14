@@ -33,8 +33,16 @@ describe('sanitizeRichHtml', () => {
     );
   });
 
-  it('bỏ thuộc tính class để nội dung không mượn được CSS của giao diện', () => {
+  it('bỏ thuộc tính class để nội dung không mượn được CSS của giao diện (trừ thẻ a đính kèm)', () => {
     expect(sanitizeRichHtml('<div class="fixed inset-0">x</div>')).toBe('<div>x</div>');
+  });
+
+  it('giữ nguyên thẻ a đính kèm tệp kèm href, download và class="attachment-link"', () => {
+    const input = '<p><a href="/api/v1/courses/1/content-attachments/download?key=abc" download="tailieu.pdf" class="attachment-link">📎 tailieu.pdf</a></p>';
+    const html = sanitizeRichHtml(input);
+    expect(html).toContain('href="/api/v1/courses/1/content-attachments/download?key=abc"');
+    expect(html).toContain('download="tailieu.pdf"');
+    expect(html).toContain('class="attachment-link"');
   });
 });
 

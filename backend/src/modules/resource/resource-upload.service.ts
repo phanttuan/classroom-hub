@@ -15,11 +15,12 @@ import { PrismaService } from '../../database/prisma.service.js';
 import { CloudinaryService } from './cloudinary.service.js';
 import {
   CourseStatus,
+  EnrollmentStatus,
   LessonType,
   ResourceParent,
   UserRole,
 } from '../../generated/prisma/enums.js';
-import type { UserContext } from './resource.service.js';
+import type { ResourceUrlResponse, UserContext } from './resource.service.js';
 
 /** Đuôi tệp bị chặn (thực thi được / chạy script khi mở trên trình duyệt) */
 const BLOCKED_EXTENSIONS = new Set([
@@ -373,5 +374,152 @@ export class ResourceUploadService {
       deliveryType: 'upload',
     });
     return { url: result.secureUrl };
+  }
+
+  /** Tệp đính kèm trong trình soạn thảo (PDF, Word, Excel, ZIP...) — lưu riêng tư authenticated */
+  async uploadContentAttachment(
+    user: UserContext,
+    courseId: bigint,
+    file: Express.Multer.File,
+  ) {
+    if (!file) throw new BadRequestException('Chưa chọn tệp');
+    try {
+      const course = await this.prisma.course.findUnique({
+        where: { id: courseId },
+        select: { ownerId: true, status: true },
+      });
+      if (!course) throw new NotFoundException('Khóa học không tồn tại');
+      this.assertCanManageCourse(user, course);
+
+      const fileName = decodeOriginalName(file.originalname);
+      this.validateFile(file, fileName);
+
+      const resourceType = CloudinaryService.resolveResourceType(file.mimetype);
+      const publicId = this.buildPublicId(
+        `classroom-hub/content-attachments/${courseId}`,
+        fileName,
+        resourceType === 'raw',
+      );
+
+      const result = await this.cloudinary.uploadFile(file.path, {
+        publicId,
+        resourceType,
+        deliveryType: 'authenticated', // Lưu riêng tư, chỉ tải qua signed URL có hạn
+      });
+
+      const downloadPath = `/api/v1/courses/${courseId}/content-attachments/download?key=${encodeURIComponent(result.storageKey)}&fileName=${encodeURIComponent(fileName)}`;
+
+      return {
+        storageKey: result.storageKey,
+        url: downloadPath,
+        fileName,
+        fileSizeBytes: result.bytes || file.size,
+        mimeType: file.mimetype,
+      };
+    } finally {
+      if (file.path) {
+        await rm(file.path, { force: true }).catch(() => {});
+      }
+    }
+  }
+
+  /**
+   * Sinh signed URL tải tệp đính kèm nội dung (thời hạn 10 phút) sau khi kiểm tra quyền.
+   * Quyền truy cập: Admin, Giáo viên phụ trách khóa học, hoặc Sinh viên có Enrollment ACTIVE.
+   */
+  async generateContentAttachmentUrl(
+    user: UserContext,
+    courseId: bigint,
+    storageKey: string,
+    fileName?: string,
+    isDownload: boolean = true,
+  ): Promise<ResourceUrlResponse> {
+    if (!storageKey || typeof storageKey !== 'string') {
+      throw new BadRequestException('Mã lưu trữ tệp (storageKey) không hợp lệ');
+    }
+
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+      select: { id: true, ownerId: true, status: true },
+    });
+    if (!course) {
+      throw new NotFoundException('Khóa học không tồn tại');
+    }
+
+    // Kiểm tra quyền truy cập theo vai trò (CH-67)
+    if (user.role === UserRole.ADMIN) {
+      // Admin: toàn quyền
+    } else if (user.role === UserRole.TEACHER) {
+      if (course.ownerId !== user.id) {
+        throw new ForbiddenException(
+          'Bạn không phải giáo viên phụ trách khóa học này',
+        );
+      }
+    } else if (user.role === UserRole.STUDENT) {
+      const enrollment = await this.prisma.enrollment.findUnique({
+        where: {
+          uk_enrollments_course_student: {
+            courseId: course.id,
+            studentId: user.id,
+          },
+        },
+        select: { status: true },
+      });
+      if (!enrollment || enrollment.status !== EnrollmentStatus.ACTIVE) {
+        throw new ForbiddenException(
+          'Bạn không có quyền truy cập tài liệu của khóa học này',
+        );
+      }
+    } else {
+      throw new ForbiddenException('Bạn không có quyền truy cập vào tài nguyên này');
+    }
+
+    // Kiểm tra an toàn: publicId phải thuộc thư mục khóa học này
+    const { resourceType, publicId } = this.cloudinary.parseStorageKey(storageKey);
+    const expectedPrefix = `classroom-hub/content-attachments/${courseId}/`;
+    if (!publicId.startsWith(expectedPrefix)) {
+      throw new ForbiddenException('Tài liệu không thuộc khóa học này');
+    }
+
+    const cleanFileName = fileName ? decodeOriginalName(fileName) : publicId.split('/').pop() || 'download';
+    const ext = extname(cleanFileName).replace('.', '').toLowerCase();
+    const mimeTypeMap: Record<string, string> = {
+      pdf: 'application/pdf',
+      doc: 'application/msword',
+      docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      xls: 'application/vnd.ms-excel',
+      xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      ppt: 'application/vnd.ms-powerpoint',
+      pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+      zip: 'application/zip',
+      rar: 'application/x-rar-compressed',
+      '7z': 'application/x-7z-compressed',
+      tar: 'application/x-tar',
+      gz: 'application/gzip',
+      txt: 'text/plain',
+      csv: 'text/csv',
+      mp3: 'audio/mpeg',
+      mp4: 'video/mp4',
+      png: 'image/png',
+      jpg: 'image/jpeg',
+      jpeg: 'image/jpeg',
+      gif: 'image/gif',
+      webp: 'image/webp',
+    };
+    const mimeType = mimeTypeMap[ext] || 'application/octet-stream';
+
+    // Ký URL Cloudinary authenticated có thời hạn đúng 10 phút (600 giây) theo thiết kế CH-67
+    const signed = this.cloudinary.generateSignedUrl(storageKey, {
+      isDownload,
+      expiresInSeconds: 600,
+      format: resourceType === 'raw' ? '' : ext,
+    });
+
+    return {
+      url: signed.url,
+      expiresIn: signed.expiresIn,
+      mimeType,
+      fileName: cleanFileName,
+    };
   }
 }

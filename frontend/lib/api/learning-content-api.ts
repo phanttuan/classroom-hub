@@ -167,3 +167,24 @@ export async function uploadContentImage(courseId: string, file: File): Promise<
   });
   return unwrap(res).url;
 }
+
+export interface ContentAttachmentResult {
+  url: string;
+  fileName: string;
+  fileSizeBytes: number;
+  mimeType: string;
+}
+
+/** Tải tệp đính kèm chèn trong trình soạn thảo (PDF, Word, Excel, ZIP...) */
+export async function uploadContentAttachment(
+  courseId: string,
+  file: File,
+): Promise<ContentAttachmentResult> {
+  const form = new FormData();
+  form.append('file', file);
+  const res = await apiFetch<ApiEnvelope<ContentAttachmentResult>>(`/courses/${courseId}/content-attachments`, {
+    method: 'POST',
+    body: form,
+  });
+  return unwrap(res);
+}
