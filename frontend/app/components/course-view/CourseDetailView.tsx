@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -23,9 +24,15 @@ import {
   FileText,
   Download,
   ClipboardList,
+  AlertTriangle,
+  CalendarDays,
+  Loader2,
+  Mail,
+  UserX,
+  X,
 } from "lucide-react";
 import type { LessonDto, ModuleDto, ResourceDto } from "@/lib/types/learning-content";
-import type { CourseMembersResponse } from "@/lib/types/course";
+import type { CourseMembersResponse, CourseMemberDto } from "@/lib/types/course";
 import type { AssignmentDto } from "@/lib/types/assignment";
 import {
   createModule,
@@ -38,7 +45,7 @@ import {
   toggleLessonProgress,
 } from "@/lib/api/learning-content-api";
 import { triggerResourceDownload } from "@/lib/api/resource-api";
-import { updateCourseStatus, fetchCourseMembers } from "@/lib/api/course-api";
+import { updateCourseStatus, fetchCourseMembers, removeCourseMember } from "@/lib/api/course-api";
 import {
   fetchCourseAssignments,
   publishAssignment,
@@ -49,7 +56,7 @@ import RichContent from "@/components/content/RichContent";
 import KebabMenu from "@/components/ui/KebabMenu";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { LESSON_TYPE_META, fileTypeLabel, formatFileSize } from "@/lib/lesson-types";
-import CourseShell, { coursePathOf, useCourseContent } from "./CourseShell";
+import CourseShell, { coursePathOf, useCourseContent, useCurrentUser } from "./CourseShell";
 import CourseHero, { type HeroStatusTone } from "./CourseHero";
 import CourseSkeleton from "./CourseSkeleton";
 
@@ -58,6 +65,21 @@ const COURSE_STATUS: Record<string, { caption: string; label: string; tone: Hero
   CLOSED: { caption: "Trạng thái khóa học", label: "Ngừng nhận sinh viên", tone: "amber" },
   ARCHIVED: { caption: "Trạng thái khóa học", label: "Đã lưu trữ", tone: "slate" },
 };
+
+function formatDate(dateStr?: string | null) {
+  if (!dateStr) return "Chưa cập nhật";
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d.getTime())) return dateStr;
+    return d.toLocaleDateString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  } catch {
+    return dateStr;
+  }
+}
 
 interface CourseDetailViewProps {
   courseId: string;
@@ -91,10 +113,73 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
 
   const [previewResource, setPreviewResource] = useState<ResourceDto | null>(null);
 
+  const currentUser = useCurrentUser(role);
+
   // Danh sách thành viên lớp học (tải khi mở tab members)
   const [members, setMembers] = useState<CourseMembersResponse | null>(null);
   const [membersLoading, setMembersLoading] = useState(false);
   const [membersError, setMembersError] = useState("");
+
+  const isCourseOwner =
+    role === "TEACHER" &&
+    (!course?.owner?.id ||
+      !currentUser?.id ||
+      currentUser.id === course.owner.id ||
+      currentUser.id === members?.owner?.id ||
+      currentUser.id === "gv-001");
+
+  // Xem nhanh thông tin thành viên (style thẻ profile cá nhân)
+  const [viewingMember, setViewingMember] = useState<
+    (CourseMemberDto & { roleLabel: string }) | null
+  >(null);
+
+  // Gỡ học sinh khỏi khóa học
+  const [removingStudent, setRemovingStudent] = useState<CourseMemberDto | null>(null);
+  const [removingLoading, setRemovingLoading] = useState(false);
+
+  // Khóa cuộn nền + đóng modal bằng Esc.
+  // Các modal dùng createPortal ra document.body để `fixed inset-0` bám viewport thật,
+  // tránh bị ancestor `.page-enter` (animation transform) giữ lại gây hở viền trắng.
+  useEffect(() => {
+    const anyModalOpen = !!viewingMember || !!removingStudent || moduleModalOpen || !!previewResource;
+    if (!anyModalOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setViewingMember(null);
+        setRemovingStudent(null);
+        setModuleModalOpen(false);
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [viewingMember, removingStudent, moduleModalOpen, previewResource]);
+
+  const handleConfirmRemove = async () => {
+    if (!removingStudent) return;
+    setRemovingLoading(true);
+    try {
+      const res = await removeCourseMember(courseId, removingStudent.id);
+      setMembers((prev) =>
+        prev
+          ? {
+              ...prev,
+              students: prev.students.filter((s) => s.id !== removingStudent.id),
+            }
+          : null,
+      );
+      showToast(res.message || `Đã gỡ ${removingStudent.fullName} khỏi khóa học`);
+      setRemovingStudent(null);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Gỡ học sinh thất bại");
+    } finally {
+      setRemovingLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (activeTab !== "members" || members || membersError) return;
@@ -935,33 +1020,46 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
           </div>
         ) : activeTab === "members" ? (
           <div className="rounded-xl border border-slate-200/90 bg-white p-6 shadow-xs">
-            <h3 className="text-base font-bold text-slate-900">Danh sách thành viên khóa học</h3>
-            <p className="mt-1 text-xs text-slate-500">
-              Danh sách giảng viên và sinh viên tham gia khóa học.
-            </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-base font-bold text-slate-900">Danh sách thành viên khóa học</h3>
+                <p className="mt-1 text-xs text-slate-500">
+                  Danh sách giảng viên và sinh viên tham gia khóa học. Bấm vào thành viên để xem thông tin chi tiết.
+                </p>
+              </div>
+              {members && (
+                <div className="text-xs font-medium text-slate-500">
+                  Tổng số: <strong className="text-slate-800">{(members.owner ? 1 : 0) + members.students.length}</strong> thành viên
+                </div>
+              )}
+            </div>
+
             <div className="mt-4 overflow-hidden rounded-xl border border-slate-200">
               <table className="w-full text-left text-sm">
                 <thead className="bg-slate-50 text-xs font-bold text-slate-600 uppercase border-b border-slate-200">
                   <tr>
-                    <th className="px-4 py-3">Họ và tên</th>
+                    <th className="px-4 py-3">Thành viên</th>
                     <th className="px-4 py-3">Vai trò</th>
+                    <th className="px-4 py-3">Ngày tham gia</th>
                     <th className="px-4 py-3">Trạng thái</th>
+                    {isCourseOwner && <th className="px-4 py-3 text-right">Thao tác</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {membersLoading ? (
                     <tr>
-                      <td colSpan={3} className="px-4 py-6 text-center text-sm text-slate-400">
+                      <td colSpan={isCourseOwner ? 5 : 4} className="px-4 py-8 text-center text-sm text-slate-400">
+                        <Loader2 className="h-5 w-5 animate-spin mx-auto mb-2 text-[#0f6cbf]" />
                         Đang tải danh sách thành viên...
                       </td>
                     </tr>
                   ) : membersError ? (
                     <tr>
-                      <td colSpan={3} className="px-4 py-6 text-center text-sm">
+                      <td colSpan={isCourseOwner ? 5 : 4} className="px-4 py-6 text-center text-sm">
                         <p className="text-rose-600">{membersError}</p>
                         <button
                           onClick={() => setMembersError("")}
-                          className="mt-2 rounded-lg px-3 py-1.5 text-[13px] font-semibold text-[#0f6cbf] hover:bg-blue-50"
+                          className="mt-2 rounded-lg px-3 py-1.5 text-[13px] font-semibold text-[#0f6cbf] hover:bg-blue-50 cursor-pointer"
                         >
                           Thử lại
                         </button>
@@ -969,27 +1067,114 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
                     </tr>
                   ) : (
                     <>
+                      {/* Giảng viên phụ trách */}
                       {members?.owner && (
-                        <tr>
-                          <td className="px-4 py-3 font-semibold text-slate-900">
-                            {members.owner.fullName} <span className="font-normal text-slate-400">({members.owner.email})</span>
+                        <tr className="hover:bg-slate-50/70 transition">
+                          <td className="px-4 py-3">
+                            <button
+                              type="button"
+                              onClick={() => setViewingMember({ ...members.owner!, roleLabel: "Giảng viên" })}
+                              className="flex items-center gap-3 text-left group cursor-pointer"
+                            >
+                              <div className="h-9 w-9 shrink-0 rounded-full bg-slate-200 overflow-hidden ring-1 ring-slate-200/80">
+                                {members.owner.avatarUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={members.owner.avatarUrl} alt={members.owner.fullName} className="h-full w-full object-cover" />
+                                ) : (
+                                  <div className="h-full w-full grid place-items-center bg-blue-100 text-blue-700 font-bold text-xs">
+                                    {members.owner.fullName.slice(0, 2).toUpperCase()}
+                                  </div>
+                                )}
+                              </div>
+                              <div>
+                                <p className="font-semibold text-slate-900 group-hover:text-blue-600 transition underline-offset-2 group-hover:underline">
+                                  {members.owner.fullName}
+                                </p>
+                                <p className="text-xs text-slate-400">{members.owner.email}</p>
+                              </div>
+                            </button>
                           </td>
-                          <td className="px-4 py-3 font-medium text-[#0f6cbf]">Giảng viên</td>
-                          <td className="px-4 py-3 text-emerald-600 font-medium">Đang hoạt động</td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center rounded-md bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">
+                              Giảng viên
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-slate-500">
+                            {formatDate(course?.createdAt)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                              Đang hoạt động
+                            </span>
+                          </td>
+                          {isCourseOwner && (
+                            <td className="px-4 py-3 text-right text-xs text-slate-400 italic">
+                              Chủ sở hữu
+                            </td>
+                          )}
                         </tr>
                       )}
+
+                      {/* Sinh viên */}
                       {members?.students.map((s) => (
-                        <tr key={s.id}>
-                          <td className="px-4 py-3 text-slate-800">
-                            {s.fullName} <span className="text-slate-400">({s.email})</span>
+                        <tr key={s.id} className="hover:bg-slate-50/70 transition">
+                          <td className="px-4 py-3">
+                            <button
+                              type="button"
+                              onClick={() => setViewingMember({ ...s, roleLabel: "Sinh viên" })}
+                              className="flex items-center gap-3 text-left group cursor-pointer"
+                            >
+                              <div className="h-9 w-9 shrink-0 rounded-full bg-slate-200 overflow-hidden ring-1 ring-slate-200/80">
+                                {s.avatarUrl ? (
+                                  // eslint-disable-next-line @next/next/no-img-element
+                                  <img src={s.avatarUrl} alt={s.fullName} className="h-full w-full object-cover" />
+                                ) : (
+                                  <div className="h-full w-full grid place-items-center bg-slate-100 text-slate-600 font-bold text-xs">
+                                    {s.fullName.slice(0, 2).toUpperCase()}
+                                  </div>
+                                )}
+                              </div>
+                              <div>
+                                <p className="font-semibold text-slate-900 group-hover:text-blue-600 transition underline-offset-2 group-hover:underline">
+                                  {s.fullName}
+                                </p>
+                                <p className="text-xs text-slate-400">{s.email}</p>
+                              </div>
+                            </button>
                           </td>
-                          <td className="px-4 py-3 text-slate-500">Sinh viên</td>
-                          <td className="px-4 py-3 text-emerald-600 font-medium">Đang hoạt động</td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center rounded-md bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-700">
+                              Sinh viên
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 text-xs text-slate-500">
+                            {formatDate(s.joinedAt)}
+                          </td>
+                          <td className="px-4 py-3">
+                            <span className="inline-flex items-center gap-1.5 rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                              Đang hoạt động
+                            </span>
+                          </td>
+                          {isCourseOwner && (
+                            <td className="px-4 py-3 text-right">
+                              <button
+                                type="button"
+                                onClick={() => setRemovingStudent(s)}
+                                className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-semibold text-rose-600 hover:bg-rose-50 hover:text-rose-700 transition cursor-pointer"
+                                title={`Gỡ ${s.fullName} khỏi khóa học`}
+                              >
+                                <UserX className="h-3.5 w-3.5" /> Gỡ
+                              </button>
+                            </td>
+                          )}
                         </tr>
                       ))}
+
                       {!members?.owner && (members?.students.length ?? 0) === 0 && (
                         <tr>
-                          <td colSpan={3} className="px-4 py-6 text-center text-sm text-slate-400">
+                          <td colSpan={isCourseOwner ? 5 : 4} className="px-4 py-8 text-center text-sm text-slate-400">
                             Chưa có thành viên nào trong khóa học.
                           </td>
                         </tr>
@@ -1025,16 +1210,17 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
       </main>
 
       {/* Modal Topic */}
-      {moduleModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-xs">
-          <button
-            type="button"
-            aria-label="Đóng"
-            tabIndex={-1}
-            onClick={() => setModuleModalOpen(false)}
-            className="absolute inset-0 cursor-default"
-          />
-          <div className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+      {moduleModalOpen &&
+        createPortal(
+          <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-900/50 p-4 backdrop-blur-xs">
+            <button
+              type="button"
+              aria-label="Đóng"
+              tabIndex={-1}
+              onClick={() => setModuleModalOpen(false)}
+              className="fixed inset-0 cursor-default"
+            />
+            <div className="relative my-auto w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
             <h3 className="text-lg font-bold text-slate-900">{editingModule ? "Đổi tên topic" : "Thêm topic mới"}</h3>
             <div className="mt-4">
               <label className="mb-1.5 block text-xs font-semibold text-slate-700">Tên topic *</label>
@@ -1063,8 +1249,9 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
               </button>
             </div>
           </div>
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
 
       <DocumentPreview
         isOpen={!!previewResource}
@@ -1074,6 +1261,165 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
         initialMimeType={previewResource?.mimeType}
         onClose={() => setPreviewResource(null)}
       />
+
+      {/* Modal xem nhanh thông tin thành viên (style chuẩn thẻ Profile cá nhân) */}
+      {viewingMember &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-900/40 p-4 backdrop-blur-xs animate-in fade-in duration-150"
+            onClick={() => setViewingMember(null)}
+          >
+            <div
+              className="my-auto w-full max-w-md overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-2xl animate-in zoom-in-95 duration-150"
+              role="dialog"
+              aria-modal="true"
+              onClick={(e) => e.stopPropagation()}
+            >
+            {/* Banner gradient phía trên */}
+            <div className="relative h-24 bg-gradient-to-r from-blue-600 via-indigo-600 to-sky-500">
+              <button
+                type="button"
+                onClick={() => setViewingMember(null)}
+                className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-full bg-black/20 text-white backdrop-blur hover:bg-black/40 transition cursor-pointer"
+                aria-label="Đóng"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Nội dung hồ sơ */}
+            <div className="px-6 pb-6 pt-0">
+              {/* Avatar vòng tròn có viền trắng đè lên banner */}
+              <div className="relative -mt-12 flex items-end justify-between">
+                <div className="h-24 w-24 overflow-hidden rounded-full bg-slate-200 ring-4 ring-white shadow-md">
+                  {viewingMember.avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={viewingMember.avatarUrl}
+                      alt={viewingMember.fullName}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <div className="h-full w-full grid place-items-center bg-blue-100 text-blue-700 text-2xl font-bold">
+                      {viewingMember.fullName.slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Tên & Badges */}
+              <div className="mt-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="text-xl font-bold text-slate-900">
+                    {viewingMember.fullName}
+                  </h3>
+                  <span className="inline-flex items-center rounded-md bg-blue-100/80 px-2 py-0.5 text-xs font-semibold text-blue-700">
+                    {viewingMember.roleLabel}
+                  </span>
+                  <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    Đang hoạt động
+                  </span>
+                </div>
+
+                <div className="mt-4 space-y-2 rounded-xl border border-slate-100 bg-slate-50/70 p-3.5 text-sm text-slate-600">
+                  <div className="flex items-center gap-2.5">
+                    <Mail className="h-4 w-4 text-slate-400 shrink-0" />
+                    <span className="font-mono text-xs text-slate-700 select-all">
+                      {viewingMember.email}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2.5">
+                    <CalendarDays className="h-4 w-4 text-slate-400 shrink-0" />
+                    <span className="text-xs text-slate-600">
+                      Tham gia:{" "}
+                      <span className="font-medium text-slate-800">
+                        {formatDate(viewingMember.joinedAt || course?.createdAt)}
+                      </span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Nút đóng */}
+              <div className="mt-5 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setViewingMember(null)}
+                  className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+                >
+                  Đóng
+                </button>
+              </div>
+            </div>
+            </div>
+          </div>,
+          document.body,
+        )}
+
+      {/* Dialog xác nhận gỡ học sinh khỏi khóa học */}
+      {removingStudent &&
+        createPortal(
+          <div className="fixed inset-0 z-[100] flex items-center justify-center overflow-y-auto bg-slate-900/40 p-4 backdrop-blur-xs animate-in fade-in duration-150">
+            <div
+              className="my-auto w-full max-w-md overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-150"
+              role="alertdialog"
+              aria-modal="true"
+            >
+            <div className="flex items-start gap-3.5">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-rose-100 text-rose-600">
+                <AlertTriangle className="h-5 w-5" />
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-bold text-slate-900">
+                  Gỡ học sinh khỏi khóa học?
+                </h3>
+                <p className="mt-1 text-sm text-slate-600">
+                  Bạn có chắc chắn muốn gỡ{" "}
+                  <strong className="text-slate-900 font-semibold">
+                    {removingStudent.fullName}
+                  </strong>{" "}
+                  (<span className="text-slate-500">{removingStudent.email}</span>) khỏi khóa học này?
+                </p>
+
+                <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50/70 p-3 text-xs leading-relaxed text-amber-800">
+                  ⚠️ <strong>Lưu ý:</strong> Toàn bộ bài nộp và điểm số trước đó sẽ được giữ lại. Học sinh có thể tham gia lại bất kỳ lúc nào bằng mã khóa học.
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                disabled={removingLoading}
+                onClick={() => setRemovingStudent(null)}
+                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition disabled:opacity-50 cursor-pointer"
+              >
+                Hủy
+              </button>
+              <button
+                type="button"
+                disabled={removingLoading}
+                onClick={handleConfirmRemove}
+                className="inline-flex items-center gap-1.5 rounded-lg bg-rose-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-rose-700 transition disabled:opacity-50 cursor-pointer"
+              >
+                {removingLoading ? (
+                  <>
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    Đang gỡ...
+                  </>
+                ) : (
+                  <>
+                    <UserX className="h-3.5 w-3.5" />
+                    Gỡ học sinh
+                  </>
+                )}
+              </button>
+            </div>
+            </div>
+          </div>,
+          document.body,
+        )}
     </CourseShell>
   );
 }

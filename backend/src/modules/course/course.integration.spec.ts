@@ -160,5 +160,27 @@ describe('CourseService Real DB Integration Test', () => {
     const studentCourses = await service.findStudentCourses(testStudentId, {});
     expect(studentCourses.items.some((c) => c.id === testCourseId)).toBe(true);
   });
+
+  it('12. Giáo viên gỡ sinh viên khỏi khóa học qua service.removeMember (CH-91)', async () => {
+    // 12a: Giáo viên gỡ sinh viên thành công
+    const removeResult = await service.removeMember(testTeacherId, testCourseId, testStudentId);
+    expect(removeResult.message).toBe('Đã gỡ học sinh khỏi khóa học');
+    expect(removeResult.data.status).toBe(EnrollmentStatus.REMOVED);
+    expect(removeResult.data.removedAt).not.toBeNull();
+
+    // 12b: Gỡ lại lần nữa -> 404 (đã bị REMOVED)
+    await expect(
+      service.removeMember(testTeacherId, testCourseId, testStudentId),
+    ).rejects.toThrow();
+
+    // 12c: Tự gỡ chính mình -> 409 Conflict
+    await expect(
+      service.removeMember(testTeacherId, testCourseId, testTeacherId),
+    ).rejects.toThrow();
+
+    // 12d: Sinh viên sau khi bị gỡ không còn trong danh sách thành viên active
+    const members = await service.findMembers(testCourseId);
+    expect(members.students.some((s) => s.id === testStudentId)).toBe(false);
+  });
 });
 
