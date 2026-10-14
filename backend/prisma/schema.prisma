@@ -1,6 +1,6 @@
 // ==============================================================================
 // CLASSROOM-HUB - PRISMA DATABASE SCHEMA
-// Chuẩn hóa theo ERD (erd.mmd / erd.puml) và Class Diagram UML 2.5 (26 bảng)
+// Chuẩn hóa theo ERD (erd.mmd / erd.puml) và Class Diagram UML 2.5 (27 bảng)
 // ==============================================================================
 
 generator client {
@@ -95,7 +95,6 @@ enum QuestionStatus {
 }
 
 enum AttemptStatus {
-  DRAFT
   IN_PROGRESS
   SUBMITTED
   GRADED
@@ -141,6 +140,7 @@ model User {
   // Quan hệ 1-nhiều
   ownedCourses          Course[]          @relation("CourseOwner")
   enrollments           Enrollment[]
+  createdLessons        Lesson[]          @relation("LessonCreator")
   lessonProgresses      LessonProgress[]
   uploadedResources     Resource[]        @relation("ResourceUploader")
   createdAssignments    Assignment[]      @relation("AssignmentCreator")
@@ -213,8 +213,9 @@ model Module {
   createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  course  Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  lessons Lesson[]
+  course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons     Lesson[]
+  assignments Assignment[]
 
   @@unique([courseId, orderIndex], name: "uk_modules_course_order")
   @@map("modules")
@@ -223,12 +224,13 @@ model Module {
 model Lesson {
   id          BigInt       @id @default(autoincrement())
   moduleId    BigInt       @map("module_id")
+  createdBy   BigInt?      @map("created_by")
   title       String       @db.VarChar(255)
   type        LessonType   @default(PAGE)
   // Mô tả ngắn (HTML), tùy chọn hiển thị trên trang khóa học
   description String?      @db.Text
   // Nội dung chính (HTML) của PAGE / LABEL
-  content     String       @db.Text
+  content     String?      @db.Text
   // Đường dẫn ngoài của URL
   externalUrl String?      @map("external_url") @db.VarChar(2048)
   // Tùy chọn hiển thị theo loại: { display, showDescription, ... }
@@ -240,6 +242,7 @@ model Lesson {
   updatedAt   DateTime     @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   module     Module           @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  creator    User?            @relation("LessonCreator", fields: [createdBy], references: [id], onDelete: SetNull)
   progresses LessonProgress[]
   resources  Resource[]
 
@@ -287,6 +290,7 @@ model Resource {
 model Assignment {
   id          BigInt         @id @default(autoincrement())
   courseId    BigInt         @map("course_id")
+  moduleId    BigInt         @map("module_id")
   createdBy   BigInt         @map("created_by")
   title       String         @db.VarChar(255)
   description String?        @db.Text
@@ -299,6 +303,7 @@ model Assignment {
   updatedAt   DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  module      Module       @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   creator     User         @relation("AssignmentCreator", fields: [createdBy], references: [id], onDelete: Restrict)
   submissions Submission[]
   gradeItem   GradeItem?
@@ -312,7 +317,6 @@ model Submission {
   studentId    BigInt           @map("student_id")
   status       SubmissionStatus @default(SUBMITTED)
   submittedAt  DateTime         @default(now()) @map("submitted_at") @db.Timestamptz(6)
-  createdAt    DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt    DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   assignment Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
@@ -477,7 +481,7 @@ model QuizAttempt {
   quizId        BigInt        @map("quiz_id")
   studentId     BigInt        @map("student_id")
   attemptNumber Int           @default(1) @map("attempt_number") @db.SmallInt
-  status        AttemptStatus @default(DRAFT)
+  status        AttemptStatus @default(IN_PROGRESS)
   startedAt     DateTime?     @map("started_at") @db.Timestamptz(6)
   submittedAt   DateTime?     @map("submitted_at") @db.Timestamptz(6)
   gradedAt      DateTime?     @map("graded_at") @db.Timestamptz(6)
@@ -557,7 +561,7 @@ model Announcement {
 model Notification {
   id          BigInt           @id @default(autoincrement())
   recipientId BigInt           @map("recipient_id")
-  eventKey    String           @default(uuid()) @map("event_key") @db.Uuid
+  eventKey    String           @map("event_key") @db.Uuid
   type        NotificationType
   title       String           @db.VarChar(255)
   message     String           @db.Text
