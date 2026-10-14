@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { BadRequestException } from '@nestjs/common';
 import { CourseController } from './course.controller.js';
 import { CourseService } from './course.service.js';
 import { UserRole, CourseStatus } from '../../generated/prisma/enums.js';
@@ -19,6 +20,7 @@ describe('CourseController', () => {
     findAllCourses: ReturnType<typeof vi.fn>;
     joinCourse: ReturnType<typeof vi.fn>;
     findMembers: ReturnType<typeof vi.fn>;
+    removeMember: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -32,6 +34,7 @@ describe('CourseController', () => {
       findAllCourses: vi.fn(),
       joinCourse: vi.fn(),
       findMembers: vi.fn(),
+      removeMember: vi.fn(),
     };
     controller = new CourseController(service as unknown as CourseService);
   });
@@ -223,6 +226,44 @@ describe('CourseController', () => {
 
       const result = await controller.joinCourse(req, dto);
       expect(result.message).toContain('Lịch sử học tập trước đó đã được khôi phục');
+    });
+  });
+
+  describe('removeMember', () => {
+    it('should validate userId and call service.removeMember', async () => {
+      const course = { id: 1n, ownerId: 10n } as any;
+      const req = {
+        course,
+        user: { id: '10', role: UserRole.TEACHER },
+      } as RequestWithCourseContext;
+
+      service.removeMember = vi.fn().mockResolvedValue({
+        message: 'Đã gỡ học sinh khỏi khóa học',
+        data: { id: 100n },
+      });
+
+      const result = await controller.removeMember(req, '20');
+
+      expect(service.removeMember).toHaveBeenCalledWith(10n, 1n, 20n);
+      expect(result).toEqual({
+        message: 'Đã gỡ học sinh khỏi khóa học',
+        data: { id: 100n },
+      });
+    });
+
+    it('should throw BadRequestException if userId is invalid', async () => {
+      const course = { id: 1n, ownerId: 10n } as any;
+      const req = {
+        course,
+        user: { id: '10', role: UserRole.TEACHER },
+      } as RequestWithCourseContext;
+
+      await expect(controller.removeMember(req, 'abc')).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(controller.removeMember(req, '-5')).rejects.toThrow(
+        BadRequestException,
+      );
     });
   });
 });

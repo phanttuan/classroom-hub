@@ -558,5 +558,104 @@ describe('CourseService', () => {
       );
     });
   });
+
+  describe('removeMember', () => {
+    const courseId = 1n;
+    const ownerId = 10n;
+    const studentId = 20n;
+
+    it('should throw ConflictException if owner tries to remove themselves', async () => {
+      await expect(
+        service.removeMember(ownerId, courseId, ownerId),
+      ).rejects.toThrow(ConflictException);
+      await expect(
+        service.removeMember(ownerId, courseId, ownerId),
+      ).rejects.toThrow('Không thể tự gỡ chính mình khỏi khóa học');
+    });
+
+    it('should throw NotFoundException if course does not exist', async () => {
+      prisma.course.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.removeMember(ownerId, courseId, studentId),
+      ).rejects.toThrow(NotFoundException);
+      await expect(
+        service.removeMember(ownerId, courseId, studentId),
+      ).rejects.toThrow('Khóa học không tồn tại');
+    });
+
+    it('should throw ForbiddenException if requester is not the course owner', async () => {
+      const otherTeacherId = 99n;
+      prisma.course.findUnique.mockResolvedValue({
+        id: courseId,
+        ownerId: ownerId,
+      });
+
+      await expect(
+        service.removeMember(otherTeacherId, courseId, studentId),
+      ).rejects.toThrow(ForbiddenException);
+      await expect(
+        service.removeMember(otherTeacherId, courseId, studentId),
+      ).rejects.toThrow('Chỉ chủ sở hữu khóa học mới có quyền gỡ học sinh');
+    });
+
+    it('should throw NotFoundException if enrollment not found or already REMOVED', async () => {
+      prisma.course.findUnique.mockResolvedValue({
+        id: courseId,
+        ownerId: ownerId,
+      });
+      prisma.enrollment.findUnique.mockResolvedValue(null);
+
+      await expect(
+        service.removeMember(ownerId, courseId, studentId),
+      ).rejects.toThrow(NotFoundException);
+      await expect(
+        service.removeMember(ownerId, courseId, studentId),
+      ).rejects.toThrow('Thành viên không tồn tại trong khóa học');
+
+      // Test already REMOVED
+      prisma.enrollment.findUnique.mockResolvedValue({
+        id: 100n,
+        status: EnrollmentStatus.REMOVED,
+      });
+      await expect(
+        service.removeMember(ownerId, courseId, studentId),
+      ).rejects.toThrow(NotFoundException);
+    });
+
+    it('should soft delete enrollment by setting status to REMOVED and setting removedAt', async () => {
+      prisma.course.findUnique.mockResolvedValue({
+        id: courseId,
+        ownerId: ownerId,
+      });
+      const activeEnrollment = {
+        id: 100n,
+        courseId,
+        studentId,
+        status: EnrollmentStatus.ACTIVE,
+      };
+      prisma.enrollment.findUnique.mockResolvedValue(activeEnrollment);
+      const updatedEnrollment = {
+        ...activeEnrollment,
+        status: EnrollmentStatus.REMOVED,
+        removedAt: new Date(),
+      };
+      prisma.enrollment.update.mockResolvedValue(updatedEnrollment);
+
+      const result = await service.removeMember(ownerId, courseId, studentId);
+
+      expect(prisma.enrollment.update).toHaveBeenCalledWith({
+        where: { id: activeEnrollment.id },
+        data: {
+          status: EnrollmentStatus.REMOVED,
+          removedAt: expect.any(Date),
+        },
+      });
+      expect(result).toEqual({
+        message: 'Đã gỡ học sinh khỏi khóa học',
+        data: updatedEnrollment,
+      });
+    });
+  });
 });
 

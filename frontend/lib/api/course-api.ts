@@ -46,10 +46,23 @@ export async function fetchCourseDetail(courseId: string): Promise<CourseDto> {
   return unwrap(res);
 }
 
-/** Lấy danh sách thành viên lớp học (giảng viên phụ trách + sinh viên đang tham gia) */
 export async function fetchCourseMembers(courseId: string): Promise<CourseMembersResponse> {
   const res = await apiFetch<ApiEnvelope<CourseMembersResponse> | CourseMembersResponse>(
     `/courses/${courseId}/members`,
+  );
+  return unwrap(res);
+}
+
+/** Gỡ học sinh khỏi khóa học (CH-91) — chỉ dành cho chủ sở hữu khóa học */
+export async function removeCourseMember(
+  courseId: string,
+  userId: string,
+): Promise<{ message: string; data: unknown }> {
+  const res = await apiFetch<ApiEnvelope<{ message: string; data: unknown }>>(
+    `/courses/${courseId}/members/${userId}`,
+    {
+      method: 'DELETE',
+    },
   );
   return unwrap(res);
 }

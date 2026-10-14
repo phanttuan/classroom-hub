@@ -1,6 +1,9 @@
 import {
+  BadRequestException,
   Controller,
+  Delete,
   Get,
+  Param,
   Post,
   Patch,
   Body,
@@ -167,6 +170,26 @@ export class CourseController {
       message: 'Cập nhật trạng thái khóa học thành công',
       data: updated,
     };
+  }
+
+  /**
+   * Gỡ học sinh khỏi khóa học
+   * Chỉ Giáo viên sở hữu môn học mới có quyền thực hiện.
+   */
+  @Delete(':courseId/members/:userId')
+  @UseGuards(RolesGuard, CourseOwnerGuard)
+  @Roles(UserRole.TEACHER)
+  async removeMember(
+    @Req() req: RequestWithCourseContext,
+    @Param('userId') userIdParam: string,
+  ) {
+    if (!userIdParam || !/^[1-9]\d*$/.test(userIdParam.trim())) {
+      throw new BadRequestException('Mã người dùng (userId) không hợp lệ');
+    }
+    const studentId = BigInt(userIdParam.trim());
+    const courseId = req.course!.id;
+    const requesterId = BigInt(req.user!.id);
+    return this.courseService.removeMember(requesterId, courseId, studentId);
   }
 }
 

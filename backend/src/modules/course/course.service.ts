@@ -513,5 +513,57 @@ export class CourseService {
       throw error;
     }
   }
+
+  /**
+   * Gỡ học sinh khỏi khóa học (CH-91)
+   * Chỉ chủ sở hữu (owner) mới có quyền gỡ.
+   * Giữ nguyên bài nộp và điểm số, chuyển status -> REMOVED và ghi nhận removedAt.
+   */
+  async removeMember(requesterId: bigint, courseId: bigint, studentId: bigint) {
+    if (requesterId === studentId) {
+      throw new ConflictException('Không thể tự gỡ chính mình khỏi khóa học');
+    }
+
+    const course = await this.prisma.course.findUnique({
+      where: { id: courseId },
+      select: { id: true, ownerId: true },
+    });
+
+    if (!course) {
+      throw new NotFoundException('Khóa học không tồn tại');
+    }
+
+    if (course.ownerId !== requesterId) {
+      throw new ForbiddenException(
+        'Chỉ chủ sở hữu khóa học mới có quyền gỡ học sinh',
+      );
+    }
+
+    const enrollment = await this.prisma.enrollment.findUnique({
+      where: {
+        uk_enrollments_course_student: {
+          courseId,
+          studentId,
+        },
+      },
+    });
+
+    if (!enrollment || enrollment.status !== EnrollmentStatus.ACTIVE) {
+      throw new NotFoundException('Thành viên không tồn tại trong khóa học');
+    }
+
+    const updated = await this.prisma.enrollment.update({
+      where: { id: enrollment.id },
+      data: {
+        status: EnrollmentStatus.REMOVED,
+        removedAt: new Date(),
+      },
+    });
+
+    return {
+      message: 'Đã gỡ học sinh khỏi khóa học',
+      data: updated,
+    };
+  }
 }
 

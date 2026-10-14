@@ -54,7 +54,7 @@ export function useCourseContent(courseId: string) {
 /** Hồ sơ người dùng đã tải, giữ giữa các trang trong khóa học (chỉ tồn tại phía client) */
 let cachedCourseUser: TeacherProfile | null = null;
 
-function useCurrentUser(role: CourseRole) {
+export function useCurrentUser(role: CourseRole) {
   const fallbackAvatar = role === "TEACHER" ? "/images/teacher.webp" : "/images/student.webp";
   const [currentUser, setCurrentUser] = useState<TeacherProfile>(
     () =>
