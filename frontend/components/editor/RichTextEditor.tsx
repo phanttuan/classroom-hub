@@ -437,7 +437,7 @@ export default function RichTextEditor({
       TaskItem.configure({ nested: true }),
       Image.configure({ allowBase64: false }),
       TableKit.configure({ table: { resizable: true } }),
-      Youtube.configure({ nocookie: true, width: 640, height: 360 }),
+      Youtube.configure({ nocookie: true, modestBranding: true, ivLoadPolicy: 3, rel: 0, width: 640, height: 360 }),
       Placeholder.configure({ placeholder }),
       CharacterCount,
     ],

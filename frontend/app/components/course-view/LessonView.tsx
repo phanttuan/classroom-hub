@@ -247,9 +247,11 @@ export default function LessonView({ courseId, lessonId, role, backHref }: Lesso
 
     switch (lesson.type) {
       // ---------- TRANG: khung đọc rộng + mục lục ----------
-      case "PAGE":
+      case "PAGE": {
+        // Panel "Thông tin" (loại / thời gian đọc / cập nhật) là metadata thừa với học sinh → chỉ hiện cho giáo viên.
+        const showPageAside = role === "TEACHER" || (page && page.headings.length > 0);
         return (
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]">
+          <div className={showPageAside ? "grid gap-6 lg:grid-cols-[minmax(0,1fr)_300px]" : "space-y-5"}>
             <article className="rounded-2xl border border-slate-200/90 bg-white px-6 py-8 shadow-xs sm:px-10 lg:px-14 lg:py-12">
               {lesson.description && (
                 <div className="mb-8 rounded-xl border-l-4 border-[#0f6cbf] bg-blue-50/60 px-5 py-4">
@@ -259,38 +261,43 @@ export default function LessonView({ courseId, lessonId, role, backHref }: Lesso
               <RichContent html={page?.html} className="mx-auto max-w-[920px] !text-[16px] !leading-[1.8]" />
             </article>
 
-            <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
-              {page && page.headings.length > 0 && (
-                <Card title="Trong trang này" icon={ListTree}>
-                  <nav className="max-h-[50vh] overflow-y-auto py-2">
-                    {page.headings.map((h) => (
-                      <a
-                        key={h.id}
-                        href={`#${h.id}`}
-                        onClick={(e) => {
-                          e.preventDefault();
-                          document.getElementById(h.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
-                        }}
-                        className={`block border-l-2 border-transparent py-1.5 pr-4 text-[13px] text-slate-600 transition hover:border-[#0f6cbf] hover:bg-blue-50/50 hover:text-[#0f6cbf] ${
-                          h.level === 1 ? "pl-4 font-semibold" : h.level === 2 ? "pl-4" : "pl-8"
-                        }`}
-                      >
-                        {h.text}
-                      </a>
-                    ))}
-                  </nav>
-                </Card>
-              )}
-              <Card title="Thông tin" icon={FileText}>
-                <div className="py-2">
-                  <InfoRow icon={FileText} label="Loại" value={meta.label} />
-                  <InfoRow icon={Clock} label="Thời gian đọc" value={`~${readingMinutes(lesson.content)} phút`} />
-                  <InfoRow icon={CalendarDays} label="Cập nhật" value={formatDate(lesson.updatedAt) || "—"} />
-                </div>
-              </Card>
-            </aside>
+            {showPageAside && (
+              <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
+                {page && page.headings.length > 0 && (
+                  <Card title="Trong trang này" icon={ListTree}>
+                    <nav className="max-h-[50vh] overflow-y-auto py-2">
+                      {page.headings.map((h) => (
+                        <a
+                          key={h.id}
+                          href={`#${h.id}`}
+                          onClick={(e) => {
+                            e.preventDefault();
+                            document.getElementById(h.id)?.scrollIntoView({ behavior: "smooth", block: "start" });
+                          }}
+                          className={`block border-l-2 border-transparent py-1.5 pr-4 text-[13px] text-slate-600 transition hover:border-[#0f6cbf] hover:bg-blue-50/50 hover:text-[#0f6cbf] ${
+                            h.level === 1 ? "pl-4 font-semibold" : h.level === 2 ? "pl-4" : "pl-8"
+                          }`}
+                        >
+                          {h.text}
+                        </a>
+                      ))}
+                    </nav>
+                  </Card>
+                )}
+                {role === "TEACHER" && (
+                  <Card title="Thông tin" icon={FileText}>
+                    <div className="py-2">
+                      <InfoRow icon={FileText} label="Loại" value={meta.label} />
+                      <InfoRow icon={Clock} label="Thời gian đọc" value={`~${readingMinutes(lesson.content)} phút`} />
+                      <InfoRow icon={CalendarDays} label="Cập nhật" value={formatDate(lesson.updatedAt) || "—"} />
+                    </div>
+                  </Card>
+                )}
+              </aside>
+            )}
           </div>
         );
+      }
 
       // ---------- TỆP: khung xem trước lớn + thông tin tệp ----------
       case "FILE": {
@@ -299,13 +306,35 @@ export default function LessonView({ courseId, lessonId, role, backHref }: Lesso
         const embed = (display === "AUTO" || display === "EMBED") && isEmbeddable(file.mimeType);
         const showSize = settings.showSize !== false;
         const showType = settings.showType !== false;
+        // Panel "Thông tin tệp" là metadata quản trị → chỉ hiện cho giáo viên.
+        // Phía học sinh: ẩn panel, dung lượng file hiện gọn cạnh nút Tải xuống ở khu vực chính.
+        const showFileAside = role === "TEACHER" || !!descriptionCard;
         return (
-          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+          <div className={showFileAside ? "grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]" : "space-y-5"}>
             <Card className="overflow-hidden">
               {embed ? (
-                <div className="bg-slate-50 p-2">
-                  <EmbeddedFile resource={file} />
-                </div>
+                <>
+                  <div className="bg-slate-50 p-2">
+                    <EmbeddedFile resource={file} />
+                  </div>
+                  {role === "STUDENT" && (
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-3.5">
+                      {showSize ? (
+                        <p className="text-[12.5px] text-slate-500">
+                          Dung lượng:{" "}
+                          <span className="font-semibold text-slate-700">
+                            {formatFileSize(file.fileSizeBytes)}
+                          </span>
+                        </p>
+                      ) : (
+                        <span />
+                      )}
+                      <div className="w-44">
+                        <DownloadButton resource={file} />
+                      </div>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="flex flex-col items-center px-6 py-16 text-center">
                   <div className="grid h-24 w-24 place-items-center rounded-3xl bg-sky-50 text-sky-600">
@@ -330,35 +359,47 @@ export default function LessonView({ courseId, lessonId, role, backHref }: Lesso
                       <DownloadButton resource={file} />
                     </div>
                   </div>
+                  {role === "STUDENT" && showSize && (
+                    <p className="mt-3 text-[12.5px] text-slate-500">
+                      Dung lượng:{" "}
+                      <span className="font-semibold text-slate-700">
+                        {formatFileSize(file.fileSizeBytes)}
+                      </span>
+                    </p>
+                  )}
                 </div>
               )}
             </Card>
 
-            <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
-              <Card title="Thông tin tệp" icon={FileIcon}>
-                <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4">
-                  <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-sky-50 text-sky-600">
-                    <FileText className="h-5 w-5" />
-                  </div>
-                  <p className="min-w-0 break-words text-[14px] font-semibold text-slate-900">{file.fileName}</p>
-                </div>
-                <div className="py-2">
-                  {showType && <InfoRow icon={FileText} label="Định dạng" value={fileTypeLabel(file.fileName, file.mimeType)} />}
-                  {showSize && <InfoRow icon={HardDrive} label="Dung lượng" value={formatFileSize(file.fileSizeBytes)} />}
-                  <InfoRow icon={CalendarDays} label="Tải lên" value={formatDate(file.createdAt) || "—"} />
-                </div>
-                <div className="space-y-2 border-t border-slate-100 p-4">
-                  <button
-                    onClick={() => setPreview(file)}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-[14px] font-semibold text-slate-700 hover:bg-slate-50"
-                  >
-                    <Maximize2 className="h-4 w-4" /> Xem toàn màn hình
-                  </button>
-                  <DownloadButton resource={file} />
-                </div>
-              </Card>
-              {descriptionCard}
-            </aside>
+            {showFileAside && (
+              <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
+                {role === "TEACHER" && (
+                  <Card title="Thông tin tệp" icon={FileIcon}>
+                    <div className="flex items-center gap-3 border-b border-slate-100 px-5 py-4">
+                      <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-sky-50 text-sky-600">
+                        <FileText className="h-5 w-5" />
+                      </div>
+                      <p className="min-w-0 break-words text-[14px] font-semibold text-slate-900">{file.fileName}</p>
+                    </div>
+                    <div className="py-2">
+                      {showType && <InfoRow icon={FileText} label="Định dạng" value={fileTypeLabel(file.fileName, file.mimeType)} />}
+                      {showSize && <InfoRow icon={HardDrive} label="Dung lượng" value={formatFileSize(file.fileSizeBytes)} />}
+                      <InfoRow icon={CalendarDays} label="Tải lên" value={formatDate(file.createdAt) || "—"} />
+                    </div>
+                    <div className="space-y-2 border-t border-slate-100 p-4">
+                      <button
+                        onClick={() => setPreview(file)}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-[14px] font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        <Maximize2 className="h-4 w-4" /> Xem toàn màn hình
+                      </button>
+                      <DownloadButton resource={file} />
+                    </div>
+                  </Card>
+                )}
+                {descriptionCard}
+              </aside>
+            )}
           </div>
         );
       }

@@ -313,12 +313,20 @@ input::-webkit-credentials-auto-fill-button {
 .rich-content mark { border-radius: 0.2em; padding: 0 0.1em; }
 .rich-content img { max-width: 100%; height: auto; border-radius: 0.5em; }
 .rich-content img.ProseMirror-selectednode { outline: 3px solid #3b82f6; }
-.rich-content div[data-youtube-video] iframe {
-  width: 100%;
+.rich-content div[data-youtube-video] {
+  margin: 1.25em auto;
   max-width: 720px;
+}
+.rich-content div[data-youtube-video] iframe {
+  display: block;
+  width: 100%;
+  max-width: 100%;
   aspect-ratio: 16 / 9;
   height: auto;
   border-radius: 0.6em;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 12px 28px -16px rgba(15, 60, 120, 0.35);
+  background: #0f172a;
 }
 .rich-content table {
   border-collapse: collapse;
