@@ -21,9 +21,10 @@ import {
   UserRole,
 } from '../../generated/prisma/enums.js';
 import type { ResourceUrlResponse, UserContext } from './resource.service.js';
+import { detectFileSignature, verifyFileSignature } from './file-signature.js';
 
-/** Đuôi tệp bị chặn (thực thi được / chạy script khi mở trên trình duyệt) */
-const BLOCKED_EXTENSIONS = new Set([
+/** Đuôi tệp bị chặn (thực thi được / chạy script khi mở trên trình duyệt) — dùng chung cho tài liệu bài học và bài nộp */
+export const BLOCKED_EXTENSIONS = new Set([
   '.exe',
   '.msi',
   '.bat',
@@ -108,7 +109,8 @@ function slugify(name: string): string {
  */
 @Injectable()
 export class ResourceUploadService {
-  private readonly maxFileBytes: number;
+  /** Dung lượng tối đa 1 tệp (UPLOAD_MAX_FILE_MB, mặc định 20MB) — áp dụng cho cả tệp bài nộp */
+  readonly maxFileBytes: number;
 
   constructor(
     private readonly prisma: PrismaService,
@@ -138,7 +140,8 @@ export class ResourceUploadService {
     }
   }
 
-  private validateFile(file: Express.Multer.File, fileName: string) {
+  /** Kiểm tra tệp tải lên: không rỗng, không vượt dung lượng, không thuộc loại bị chặn */
+  validateFile(file: Express.Multer.File, fileName: string) {
     if (!file.size) throw new BadRequestException(`Tệp "${fileName}" rỗng`);
     if (file.size > this.maxFileBytes) {
       throw new PayloadTooLargeException(
@@ -152,7 +155,16 @@ export class ResourceUploadService {
     }
   }
 
-  private buildPublicId(
+  /**
+   * Kiểm tra magic bytes: nội dung thật phải khớp đuôi tệp, không phải tệp thực thi đổi tên.
+   * Gọi sau validateFile (đã chặn theo đuôi + dung lượng).
+   */
+  async assertSafeContent(file: Express.Multer.File, fileName: string) {
+    await verifyFileSignature({ path: file.path, buffer: file.buffer }, fileName);
+  }
+
+  /** `<folder>/<thời gian>-<ngẫu nhiên>-<tên-slug>[.đuôi]` — tên tệp người dùng không bao giờ thành đường dẫn */
+  buildPublicId(
     folder: string,
     fileName: string,
     keepExtension: boolean,
@@ -225,6 +237,7 @@ export class ResourceUploadService {
       fileName: decodeOriginalName(file.originalname),
     }));
     named.forEach(({ file, fileName }) => this.validateFile(file, fileName));
+    for (const { file, fileName } of named) await this.assertSafeContent(file, fileName);
 
     const previous =
       lesson.type === LessonType.FILE
@@ -362,6 +375,11 @@ export class ResourceUploadService {
     if (file.size > CONTENT_IMAGE_MAX_BYTES) {
       throw new PayloadTooLargeException('Ảnh tối đa 5MB');
     }
+    // Ảnh công khai nhúng thẳng vào HTML → nội dung thật phải đúng là ảnh (không tin MIME trình duyệt gửi)
+    const detected = await detectFileSignature({ buffer: file.buffer });
+    if (!detected || !CONTENT_IMAGE_TYPES.has(detected.mime)) {
+      throw new BadRequestException('Nội dung tệp không phải ảnh PNG, JPEG, GIF hoặc WEBP');
+    }
 
     const fileName = decodeOriginalName(file.originalname);
     const result = await this.cloudinary.uploadBuffer(file.buffer, {
@@ -393,6 +411,7 @@ export class ResourceUploadService {
 
       const fileName = decodeOriginalName(file.originalname);
       this.validateFile(file, fileName);
+      await this.assertSafeContent(file, fileName);
 
       const resourceType = CloudinaryService.resolveResourceType(file.mimetype);
       const publicId = this.buildPublicId(

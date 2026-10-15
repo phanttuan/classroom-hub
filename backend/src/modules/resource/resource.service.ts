@@ -34,48 +34,6 @@ export class ResourceService {
   ) {}
 
   /**
-   * Helper phân cấp: từ resourceId tìm ngược lại Lesson, Module, và Course
-   * `resource.lessonId -> lesson.moduleId -> module.courseId`
-   */
-  async getCourseAndLessonByResourceId(resourceId: bigint): Promise<{
-    resource: Resource;
-    lesson: Lesson;
-    course: Course;
-  }> {
-    const resource = await this.prisma.resource.findUnique({
-      where: { id: resourceId },
-      include: {
-        lesson: {
-          include: {
-            module: {
-              include: {
-                course: true,
-              },
-            },
-          },
-        },
-      },
-    });
-
-    if (!resource || resource.parentType !== ResourceParent.LESSON || !resource.lesson) {
-      throw new NotFoundException('Tài liệu không tồn tại');
-    }
-
-    const lesson = resource.lesson;
-    const course = resource.lesson.module?.course;
-
-    if (!course) {
-      throw new NotFoundException('Khóa học chứa tài liệu không tồn tại');
-    }
-
-    return {
-      resource,
-      lesson,
-      course,
-    };
-  }
-
-  /**
    * Helper phân cấp: từ lessonId tìm ngược lại Module và Course
    * `lesson.moduleId -> module.courseId`
    */
@@ -205,17 +163,70 @@ export class ResourceService {
   }
 
   /**
+   * Tìm tài liệu và kiểm tra quyền truy cập theo loại cha:
+   *  - LESSON: theo quy tắc bài học (checkAccess)
+   *  - SUBMISSION (tệp bài nộp): admin, giáo viên phụ trách khóa học, hoặc chính sinh viên đã nộp
+   *    (vẫn phải còn Enrollment ACTIVE)
+   */
+  async resolveAccessibleResource(
+    user: UserContext,
+    resourceId: bigint,
+  ): Promise<Resource> {
+    const resource = await this.prisma.resource.findUnique({
+      where: { id: resourceId },
+      include: {
+        lesson: { include: { module: { include: { course: true } } } },
+        submission: {
+          select: {
+            studentId: true,
+            assignment: { select: { course: true } },
+          },
+        },
+      },
+    });
+    if (!resource) throw new NotFoundException('Tài liệu không tồn tại');
+
+    if (resource.parentType === ResourceParent.SUBMISSION) {
+      const course = resource.submission?.assignment.course;
+      if (!resource.submission || !course) {
+        throw new NotFoundException('Bài nộp chứa tệp không tồn tại');
+      }
+      if (user.role === UserRole.ADMIN) return resource;
+      if (user.role === UserRole.TEACHER) {
+        if (course.ownerId !== user.id) {
+          throw new ForbiddenException('Bạn không phải là giáo viên phụ trách khóa học này');
+        }
+        return resource;
+      }
+      if (user.role === UserRole.STUDENT && resource.submission.studentId === user.id) {
+        const enrollment = await this.prisma.enrollment.findUnique({
+          where: { uk_enrollments_course_student: { courseId: course.id, studentId: user.id } },
+          select: { status: true },
+        });
+        if (enrollment?.status !== EnrollmentStatus.ACTIVE) {
+          throw new ForbiddenException('Bạn đã bị gỡ khỏi khóa học này');
+        }
+        return resource;
+      }
+      throw new ForbiddenException('Bạn không có quyền truy cập tệp bài nộp này');
+    }
+
+    const lesson = resource.lesson;
+    const course = lesson?.module?.course;
+    if (!lesson) throw new NotFoundException('Tài liệu không tồn tại');
+    if (!course) throw new NotFoundException('Khóa học chứa tài liệu không tồn tại');
+    await this.checkAccess(user, course, lesson);
+    return resource;
+  }
+
+  /**
    * Lấy signed URL xem tài liệu trực tiếp (preview) — thời hạn 10 phút, không proxy bytes qua server.
    */
   async getPreviewUrl(
     user: UserContext,
     resourceId: bigint,
   ): Promise<ResourceUrlResponse> {
-    const { resource, lesson, course } =
-      await this.getCourseAndLessonByResourceId(resourceId);
-
-    // Kiểm tra quyền
-    await this.checkAccess(user, course, lesson);
+    const resource = await this.resolveAccessibleResource(user, resourceId);
 
     // Ký URL Cloudinary authenticated
     const signed = this.cloudinaryService.generateSignedUrl(
@@ -238,11 +249,7 @@ export class ResourceService {
     user: UserContext,
     resourceId: bigint,
   ): Promise<ResourceUrlResponse> {
-    const { resource, lesson, course } =
-      await this.getCourseAndLessonByResourceId(resourceId);
-
-    // Kiểm tra quyền
-    await this.checkAccess(user, course, lesson);
+    const resource = await this.resolveAccessibleResource(user, resourceId);
 
     // Ký URL Cloudinary authenticated kèm fl_attachment
     const signed = this.cloudinaryService.generateSignedUrl(

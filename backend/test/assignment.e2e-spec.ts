@@ -200,6 +200,18 @@ describe('Assignment Full Lifecycle (E2E)', () => {
     expect(res.body.data.publishedAt).toBeTruthy();
   });
 
+  it('4b. Bài tập PUBLISHED vẫn chỉnh sửa được: gia hạn + bật nộp trễ', async () => {
+    const res = await request(app.getHttpServer())
+      .patch(`/courses/${courseId.toString()}/assignments/${assignmentId}`)
+      .set('Authorization', `Bearer ${teacher.token}`)
+      .send({ dueAt: '2026-10-30T23:59:59.000Z', allowLateSubmission: true });
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.status).toBe(ActivityStatus.PUBLISHED);
+    expect(res.body.data.allowLateSubmission).toBe(true);
+    expect(res.body.data.dueAt).toBe('2026-10-30T23:59:59.000Z');
+  });
+
   it('5. Sinh viên lấy danh sách bài tập thấy bài PUBLISHED kèm mySubmission: null', async () => {
     const res = await request(app.getHttpServer())
       .get(`/courses/${courseId.toString()}/assignments`)

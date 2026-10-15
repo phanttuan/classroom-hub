@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsDateString,
   IsNotEmpty,
   IsNumber,
@@ -11,6 +12,18 @@ import {
 import { Transform } from 'class-transformer';
 
 export class UpdateAssignmentDto {
+  @IsOptional()
+  @IsBoolean({ message: 'Tùy chọn cho phép nộp trễ phải là true/false' })
+  allowLateSubmission?: boolean;
+
+  @IsOptional()
+  @IsBoolean({ message: 'Tùy chọn bài làm trực tuyến phải là true/false' })
+  allowTextSubmission?: boolean;
+
+  @IsOptional()
+  @IsBoolean({ message: 'Tùy chọn đính kèm tệp phải là true/false' })
+  allowFileSubmission?: boolean;
+
   @IsOptional()
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : String(value ?? '')))
   @IsString({ message: 'Mã chủ đề (moduleId) phải là chuỗi' })

@@ -33,6 +33,7 @@ describe('AssignmentService', () => {
     };
     submission: {
       findUnique: ReturnType<typeof vi.fn>;
+      findMany: ReturnType<typeof vi.fn>;
     };
     $transaction: ReturnType<typeof vi.fn>;
   };
@@ -77,6 +78,7 @@ describe('AssignmentService', () => {
       },
       submission: {
         findUnique: vi.fn(),
+        findMany: vi.fn().mockResolvedValue([]),
       },
       $transaction: vi.fn(async (cb: (tx: typeof prisma) => Promise<unknown>) =>
         cb(prisma),
@@ -117,6 +119,10 @@ describe('AssignmentService', () => {
           openAt: new Date('2026-10-15T08:00:00.000Z'),
           dueAt: new Date('2026-10-20T23:59:59.000Z'),
           status: ActivityStatus.DRAFT,
+          // Mặc định: không nộp trễ, nhận cả bài làm trực tuyến lẫn tệp
+          allowLateSubmission: false,
+          allowTextSubmission: true,
+          allowFileSubmission: true,
         },
       });
       expect(prisma.gradeItem.create).toHaveBeenCalledWith({
@@ -137,6 +143,21 @@ describe('AssignmentService', () => {
         status: ActivityStatus.DRAFT,
         gradeItemId: '500',
       });
+    });
+
+    it('should throw BadRequestException when both text and file submission are disabled', async () => {
+      await expect(
+        service.create(teacherId, courseId, {
+          moduleId: '50',
+          title: 'Bài tập 1',
+          maxScore: 10,
+          openAt: '2026-10-15T08:00:00.000Z',
+          dueAt: '2026-10-20T23:59:59.000Z',
+          allowTextSubmission: false,
+          allowFileSubmission: false,
+        }),
+      ).rejects.toThrow(BadRequestException);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
     });
 
     it('should throw BadRequestException when module does not exist or belongs to another course', async () => {
@@ -175,10 +196,17 @@ describe('AssignmentService', () => {
         status: ActivityStatus.PUBLISHED,
       };
       prisma.assignment.findMany.mockResolvedValue([publishedAssignment]);
-      prisma.submission.findUnique.mockResolvedValue({
-        status: SubmissionStatus.SUBMITTED,
-        submittedAt: new Date('2026-10-16T10:00:00.000Z'),
-      });
+      // Một truy vấn lấy toàn bộ bài nộp của sinh viên (không N+1 theo từng bài tập)
+      prisma.submission.findMany.mockResolvedValue([
+        {
+          id: 900n,
+          assignmentId,
+          studentId,
+          status: SubmissionStatus.SUBMITTED,
+          isLate: true,
+          submittedAt: new Date('2026-10-16T10:00:00.000Z'),
+        },
+      ]);
 
       const result = await service.findAll(courseId, {
         id: studentId,
@@ -192,16 +220,23 @@ describe('AssignmentService', () => {
         },
         orderBy: { createdAt: 'desc' },
       });
+      expect(prisma.submission.findMany).toHaveBeenCalledTimes(1);
+      expect(prisma.submission.findMany).toHaveBeenCalledWith({
+        where: { studentId, assignmentId: { in: [assignmentId] } },
+      });
       expect(result).toHaveLength(1);
       expect(result[0]?.mySubmission).toEqual({
+        id: '900',
         status: SubmissionStatus.SUBMITTED,
-        score: null,
+        isLate: true,
         submittedAt: new Date('2026-10-16T10:00:00.000Z'),
       });
     });
 
     it('should return all assignments for teacher and support status filter', async () => {
-      prisma.assignment.findMany.mockResolvedValue([baseAssignment]);
+      prisma.assignment.findMany.mockResolvedValue([
+        { ...baseAssignment, submissions: [{ isLate: false }, { isLate: true }] },
+      ]);
 
       const result = await service.findAll(
         courseId,
@@ -212,9 +247,12 @@ describe('AssignmentService', () => {
       expect(prisma.assignment.findMany).toHaveBeenCalledWith({
         where: { courseId, status: ActivityStatus.DRAFT },
         orderBy: { createdAt: 'desc' },
+        include: { submissions: { select: { isLate: true } } },
       });
       expect(result).toHaveLength(1);
       expect(result[0]).not.toHaveProperty('mySubmission');
+      // Giáo viên thấy số bài đã nộp / nộp trễ
+      expect(result[0]?.submissionStats).toEqual({ submitted: 2, late: 1 });
     });
   });
 
@@ -258,10 +296,10 @@ describe('AssignmentService', () => {
   });
 
   describe('update', () => {
-    it('should throw ConflictException (409) when assignment status is not DRAFT', async () => {
+    it('should throw ConflictException (409) when assignment is CLOSED', async () => {
       prisma.assignment.findUnique.mockResolvedValue({
         ...baseAssignment,
-        status: ActivityStatus.PUBLISHED,
+        status: ActivityStatus.CLOSED,
       });
 
       await expect(
@@ -271,6 +309,35 @@ describe('AssignmentService', () => {
       ).rejects.toThrow(ConflictException);
 
       expect(prisma.assignment.update).not.toHaveBeenCalled();
+    });
+
+    it('should allow editing a PUBLISHED assignment (extend due date, enable late submission)', async () => {
+      prisma.assignment.findUnique.mockResolvedValue({
+        ...baseAssignment,
+        status: ActivityStatus.PUBLISHED,
+      });
+      prisma.assignment.update.mockResolvedValue({
+        ...baseAssignment,
+        status: ActivityStatus.PUBLISHED,
+        dueAt: new Date('2026-10-25T23:59:59.000Z'),
+        allowLateSubmission: true,
+      });
+
+      const result = await service.update(teacherId, courseId, assignmentId, {
+        dueAt: '2026-10-25T23:59:59.000Z',
+        allowLateSubmission: true,
+      });
+
+      expect(prisma.assignment.update).toHaveBeenCalledWith({
+        where: { id: assignmentId },
+        data: expect.objectContaining({
+          dueAt: new Date('2026-10-25T23:59:59.000Z'),
+          allowLateSubmission: true,
+          allowTextSubmission: true,
+          allowFileSubmission: true,
+        }),
+      });
+      expect(result.allowLateSubmission).toBe(true);
     });
 
     it('should update both assignment and GradeItem.maxScore in transaction when maxScore changes', async () => {
