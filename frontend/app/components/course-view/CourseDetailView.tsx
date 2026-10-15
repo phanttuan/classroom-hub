@@ -56,9 +56,19 @@ import RichContent from "@/components/content/RichContent";
 import KebabMenu from "@/components/ui/KebabMenu";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { LESSON_TYPE_META, fileTypeLabel, formatFileSize } from "@/lib/lesson-types";
+import { formatDateTime, formatScore, submissionStateLabel, type SubmissionStateTone } from "@/lib/assignment-utils";
 import CourseShell, { coursePathOf, useCourseContent, useCurrentUser } from "./CourseShell";
 import CourseHero, { type HeroStatusTone } from "./CourseHero";
 import CourseSkeleton from "./CourseSkeleton";
+
+/** Màu badge trạng thái nộp bài của sinh viên trên dòng bài tập */
+const SUBMISSION_BADGE: Record<SubmissionStateTone, string> = {
+  neutral: "border-slate-200 bg-slate-100 text-slate-600",
+  success: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  warning: "border-amber-200 bg-amber-50 text-amber-800",
+  danger: "border-red-200 bg-red-50 text-red-700",
+  info: "border-sky-200 bg-sky-50 text-sky-700",
+};
 
 const COURSE_STATUS: Record<string, { caption: string; label: string; tone: HeroStatusTone }> = {
   ACTIVE: { caption: "Trạng thái khóa học", label: "Đang mở", tone: "emerald" },
@@ -95,6 +105,8 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
   const [activeTab, setActiveTab] = useState<"course" | "members" | "grades" | "competency">("course");
   const [searchQuery, setSearchQuery] = useState("");
   const [activeNavId, setActiveNavId] = useState<string>("");
+  // Mốc thời gian lúc mở trang để so với hạn nộp bài tập (không gọi Date.now() trong lúc render)
+  const [openedAt] = useState(() => Date.now());
 
   // Trạng thái mở rộng Accordion từng Topic (mặc định mở)
   const [collapsedModules, setCollapsedModules] = useState<Record<string, boolean>>({});
@@ -652,12 +664,11 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
   const renderAssignment = (assignment: AssignmentDto) => {
     const hidden = assignment.status === "DRAFT";
     const editHref = `/teacher/content/courses/${courseId}/lessons/new?section=${assignment.moduleId}&type=ASSIGNMENT&assignmentId=${assignment.id}`;
-    const formatDue = (iso: string) => {
-      const d = new Date(iso);
-      if (Number.isNaN(d.getTime())) return iso;
-      const pad = (n: number) => String(n).padStart(2, "0");
-      return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    };
+    const viewHref = `${coursePath}/assignments/${assignment.id}`;
+    const isPastDue = new Date(assignment.dueAt).getTime() < openedAt;
+    // Trạng thái nộp bài của sinh viên / số bài nộp của giáo viên — hiện ngay trên trang khóa học
+    const studentState = role === "STUDENT" ? submissionStateLabel(assignment.mySubmission, { isPastDue }) : null;
+    const stats = assignment.submissionStats;
 
     return (
       <div
@@ -669,16 +680,24 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
         </div>
         <div className={`min-w-0 flex-1 ${hidden ? "opacity-70" : ""}`}>
           <p className="text-[11px] font-semibold uppercase tracking-wide text-pink-600">Bài tập</p>
-          <span className="text-[15px] font-semibold leading-snug text-slate-900">
+          <Link href={viewHref} className="text-[15px] font-semibold leading-snug text-[#0f6cbf] hover:underline">
             {assignment.title}
-          </span>
+          </Link>
           <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[12px] text-slate-500">
-            <span>Hạn nộp: {formatDue(assignment.dueAt)}</span>
+            <span className={isPastDue && assignment.status === "PUBLISHED" ? "text-red-600" : ""}>
+              Hạn nộp: {formatDateTime(assignment.dueAt)}
+            </span>
             <span>·</span>
-            <span>Điểm tối đa: {assignment.maxScore}</span>
+            <span>Điểm tối đa: {formatScore(assignment.maxScore)}</span>
             {assignment.status === "CLOSED" && (
               <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
                 Đã đóng
+              </span>
+            )}
+            {role === "TEACHER" && stats && (
+              <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
+                {stats.submitted} đã nộp
+                {stats.late > 0 && <span className="text-amber-700"> · {stats.late} trễ</span>}
               </span>
             )}
           </div>
@@ -691,6 +710,14 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
+          {studentState && (
+            <span
+              className={`inline-flex select-none items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] font-semibold ${SUBMISSION_BADGE[studentState.tone]}`}
+            >
+              {studentState.tone === "success" ? <CheckCircle2 className="h-3.5 w-3.5" /> : studentState.tone === "warning" || studentState.tone === "danger" ? <AlertTriangle className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
+              {studentState.label}
+            </span>
+          )}
           {role === "TEACHER" && (
             <>
               {hidden && (
@@ -703,10 +730,19 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
                 <KebabMenu
                   items={[
                     {
-                      label: "Chỉnh sửa bài tập",
-                      icon: Pencil,
-                      onClick: () => router.push(editHref),
+                      label: "Xem bài nộp",
+                      icon: Eye,
+                      onClick: () => router.push(viewHref),
                     },
+                    ...(assignment.status !== "CLOSED"
+                      ? [
+                          {
+                            label: "Chỉnh sửa bài tập",
+                            icon: Pencil,
+                            onClick: () => router.push(editHref),
+                          },
+                        ]
+                      : []),
                     ...(assignment.status === "DRAFT"
                       ? [
                           {

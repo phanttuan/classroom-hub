@@ -9,6 +9,7 @@ import { PrismaService } from '../../database/prisma.service.js';
 import {
   ActivityStatus,
   GradeCategory,
+  SubmissionStatus,
   UserRole,
 } from '../../generated/prisma/enums.js';
 import { Prisma } from '../../generated/prisma/client.js';
@@ -72,6 +73,8 @@ export class AssignmentService {
       );
     }
 
+    const submissionOptions = resolveSubmissionOptions(dto);
+
     return this.prisma.$transaction(async (tx) => {
       const assignment = await tx.assignment.create({
         data: {
@@ -84,6 +87,7 @@ export class AssignmentService {
           openAt,
           dueAt,
           status: ActivityStatus.DRAFT,
+          ...submissionOptions,
         },
       });
 
@@ -136,32 +140,20 @@ export class AssignmentService {
         orderBy: { createdAt: 'desc' },
       });
 
-      const results = await Promise.all(
-        assignments.map(async (assignment) => {
-          const submission = await this.prisma.submission.findUnique({
-            where: {
-              uk_submissions_assignment_student: {
-                assignmentId: assignment.id,
-                studentId: viewer.id,
-              },
-            },
-          });
+      // Một truy vấn cho toàn bộ bài nộp của sinh viên trong khóa học (tránh N+1)
+      const submissions = await this.prisma.submission.findMany({
+        where: {
+          studentId: viewer.id,
+          assignmentId: { in: assignments.map((a) => a.id) },
+        },
+      });
+      const byAssignment = new Map(submissions.map((s) => [s.assignmentId, s]));
 
-          const mySubmission = submission
-            ? {
-                status: submission.status,
-                score: formatScore(
-                  (submission as { score?: Prisma.Decimal | number | string | null }).score,
-                ),
-                submittedAt: submission.submittedAt,
-              }
-            : null;
-
-          return this.formatAssignment(assignment, { mySubmission });
+      return assignments.map((assignment) =>
+        this.formatAssignment(assignment, {
+          mySubmission: toMySubmission(byAssignment.get(assignment.id)),
         }),
       );
-
-      return results;
     }
 
     const where: Prisma.AssignmentWhereInput = { courseId };
@@ -183,9 +175,18 @@ export class AssignmentService {
     const assignments = await this.prisma.assignment.findMany({
       where,
       orderBy: { createdAt: 'desc' },
+      include: { submissions: { select: { isLate: true } } },
     });
 
-    return assignments.map((assignment) => this.formatAssignment(assignment));
+    // Giáo viên thấy nhanh số bài đã nộp / nộp trễ ngay trên trang khóa học
+    return assignments.map(({ submissions, ...assignment }) =>
+      this.formatAssignment(assignment, {
+        submissionStats: {
+          submitted: submissions?.length ?? 0,
+          late: submissions?.filter((s) => s.isLate).length ?? 0,
+        },
+      }),
+    );
   }
 
   /**
@@ -220,17 +221,9 @@ export class AssignmentService {
         },
       });
 
-      const mySubmission = submission
-        ? {
-            status: submission.status,
-            score: formatScore(
-              (submission as { score?: Prisma.Decimal | number | string | null }).score,
-            ),
-            submittedAt: submission.submittedAt,
-          }
-        : null;
-
-      return this.formatAssignment(assignment, { mySubmission });
+      return this.formatAssignment(assignment, {
+        mySubmission: toMySubmission(submission ?? undefined),
+      });
     }
 
     return this.formatAssignment(assignment);
@@ -254,9 +247,11 @@ export class AssignmentService {
       throw new NotFoundException('Bài tập không tồn tại trong khóa học này');
     }
 
-    if (existing.status !== ActivityStatus.DRAFT) {
+    // Giống Moodle: bài tập đã xuất bản vẫn sửa được (gia hạn, bật nộp trễ, đổi hình thức nộp...);
+    // chỉ bài tập đã đóng mới bị khóa.
+    if (existing.status === ActivityStatus.CLOSED) {
       throw new ConflictException(
-        'Chỉ có thể chỉnh sửa bài tập khi đang ở trạng thái nháp (DRAFT)',
+        'Bài tập đã đóng, không thể chỉnh sửa',
       );
     }
 
@@ -305,6 +300,21 @@ export class AssignmentService {
     }
     if (dto.maxScore !== undefined) {
       dataToUpdate.maxScore = new Prisma.Decimal(dto.maxScore);
+    }
+    if (
+      dto.allowLateSubmission !== undefined ||
+      dto.allowTextSubmission !== undefined ||
+      dto.allowFileSubmission !== undefined
+    ) {
+      // Gộp với giá trị hiện có để vẫn bảo đảm còn ít nhất một hình thức nộp bài
+      Object.assign(
+        dataToUpdate,
+        resolveSubmissionOptions({
+          allowLateSubmission: dto.allowLateSubmission ?? existing.allowLateSubmission,
+          allowTextSubmission: dto.allowTextSubmission ?? existing.allowTextSubmission,
+          allowFileSubmission: dto.allowFileSubmission ?? existing.allowFileSubmission,
+        }),
+      );
     }
 
     if (dto.maxScore !== undefined) {
@@ -414,14 +424,14 @@ export class AssignmentService {
       publishedAt: Date | null;
       createdAt: Date;
       updatedAt: Date;
+      allowLateSubmission?: boolean;
+      allowTextSubmission?: boolean;
+      allowFileSubmission?: boolean;
     },
     extra?: {
       gradeItemId?: bigint;
-      mySubmission?: {
-        status: string;
-        score: string | null;
-        submittedAt: Date;
-      } | null;
+      mySubmission?: MySubmissionSummary | null;
+      submissionStats?: { submitted: number; late: number };
     },
   ) {
     return {
@@ -436,6 +446,9 @@ export class AssignmentService {
       dueAt: assignment.dueAt,
       status: assignment.status,
       publishedAt: assignment.publishedAt,
+      allowLateSubmission: assignment.allowLateSubmission ?? false,
+      allowTextSubmission: assignment.allowTextSubmission ?? true,
+      allowFileSubmission: assignment.allowFileSubmission ?? true,
       createdAt: assignment.createdAt,
       updatedAt: assignment.updatedAt,
       ...(extra?.gradeItemId !== undefined
@@ -444,7 +457,52 @@ export class AssignmentService {
       ...(extra && 'mySubmission' in extra
         ? { mySubmission: extra.mySubmission }
         : {}),
+      ...(extra?.submissionStats
+        ? { submissionStats: extra.submissionStats }
+        : {}),
     };
   }
+}
+
+export interface MySubmissionSummary {
+  id: string;
+  status: SubmissionStatus;
+  isLate: boolean;
+  submittedAt: Date;
+}
+
+/** Tóm tắt bài nộp của sinh viên gắn kèm bài tập (chi tiết lấy ở SubmissionService) */
+function toMySubmission(
+  submission?: { id: bigint; status: SubmissionStatus; isLate: boolean; submittedAt: Date } | null,
+): MySubmissionSummary | null {
+  if (!submission) return null;
+  return {
+    id: submission.id.toString(),
+    status: submission.status,
+    isLate: submission.isLate,
+    submittedAt: submission.submittedAt,
+  };
+}
+
+/**
+ * Tùy chọn nộp bài: mặc định cho phép bài làm trực tuyến + tệp đính kèm, không cho nộp trễ.
+ * Phải còn ít nhất một hình thức nộp, nếu không sinh viên không thể nộp bài.
+ */
+function resolveSubmissionOptions(dto: {
+  allowLateSubmission?: boolean;
+  allowTextSubmission?: boolean;
+  allowFileSubmission?: boolean;
+}) {
+  const options = {
+    allowLateSubmission: dto.allowLateSubmission ?? false,
+    allowTextSubmission: dto.allowTextSubmission ?? true,
+    allowFileSubmission: dto.allowFileSubmission ?? true,
+  };
+  if (!options.allowTextSubmission && !options.allowFileSubmission) {
+    throw new BadRequestException(
+      'Phải cho phép ít nhất một hình thức nộp bài (bài làm trực tuyến hoặc tệp đính kèm)',
+    );
+  }
+  return options;
 }
 

@@ -1,6 +1,8 @@
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient, Prisma } from '../src/generated/prisma/client.js';
 import {
+  ActivityStatus,
+  GradeCategory,
   UserRole,
   UserStatus,
   CourseStatus,
@@ -13,6 +15,7 @@ import bcrypt from 'bcryptjs';
 import { v2 as cloudinary } from 'cloudinary';
 import { DEFAULT_MODULE_TITLE } from '../src/modules/learning-content/learning-content.constants.js';
 import { buildLessonFields } from '../src/modules/learning-content/utils/lesson-fields.js';
+import { sanitizeRichHtml } from '../src/modules/learning-content/utils/html-sanitizer.js';
 import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -105,6 +108,32 @@ interface SeedModule {
   lessons: SeedLesson[];
 }
 
+interface SeedSubmission {
+  student: UserKey;
+  /** HTML bài làm trực tuyến (hoặc văn bản thuần) */
+  content?: string;
+  /** Tệp mẫu đính kèm (không có trên Cloudinary — chỉ để hiển thị) */
+  file?: SeedResource;
+  /** Nộp sau hạn — chỉ dùng cho bài tập cho phép nộp trễ */
+  late?: boolean;
+}
+
+interface SeedAssignment {
+  /** Tiêu đề module chứa bài tập */
+  module: string;
+  title: string;
+  description?: string;
+  maxScore?: number; // mặc định 10
+  /** Số ngày tính từ lúc seed: âm = quá khứ, dương = tương lai */
+  opensInDays: number;
+  dueInDays: number;
+  status?: ActivityStatus; // mặc định PUBLISHED
+  allowLateSubmission?: boolean;
+  allowTextSubmission?: boolean;
+  allowFileSubmission?: boolean;
+  submissions?: SeedSubmission[];
+}
+
 interface SeedCourse {
   code: string;
   name: string;
@@ -115,6 +144,7 @@ interface SeedCourse {
   // Số bài học PUBLISHED đầu tiên (theo thứ tự hiển thị) mà sinh viên đã hoàn thành; 'all' = toàn bộ
   progress?: Partial<Record<UserKey, number | 'all'>>;
   modules: SeedModule[];
+  assignments?: SeedAssignment[];
 }
 
 const PDF = 'application/pdf';
@@ -254,6 +284,59 @@ const COURSES: SeedCourse[] = [
         // Module rỗng: test trạng thái "chưa có bài học"
         title: 'Chương 4: Triển khai ứng dụng (đang soạn)',
         lessons: [],
+      },
+    ],
+    // Bài tập: đủ các tình huống nộp bài (đang mở / quá hạn cho nộp trễ / quá hạn không nhận / chỉ tệp / nháp)
+    assignments: [
+      {
+        module: 'Chương 1: Tổng quan & chuẩn bị môi trường',
+        title: 'Bài tập 1: Thiết lập môi trường và Git',
+        description:
+          '<p>Cài đặt Node.js, PostgreSQL và tạo repository trên GitHub.</p><ul><li>Nộp <strong>đường dẫn repository</strong> trong bài làm trực tuyến.</li><li>Đính kèm ảnh chụp màn hình <code>npm run start:dev</code> chạy thành công (nén .zip nếu nhiều ảnh).</li></ul>',
+        opensInDays: -7,
+        dueInDays: 5,
+        submissions: [
+          { student: 'student1', content: 'Repo: https://github.com/student1/classroom-hub-lab1', file: { fileName: 'lab1-screenshots.zip', mimeType: 'application/zip', sizeKb: 860 } },
+          { student: 'student2', content: 'Repo: https://github.com/student2/web-lab1' },
+        ],
+      },
+      {
+        module: 'Chương 2: Backend với NestJS & Prisma',
+        title: 'Bài tập 2: Thiết kế schema Prisma cho hệ thống quản lý khóa học',
+        description:
+          '<p>Thiết kế schema gồm <em>User, Course, Enrollment</em>. Giải thích lựa chọn khóa ngoại và ràng buộc.</p><p><strong>Cho phép nộp trễ</strong> — bài nộp sau hạn sẽ được đánh dấu "Nộp trễ".</p>',
+        opensInDays: -14,
+        dueInDays: -2,
+        allowLateSubmission: true,
+        submissions: [
+          { student: 'student2', content: '<h3>Schema</h3><p>Ba bảng với quan hệ nhiều-nhiều qua Enrollment...</p>', file: { fileName: 'schema.prisma', mimeType: 'text/plain', sizeKb: 6 } },
+          { student: 'student1', content: '<p>Em nộp trễ do ốm, mong thầy thông cảm.</p>', late: true },
+        ],
+      },
+      {
+        module: 'Chương 2: Backend với NestJS & Prisma',
+        title: 'Bài tập 3: Viết REST API CRUD cho Course (chỉ nhận tệp)',
+        description: '<p>Nén mã nguồn thành <strong>.zip</strong> (không kèm node_modules) và nộp. Không nhận bài làm trực tuyến, <strong>không nhận bài nộp trễ</strong>.</p>',
+        maxScore: 100,
+        opensInDays: -10,
+        dueInDays: -1,
+        allowTextSubmission: false,
+        submissions: [{ student: 'student2', file: { fileName: 'course-api.zip', mimeType: 'application/zip', sizeKb: 2450 } }],
+      },
+      {
+        module: 'Chương 3: Frontend với Next.js',
+        title: 'Bài tập 4: Trang danh sách khóa học với Next.js (chỉ bài làm trực tuyến)',
+        description: '<p>Trình bày cách tổ chức component và gọi API trong bài làm trực tuyến. Không cần đính kèm tệp.</p>',
+        opensInDays: 3,
+        dueInDays: 14,
+        allowFileSubmission: false,
+      },
+      {
+        module: 'Chương 4: Triển khai ứng dụng (đang soạn)',
+        title: 'Bài tập 5: Triển khai lên Vercel + Render (đang soạn)',
+        opensInDays: 10,
+        dueInDays: 24,
+        status: ActivityStatus.DRAFT,
       },
     ],
   },
@@ -426,6 +509,7 @@ async function seedCourse(c: SeedCourse, userIds: Record<UserKey, bigint>) {
   }
 
   const publishedLessonIds: bigint[] = [];
+  const moduleIds = new Map<string, bigint>();
   let lessonCount = 0;
 
   // Module mặc định "Chung" luôn đứng đầu: dùng module "Chung" khai báo sẵn, nếu không có thì tạo rỗng
@@ -436,6 +520,7 @@ async function seedCourse(c: SeedCourse, userIds: Record<UserKey, bigint>) {
     const mod = await prisma.module.create({
       data: { courseId: course.id, title: m.title, orderIndex: mIdx + 1, isDefault: mIdx === 0 },
     });
+    moduleIds.set(m.title, mod.id);
 
     for (const [lIdx, l] of m.lessons.entries()) {
       const status = l.status ?? LessonStatus.PUBLISHED;
@@ -488,18 +573,93 @@ async function seedCourse(c: SeedCourse, userIds: Record<UserKey, bigint>) {
     }
   }
 
+  const assignmentCount = await seedAssignments(c, course.id, moduleIds, userIds);
+
   console.log(
-    `✅ ${c.code.padEnd(9)} ${c.status.padEnd(8)} ${c.name} — ${modules.length} module, ${lessonCount} bài học, ${c.enrollments.length} ghi danh`,
+    `✅ ${c.code.padEnd(9)} ${c.status.padEnd(8)} ${c.name} — ${modules.length} module, ${lessonCount} bài học, ${assignmentCount} bài tập, ${c.enrollments.length} ghi danh`,
   );
+}
+
+const daysFromNow = (days: number) => new Date(Date.now() + days * 24 * 60 * 60 * 1000);
+
+/** Bài tập kèm GradeItem (như AssignmentService.create) và bài nộp mẫu (như SubmissionService.upsert) */
+async function seedAssignments(
+  c: SeedCourse,
+  courseId: bigint,
+  moduleIds: Map<string, bigint>,
+  userIds: Record<UserKey, bigint>,
+) {
+  for (const a of c.assignments ?? []) {
+    const moduleId = moduleIds.get(a.module);
+    if (!moduleId) throw new Error(`Seed ${c.code}: không tìm thấy module "${a.module}" cho bài tập "${a.title}"`);
+    const status = a.status ?? ActivityStatus.PUBLISHED;
+    const maxScore = new Prisma.Decimal(a.maxScore ?? 10);
+    const dueAt = daysFromNow(a.dueInDays);
+
+    const assignment = await prisma.assignment.create({
+      data: {
+        courseId,
+        moduleId,
+        createdBy: userIds[c.owner],
+        title: a.title,
+        description: sanitizeRichHtml(toHtml(a.description)) || null,
+        maxScore,
+        openAt: daysFromNow(a.opensInDays),
+        dueAt,
+        status,
+        publishedAt: status === ActivityStatus.PUBLISHED ? new Date() : null,
+        allowLateSubmission: a.allowLateSubmission ?? false,
+        allowTextSubmission: a.allowTextSubmission ?? true,
+        allowFileSubmission: a.allowFileSubmission ?? true,
+      },
+    });
+    await prisma.gradeItem.create({
+      data: { courseId, category: GradeCategory.ASSIGNMENT, assignmentId: assignment.id, maxScore },
+    });
+
+    for (const s of a.submissions ?? []) {
+      // Nộp trễ: 1 ngày sau hạn; đúng hạn: 1 ngày trước hạn (hoặc hôm nay nếu hạn còn xa)
+      const submittedAt = s.late
+        ? new Date(dueAt.getTime() + 24 * 60 * 60 * 1000)
+        : new Date(Math.min(Date.now(), dueAt.getTime() - 24 * 60 * 60 * 1000));
+      const submission = await prisma.submission.create({
+        data: {
+          assignmentId: assignment.id,
+          studentId: userIds[s.student],
+          content: sanitizeRichHtml(toHtml(s.content)) || null,
+          isLate: Boolean(s.late),
+          submittedAt,
+        },
+      });
+      if (s.file) {
+        await prisma.resource.create({
+          data: {
+            parentType: ResourceParent.SUBMISSION,
+            submissionId: submission.id,
+            uploadedBy: userIds[s.student],
+            fileName: s.file.fileName,
+            storageKey: `raw:classroom-hub/seed/${c.code.toLowerCase()}/submissions/${s.file.fileName}`,
+            fileSizeBytes: BigInt(s.file.sizeKb * 1024),
+            mimeType: s.file.mimeType,
+          },
+        });
+      }
+    }
+  }
+  return c.assignments?.length ?? 0;
 }
 
 async function destroyUploadedFiles(courseCodes: string[]) {
   const { CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET } = process.env;
   if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_API_KEY || !CLOUDINARY_API_SECRET) return;
 
+  // Tệp tài liệu bài học + tệp bài nộp của sinh viên trong các môn seed
   const resources = await prisma.resource.findMany({
     where: {
-      lesson: { module: { course: { courseCode: { in: courseCodes } } } },
+      OR: [
+        { lesson: { module: { course: { courseCode: { in: courseCodes } } } } },
+        { submission: { assignment: { course: { courseCode: { in: courseCodes } } } } },
+      ],
       NOT: { storageKey: { contains: ':classroom-hub/seed/' } },
     },
     select: { storageKey: true },

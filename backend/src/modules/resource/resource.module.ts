@@ -14,7 +14,7 @@ import { ResourceUploadService } from './resource-upload.service.js';
   imports: [DatabaseModule, JwtModule.register({})],
   controllers: [ResourceController, LessonResourceController, ResourceUploadController],
   providers: [ResourceService, CloudinaryService, ResourceUploadService],
-  exports: [ResourceService, CloudinaryService],
+  exports: [ResourceService, CloudinaryService, ResourceUploadService],
 })
 export class ResourceModule {}
 

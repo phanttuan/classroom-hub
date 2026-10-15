@@ -14,6 +14,7 @@ import { CourseModule } from './modules/course/course.module.js';
 import { ResourceModule } from './modules/resource/resource.module.js';
 import { LearningContentModule } from './modules/learning-content/learning-content.module.js';
 import { AssignmentModule } from './modules/assignment/assignment.module.js';
+import { SubmissionModule } from './modules/submission/submission.module.js';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor.js';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
 
@@ -39,6 +40,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
     ResourceModule,
     LearningContentModule,
     AssignmentModule,
+    SubmissionModule,
   ],
   controllers: [AppController],
   providers: [

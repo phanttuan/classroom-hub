@@ -299,6 +299,10 @@ model Assignment {
   dueAt       DateTime       @map("due_at") @db.Timestamptz(6)
   status      ActivityStatus @default(DRAFT)
   publishedAt DateTime?      @map("published_at") @db.Timestamptz(6)
+  // Tùy chọn nộp bài do giáo viên thiết lập (giống Moodle): nộp trễ / bài làm trực tuyến / tệp đính kèm
+  allowLateSubmission Boolean @default(false) @map("allow_late_submission")
+  allowTextSubmission Boolean @default(true) @map("allow_text_submission")
+  allowFileSubmission Boolean @default(true) @map("allow_file_submission")
   createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -316,6 +320,10 @@ model Submission {
   assignmentId BigInt           @map("assignment_id")
   studentId    BigInt           @map("student_id")
   status       SubmissionStatus @default(SUBMITTED)
+  /// Bài làm trực tuyến (HTML đã làm sạch); null nếu chỉ nộp tệp
+  content      String?          @db.Text
+  /// Nộp sau hạn (dueAt) — chỉ xảy ra khi bài tập cho phép nộp trễ
+  isLate       Boolean          @default(false) @map("is_late")
   submittedAt  DateTime         @default(now()) @map("submitted_at") @db.Timestamptz(6)
   updatedAt    DateTime         @updatedAt @map("updated_at") @db.Timestamptz(6)
 

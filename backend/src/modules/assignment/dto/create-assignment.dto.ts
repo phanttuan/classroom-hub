@@ -1,4 +1,5 @@
 import {
+  IsBoolean,
   IsDateString,
   IsNotEmpty,
   IsNumber,
@@ -11,6 +12,21 @@ import {
 import { Transform } from 'class-transformer';
 
 export class CreateAssignmentDto {
+  /** Cho phép sinh viên nộp sau hạn (bài nộp được đánh dấu "Nộp trễ") */
+  @IsOptional()
+  @IsBoolean({ message: 'Tùy chọn cho phép nộp trễ phải là true/false' })
+  allowLateSubmission?: boolean;
+
+  /** Cho phép sinh viên trả lời bằng trình soạn thảo (bài làm trực tuyến) */
+  @IsOptional()
+  @IsBoolean({ message: 'Tùy chọn bài làm trực tuyến phải là true/false' })
+  allowTextSubmission?: boolean;
+
+  /** Cho phép sinh viên đính kèm tệp */
+  @IsOptional()
+  @IsBoolean({ message: 'Tùy chọn đính kèm tệp phải là true/false' })
+  allowFileSubmission?: boolean;
+
   @Transform(({ value }) => (typeof value === 'string' ? value.trim() : String(value ?? '')))
   @IsString({ message: 'Mã chủ đề (moduleId) phải là chuỗi' })
   @IsNotEmpty({ message: 'Mã chủ đề (moduleId) không được để trống' })

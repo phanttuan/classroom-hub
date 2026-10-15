@@ -129,6 +129,8 @@ export default function CourseShell({
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedNoti, setSelectedNoti] = useState<TeacherNotification | null | undefined>(undefined);
   const [localSearch, setLocalSearch] = useState("");
+  // Topic đã thu gọn trong mục lục (mặc định mở hết)
+  const [collapsedModules, setCollapsedModules] = useState<Record<string, boolean>>({});
 
   const coursePath = course ? coursePathOf(role, course.id) : "";
 
@@ -205,19 +207,38 @@ export default function CourseShell({
           <ul className="space-y-1.5">
             {course?.modules?.map((m) => {
               const isSelected = activeModuleId === m.id;
+              const isCollapsed = collapsedModules[m.id] ?? false;
+              const hasLessons = Boolean(m.lessons && m.lessons.length > 0);
               return (
                 <li key={m.id}>
-                  <button
-                    onClick={() => goToModule(m.id)}
-                    className={`flex w-full items-start gap-2 rounded-xl p-2.5 text-left text-[13px] font-semibold transition ${
+                  {/* Mũi tên thu gọn / mở rộng là nút riêng — bấm vào tên topic vẫn điều hướng */}
+                  <div
+                    className={`flex w-full items-start gap-1 rounded-xl p-1.5 pr-2.5 text-[13px] font-semibold transition ${
                       isSelected ? "bg-[#0f6cbf] text-white shadow-sm" : "text-slate-700 hover:bg-slate-100"
                     }`}
                   >
-                    <ChevronDown className={`mt-0.5 h-4 w-4 shrink-0 ${isSelected ? "text-white" : "text-slate-400"}`} />
-                    <span className="line-clamp-2 flex-1 leading-snug">{m.title}</span>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setCollapsedModules((prev) => ({ ...prev, [m.id]: !isCollapsed }))}
+                      aria-expanded={!isCollapsed}
+                      aria-label={isCollapsed ? "Mở rộng topic" : "Thu gọn topic"}
+                      disabled={!hasLessons}
+                      className={`grid h-6 w-6 shrink-0 place-items-center rounded-md transition ${
+                        isSelected ? "text-white hover:bg-white/20" : "text-slate-400 hover:bg-slate-200"
+                      } ${hasLessons ? "" : "opacity-40"}`}
+                    >
+                      <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${isCollapsed ? "-rotate-90" : ""}`} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => goToModule(m.id)}
+                      className="line-clamp-2 flex-1 py-0.5 text-left leading-snug"
+                    >
+                      {m.title}
+                    </button>
+                  </div>
 
-                  {m.lessons && m.lessons.length > 0 && (
+                  {hasLessons && !isCollapsed && (
                     <ul className="ml-5 mt-1 space-y-0.5 border-l-2 border-slate-200 pl-2">
                       {m.lessons.map((l) => {
                         const meta = LESSON_TYPE_META[l.type] ?? LESSON_TYPE_META.PAGE;

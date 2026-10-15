@@ -5,8 +5,6 @@ import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   Archive,
-  ChevronDown,
-  ChevronRight,
   ClipboardList,
   Eye,
   EyeOff,
@@ -56,6 +54,7 @@ import {
 } from "@/lib/lesson-types";
 import RichContent from "@/components/content/RichContent";
 import RichTextEditor from "@/components/editor/RichTextEditor";
+import { Checkbox, Field, Fieldset } from "./form-controls";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { toast } from "@/app/components/common/Toast";
 import CourseShell, { coursePathOf, useCourseContent } from "./CourseShell";
@@ -123,8 +122,10 @@ const TYPE_TIPS: Record<EditorActivityType, string[]> = {
   ASSIGNMENT: [
     "Hạn nộp bài phải sau thời gian mở bài tập.",
     "Điểm tối đa mặc định là 10. Điểm này sẽ tự động được đưa vào Sổ điểm (Gradebook) của khóa học.",
+    "Chọn hình thức nộp: bài làm trực tuyến, tệp đính kèm hoặc cả hai. Mỗi sinh viên nộp tối đa 1 tệp — nhiều tệp thì nén .zip.",
+    "Bật “Cho phép nộp bài sau hạn” nếu muốn nhận bài trễ; bài nộp sau hạn luôn được đánh dấu “Nộp trễ”.",
     "Chọn 'Lưu bản nháp' nếu bài tập chưa sẵn sàng hiển thị cho sinh viên.",
-    "Chọn 'Lưu và quay lại khóa học' (hoặc xuất bản) để sinh viên có thể xem và nộp bài.",
+    "Bài tập đã xuất bản vẫn chỉnh sửa được (gia hạn, bật nộp trễ, đổi hình thức nộp…); chỉ bài tập đã đóng mới bị khóa.",
   ],
 };
 
@@ -176,86 +177,6 @@ interface LessonEditorProps {
   assignmentId?: string;
 }
 
-/** Nhóm trường có thể thu gọn — giống fieldset trong form của Moodle */
-function Fieldset({
-  title,
-  children,
-  defaultOpen = true,
-}: {
-  title: string;
-  children: React.ReactNode;
-  defaultOpen?: boolean;
-}) {
-  const [open, setOpen] = useState(defaultOpen);
-  return (
-    <section className="border-b border-slate-100 last:border-b-0">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center gap-2 px-6 py-4 text-left text-[16px] font-bold text-slate-900 hover:text-[#0f6cbf]"
-      >
-        {open ? (
-          <ChevronDown className="h-5 w-5 text-[#0f6cbf]" />
-        ) : (
-          <ChevronRight className="h-5 w-5 text-[#0f6cbf]" />
-        )}
-        {title}
-      </button>
-      {open && <div className="space-y-5 px-6 pb-6 sm:pl-[52px]">{children}</div>}
-    </section>
-  );
-}
-
-function Field({
-  label,
-  required,
-  hint,
-  error,
-  children,
-}: {
-  label: string;
-  required?: boolean;
-  hint?: string;
-  error?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="grid gap-2 lg:grid-cols-[200px_1fr] lg:gap-6">
-      <label className="pt-2 text-[14px] font-medium text-slate-700">
-        {label}
-        {required && (
-          <span className="ml-1 text-red-600" title="Bắt buộc">
-            *
-          </span>
-        )}
-      </label>
-      <div className="min-w-0">
-        {children}
-        {hint && !error && <p className="mt-1.5 text-[12.5px] text-slate-500">{hint}</p>}
-        {error && (
-          <p className="mt-1.5 flex items-center gap-1 text-[12.5px] font-medium text-red-600">
-            <AlertCircle className="h-3.5 w-3.5" /> {error}
-          </p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function Checkbox({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label: string }) {
-  return (
-    <label className="flex cursor-pointer items-center gap-2.5 text-[14px] text-slate-700">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="h-4 w-4 rounded border-slate-300 text-[#0f6cbf] focus:ring-[#0f6cbf]"
-      />
-      {label}
-    </label>
-  );
-}
-
 const selectClass =
   "h-10 w-full max-w-sm rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#0f6cbf] focus:ring-4 focus:ring-blue-100";
 
@@ -300,6 +221,12 @@ export default function LessonEditor({
   const [maxScore, setMaxScore] = useState<string>("10");
   const [openAt, setOpenAt] = useState<string>(() => defaultOpenAtLocal());
   const [dueAt, setDueAt] = useState<string>(() => defaultDueAtLocal());
+  // Tùy chọn nộp bài (giống "Submission types" / "Cut-off" của Moodle)
+  const [allowTextSubmission, setAllowTextSubmission] = useState(true);
+  const [allowFileSubmission, setAllowFileSubmission] = useState(true);
+  const [allowLateSubmission, setAllowLateSubmission] = useState(false);
+  // Trạng thái bài tập đang chỉnh sửa — bài đã xuất bản thì nhắc rằng thay đổi có hiệu lực ngay với sinh viên
+  const [assignmentStatus, setAssignmentStatus] = useState<"DRAFT" | "PUBLISHED" | "CLOSED" | null>(null);
 
   // Tệp
   const [existingFiles, setExistingFiles] = useState<ResourceDto[]>([]);
@@ -351,6 +278,10 @@ export default function LessonEditor({
         setMaxScore(String(Number(a.maxScore) || a.maxScore));
         setOpenAt(toDatetimeLocalValue(a.openAt));
         setDueAt(toDatetimeLocalValue(a.dueAt));
+        setAllowTextSubmission(a.allowTextSubmission ?? true);
+        setAllowFileSubmission(a.allowFileSubmission ?? true);
+        setAllowLateSubmission(a.allowLateSubmission ?? false);
+        setAssignmentStatus(a.status);
         setVisible(a.status === "PUBLISHED");
       })
       .catch((err) => active && setLoadError((err as Error)?.message || "Không tải được thông tin bài tập"));
@@ -447,6 +378,9 @@ export default function LessonEditor({
     if (!Number.isNaN(openDate.getTime()) && !Number.isNaN(dueDate.getTime()) && dueDate <= openDate) {
       nextErrors.dueAt = "Hạn nộp phải sau thời gian mở bài tập";
     }
+    if (!allowTextSubmission && !allowFileSubmission) {
+      nextErrors.submissionTypes = "Phải cho phép ít nhất một hình thức nộp bài";
+    }
 
     if (Object.keys(nextErrors).length > 0) {
       setErrors(nextErrors);
@@ -459,27 +393,25 @@ export default function LessonEditor({
       return;
     }
 
+    const payload = {
+      moduleId: targetMod,
+      title: title.trim(),
+      description: description.trim() || undefined,
+      maxScore: parsedScore,
+      openAt: openDate.toISOString(),
+      dueAt: dueDate.toISOString(),
+      allowTextSubmission,
+      allowFileSubmission,
+      allowLateSubmission,
+    };
+
     setSaving(mode);
     try {
       if (assignmentId) {
-        await updateAssignment(courseId, assignmentId, {
-          moduleId: targetMod,
-          title: title.trim(),
-          description: description.trim() || undefined,
-          maxScore: parsedScore,
-          openAt: openDate.toISOString(),
-          dueAt: dueDate.toISOString(),
-        });
+        await updateAssignment(courseId, assignmentId, payload);
         toast.success("Đã cập nhật bài tập");
       } else {
-        const created = await createAssignment(courseId, {
-          moduleId: targetMod,
-          title: title.trim(),
-          description: description.trim() || undefined,
-          maxScore: parsedScore,
-          openAt: openDate.toISOString(),
-          dueAt: dueDate.toISOString(),
-        });
+        const created = await createAssignment(courseId, payload);
         if (mode === "course") {
           await publishAssignment(courseId, created.id);
           toast.success("Đã tạo và xuất bản bài tập");
@@ -633,8 +565,8 @@ export default function LessonEditor({
                 <Eye className="h-4 w-4" /> Xem trang hiện tại
               </HeroButton>
             ) : isEdit && assignmentId ? (
-              <HeroButton href={backToCourse}>
-                <ExternalLink className="h-4 w-4" /> Về khóa học
+              <HeroButton href={`${coursePath}/assignments/${assignmentId}`}>
+                <Eye className="h-4 w-4" /> Xem bài tập
               </HeroButton>
             ) : type ? (
               <HeroButton href={`/teacher/content/courses/${courseId}/lessons/new?section=${targetModuleId}`}>
@@ -691,6 +623,15 @@ export default function LessonEditor({
                 }}
                 className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs"
               >
+                {assignmentStatus === "PUBLISHED" && (
+                  <div className="flex items-start gap-3 border-b border-sky-200 bg-sky-50 px-6 py-3.5 text-[13.5px] text-sky-900">
+                    <Eye className="mt-0.5 h-4.5 w-4.5 shrink-0 text-sky-600" />
+                    <span>
+                      Bài tập <b>đã xuất bản</b> — thay đổi có hiệu lực ngay với sinh viên. Bài đã nộp được giữ nguyên; nếu tắt một
+                      hình thức nộp, sinh viên sẽ không gửi thêm theo hình thức đó.
+                    </span>
+                  </div>
+                )}
                 {/* ============ CHUNG ============ */}
                 <Fieldset title="Chung">
                   <Field label="Tên bài tập" required error={errors.title}>
@@ -802,8 +743,55 @@ export default function LessonEditor({
                   </div>
                 </Fieldset>
 
+                {/* ============ TÙY CHỌN NỘP BÀI ============ */}
+                <Fieldset title="Tùy chọn nộp bài">
+                  <Field
+                    label="Hình thức nộp bài"
+                    required
+                    error={errors.submissionTypes}
+                    hint="Hình thức không được chọn sẽ bị ẩn ở trang nộp bài và bị chặn ở máy chủ."
+                  >
+                    <div className="space-y-3">
+                      <Checkbox
+                        checked={allowTextSubmission}
+                        onChange={(v) => {
+                          setAllowTextSubmission(v);
+                          setErrors((er) => ({ ...er, submissionTypes: "" }));
+                          markDirty();
+                        }}
+                        label="Bài làm trực tuyến"
+                        hint="Sinh viên soạn câu trả lời ngay trên trình soạn thảo (có đầy đủ công cụ định dạng)."
+                      />
+                      <Checkbox
+                        checked={allowFileSubmission}
+                        onChange={(v) => {
+                          setAllowFileSubmission(v);
+                          setErrors((er) => ({ ...er, submissionTypes: "" }));
+                          markDirty();
+                        }}
+                        label="Tệp đính kèm"
+                        hint="Sinh viên đính kèm 1 tệp bài làm (nhiều tệp thì nén thành .zip). Hệ thống chặn tệp thực thi và giới hạn dung lượng."
+                      />
+                    </div>
+                  </Field>
+
+                  <Field
+                    label="Nộp trễ"
+                    hint="Không bật: sau hạn nộp sinh viên không thể nộp hay sửa bài. Bật: vẫn nhận bài nhưng đánh dấu rõ “Nộp trễ” ở cả hai phía."
+                  >
+                    <Checkbox
+                      checked={allowLateSubmission}
+                      onChange={(v) => {
+                        setAllowLateSubmission(v);
+                        markDirty();
+                      }}
+                      label="Cho phép nộp bài sau hạn"
+                    />
+                  </Field>
+                </Fieldset>
+
                 {/* ============ NÚT LƯU ============ */}
-                <div className="flex flex-wrap items-center gap-2.5 border-t border-slate-200 bg-slate-50/70 px-6 py-4">
+                <div className="flex flex-wrap items-center justify-center gap-2.5 border-t border-slate-200 bg-slate-50/70 px-6 py-4">
                   {submitError && (
                     <p className="mb-1 flex w-full items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] font-medium text-red-700">
                       <AlertCircle className="h-4 w-4 shrink-0" /> {submitError}
@@ -1166,7 +1154,7 @@ export default function LessonEditor({
                 </Fieldset>
 
                 {/* ============ NÚT LƯU ============ */}
-                <div className="flex flex-wrap items-center gap-2.5 border-t border-slate-200 bg-slate-50/70 px-6 py-4">
+                <div className="flex flex-wrap items-center justify-center gap-2.5 border-t border-slate-200 bg-slate-50/70 px-6 py-4">
                   {submitError && (
                     <p className="mb-1 flex w-full items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] font-medium text-red-700">
                       <AlertCircle className="h-4 w-4 shrink-0" /> {submitError}

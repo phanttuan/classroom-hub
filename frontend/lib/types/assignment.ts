@@ -1,9 +1,19 @@
 export type BackendAssignmentStatus = 'DRAFT' | 'PUBLISHED' | 'CLOSED';
 
+export type SubmissionStatus = 'SUBMITTED' | 'GRADED';
+
+/** Tóm tắt bài nộp của chính sinh viên gắn kèm bài tập (chi tiết lấy ở submission-api) */
 export interface AssignmentMySubmissionDto {
-  status: 'SUBMITTED' | 'GRADED';
-  score: string | null;
+  id: string;
+  status: SubmissionStatus;
+  isLate: boolean;
   submittedAt: string;
+}
+
+/** Số bài đã nộp / nộp trễ — chỉ có trong danh sách của giáo viên */
+export interface AssignmentSubmissionStatsDto {
+  submitted: number;
+  late: number;
 }
 
 /**
@@ -24,17 +34,29 @@ export interface AssignmentDto {
   dueAt: string;
   status: BackendAssignmentStatus;
   publishedAt?: string | null;
+  /** Tùy chọn nộp bài do giáo viên thiết lập */
+  allowLateSubmission: boolean;
+  allowTextSubmission: boolean;
+  allowFileSubmission: boolean;
   createdAt: string;
   updatedAt: string;
   gradeItemId?: string;
   mySubmission?: AssignmentMySubmissionDto | null;
+  submissionStats?: AssignmentSubmissionStatsDto;
+}
+
+/** Tùy chọn nộp bài — dùng chung cho payload tạo / cập nhật */
+export interface AssignmentSubmissionOptions {
+  allowLateSubmission?: boolean;
+  allowTextSubmission?: boolean;
+  allowFileSubmission?: boolean;
 }
 
 /**
  * Payload gửi lên khi tạo bài tập mới (POST /courses/:courseId/assignments).
  * Lưu ý: maxScore gửi lên phải là kiểu number (>= 0.01).
  */
-export interface CreateAssignmentPayload {
+export interface CreateAssignmentPayload extends AssignmentSubmissionOptions {
   moduleId: string;
   title: string;
   description?: string;
@@ -47,7 +69,7 @@ export interface CreateAssignmentPayload {
  * Payload gửi lên khi cập nhật bài tập ở trạng thái DRAFT (PATCH /courses/:courseId/assignments/:assignmentId).
  * Lưu ý: maxScore (nếu có) gửi lên phải là kiểu number (>= 0.01).
  */
-export interface UpdateAssignmentPayload {
+export interface UpdateAssignmentPayload extends AssignmentSubmissionOptions {
   moduleId?: string;
   title?: string;
   description?: string;
@@ -55,4 +77,3 @@ export interface UpdateAssignmentPayload {
   openAt?: string;
   dueAt?: string;
 }
-
