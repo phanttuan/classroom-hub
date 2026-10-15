@@ -17,7 +17,7 @@ export class UpdateAssignmentDto {
   allowLateSubmission?: boolean;
 
   @IsOptional()
-  @IsBoolean({ message: 'Tùy chọn bài làm trực tuyến phải là true/false' })
+  @IsBoolean({ message: 'Tùy chọn bài làm văn bản phải là true/false' })
   allowTextSubmission?: boolean;
 
   @IsOptional()

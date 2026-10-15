@@ -74,6 +74,7 @@ export class AssignmentService {
     }
 
     const submissionOptions = resolveSubmissionOptions(dto);
+    const orderIndex = await this.nextOrderIndex(moduleId);
 
     return this.prisma.$transaction(async (tx) => {
       const assignment = await tx.assignment.create({
@@ -87,6 +88,7 @@ export class AssignmentService {
           openAt,
           dueAt,
           status: ActivityStatus.DRAFT,
+          orderIndex,
           ...submissionOptions,
         },
       });
@@ -137,7 +139,7 @@ export class AssignmentService {
 
       const assignments = await this.prisma.assignment.findMany({
         where,
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }],
       });
 
       // Một truy vấn cho toàn bộ bài nộp của sinh viên trong khóa học (tránh N+1)
@@ -174,7 +176,7 @@ export class AssignmentService {
 
     const assignments = await this.prisma.assignment.findMany({
       where,
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }],
       include: { submissions: { select: { isLate: true } } },
     });
 
@@ -285,6 +287,10 @@ export class AssignmentService {
         );
       }
       dataToUpdate.module = { connect: { id: newModuleId } };
+      // Chuyển topic → xếp cuối topic mới
+      if (newModuleId !== existing.moduleId) {
+        dataToUpdate.orderIndex = await this.nextOrderIndex(newModuleId);
+      }
     }
     if (dto.title !== undefined) {
       dataToUpdate.title = dto.title.trim();
@@ -409,6 +415,15 @@ export class AssignmentService {
     return this.formatAssignment(updated);
   }
 
+  /** Vị trí kế tiếp trong topic — sau toàn bộ bài học và bài tập hiện có (cùng dãy với Lesson.orderIndex) */
+  private async nextOrderIndex(moduleId: bigint): Promise<number> {
+    const [lesson, assignment] = await Promise.all([
+      this.prisma.lesson.aggregate({ where: { moduleId }, _max: { orderIndex: true } }),
+      this.prisma.assignment.aggregate({ where: { moduleId }, _max: { orderIndex: true } }),
+    ]);
+    return Math.max(lesson._max.orderIndex ?? 0, assignment._max.orderIndex ?? 0) + 1;
+  }
+
   private formatAssignment(
     assignment: {
       id: bigint;
@@ -427,6 +442,7 @@ export class AssignmentService {
       allowLateSubmission?: boolean;
       allowTextSubmission?: boolean;
       allowFileSubmission?: boolean;
+      orderIndex?: number;
     },
     extra?: {
       gradeItemId?: bigint;
@@ -449,6 +465,7 @@ export class AssignmentService {
       allowLateSubmission: assignment.allowLateSubmission ?? false,
       allowTextSubmission: assignment.allowTextSubmission ?? true,
       allowFileSubmission: assignment.allowFileSubmission ?? true,
+      orderIndex: assignment.orderIndex ?? 0,
       createdAt: assignment.createdAt,
       updatedAt: assignment.updatedAt,
       ...(extra?.gradeItemId !== undefined
@@ -485,7 +502,7 @@ function toMySubmission(
 }
 
 /**
- * Tùy chọn nộp bài: mặc định cho phép bài làm trực tuyến + tệp đính kèm, không cho nộp trễ.
+ * Tùy chọn nộp bài: mặc định cho phép bài làm văn bản + tệp đính kèm, không cho nộp trễ.
  * Phải còn ít nhất một hình thức nộp, nếu không sinh viên không thể nộp bài.
  */
 function resolveSubmissionOptions(dto: {
@@ -500,7 +517,7 @@ function resolveSubmissionOptions(dto: {
   };
   if (!options.allowTextSubmission && !options.allowFileSubmission) {
     throw new BadRequestException(
-      'Phải cho phép ít nhất một hình thức nộp bài (bài làm trực tuyến hoặc tệp đính kèm)',
+      'Phải cho phép ít nhất một hình thức nộp bài (bài làm văn bản hoặc tệp đính kèm)',
     );
   }
   return options;

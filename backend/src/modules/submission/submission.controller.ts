@@ -10,10 +10,12 @@ import {
   Param,
   Put,
   Req,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
@@ -27,6 +29,7 @@ import {
 } from '../resource/resource-upload.service.js';
 import { SubmissionService } from './submission.service.js';
 import { UpsertSubmissionDto } from './dto/upsert-submission.dto.js';
+import { GradeSubmissionDto } from './dto/grade-submission.dto.js';
 
 function parseId(raw: string, label: string): bigint {
   const trimmed = (raw ?? '').trim();
@@ -113,6 +116,64 @@ export class SubmissionController {
       parseId(assignmentIdParam, 'Mã bài tập (assignmentId)'),
     );
     return { message: 'Lấy danh sách bài nộp thành công', data };
+  }
+
+  /** Tải toàn bộ tệp bài nộp dạng .zip (giáo viên phụ trách / admin) — khai báo trước :submissionId */
+  @Get('submissions/download')
+  @Roles(UserRole.TEACHER, UserRole.ADMIN)
+  async downloadAllSubmissions(
+    @Req() req: RequestWithCourseContext,
+    @Res() res: Response,
+    @Param('assignmentId') assignmentIdParam: string,
+  ) {
+    const { archive, fileName, total } = await this.submissionService.buildSubmissionsArchive(
+      req.course!.id,
+      parseId(assignmentIdParam, 'Mã bài tập (assignmentId)'),
+    );
+    res.setHeader('Content-Type', 'application/zip');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="submissions.zip"; filename*=UTF-8''${encodeURIComponent(fileName)}`,
+    );
+    res.setHeader('X-Submission-Files', String(total));
+    archive.on('error', () => res.destroy());
+    archive.pipe(res);
+  }
+
+  /** Chấm điểm / chấm lại bài nộp (giáo viên phụ trách / admin) */
+  @Put('submissions/:submissionId/grade')
+  @Roles(UserRole.TEACHER, UserRole.ADMIN)
+  @HttpCode(HttpStatus.OK)
+  async gradeSubmission(
+    @Req() req: RequestWithCourseContext,
+    @Param('assignmentId') assignmentIdParam: string,
+    @Param('submissionId') submissionIdParam: string,
+    @Body() dto: GradeSubmissionDto,
+  ) {
+    const data = await this.submissionService.grade(
+      req.course!.id,
+      parseId(assignmentIdParam, 'Mã bài tập (assignmentId)'),
+      parseId(submissionIdParam, 'Mã bài nộp (submissionId)'),
+      BigInt(req.user!.id),
+      dto,
+    );
+    return { message: 'Đã lưu điểm và nhận xét', data };
+  }
+
+  /** Bỏ chấm — xóa điểm, bài nộp trở về trạng thái đã nộp */
+  @Delete('submissions/:submissionId/grade')
+  @Roles(UserRole.TEACHER, UserRole.ADMIN)
+  async ungradeSubmission(
+    @Req() req: RequestWithCourseContext,
+    @Param('assignmentId') assignmentIdParam: string,
+    @Param('submissionId') submissionIdParam: string,
+  ) {
+    const data = await this.submissionService.ungrade(
+      req.course!.id,
+      parseId(assignmentIdParam, 'Mã bài tập (assignmentId)'),
+      parseId(submissionIdParam, 'Mã bài nộp (submissionId)'),
+    );
+    return { message: 'Đã bỏ chấm bài nộp', data };
   }
 
   /** Chi tiết một bài nộp (giáo viên phụ trách / admin) */

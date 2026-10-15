@@ -81,8 +81,8 @@ export const BLOCK_REASON_TEXT: Record<SubmissionBlockReason, string> = {
 
 /** Mô tả ngắn hình thức nộp bài giáo viên cho phép */
 export function submissionTypesLabel(a: Pick<AssignmentDto, 'allowTextSubmission' | 'allowFileSubmission'>): string {
-  if (a.allowTextSubmission && a.allowFileSubmission) return 'Bài làm trực tuyến và tệp đính kèm';
-  if (a.allowTextSubmission) return 'Chỉ bài làm trực tuyến';
+  if (a.allowTextSubmission && a.allowFileSubmission) return 'Bài làm văn bản và tệp đính kèm';
+  if (a.allowTextSubmission) return 'Chỉ bài làm văn bản';
   if (a.allowFileSubmission) return 'Chỉ tệp đính kèm';
   return 'Không nhận bài nộp';
 }

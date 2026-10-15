@@ -109,6 +109,17 @@ export async function deleteLesson(lessonId: string): Promise<{ message: string 
   return unwrap(res);
 }
 
+export type ModuleItemRef = { type: 'LESSON' | 'ASSIGNMENT'; id: string };
+
+/** Sắp xếp xen kẽ bài học + bài tập trong topic — gửi đúng toàn bộ mục của topic theo thứ tự mới */
+export async function reorderModuleItems(moduleId: string, items: ModuleItemRef[]): Promise<{ message: string }> {
+  const res = await apiFetch<ApiEnvelope<{ message: string }> | { message: string }>(`/modules/${moduleId}/items/reorder`, {
+    method: 'PATCH',
+    body: JSON.stringify({ items }),
+  });
+  return unwrap(res);
+}
+
 export async function reorderLessons(moduleId: string, itemIds: string[]): Promise<{ message: string }> {
   const res = await apiFetch<ApiEnvelope<{ message: string }> | { message: string }>(`/modules/${moduleId}/lessons/reorder`, {
     method: 'PATCH',

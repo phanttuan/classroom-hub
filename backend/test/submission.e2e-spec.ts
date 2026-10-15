@@ -18,7 +18,7 @@ import {
 import { Prisma } from '../src/generated/prisma/client.js';
 
 /**
- * Luồng nộp bài của sinh viên (bài làm trực tuyến — không gọi Cloudinary):
+ * Luồng nộp bài của sinh viên (bài làm văn bản — không gọi Cloudinary):
  * nộp → xem → sửa (cập nhật thời gian nộp) → loại bỏ; nộp trễ; chặn theo tùy chọn giáo viên; phân quyền.
  */
 describe('Student Submission (E2E)', () => {
@@ -222,7 +222,7 @@ describe('Student Submission (E2E)', () => {
     expect(teacherList.body.data.rows[0].submission.isLate).toBe(true);
   });
 
-  it('4. Tùy chọn giáo viên được chặn ở backend: tắt bài làm trực tuyến / tắt tệp / chưa mở / đã đóng', async () => {
+  it('4. Tùy chọn giáo viên được chặn ở backend: tắt bài làm văn bản / tắt tệp / chưa mở / đã đóng', async () => {
     const server = app.getHttpServer();
 
     const fileOnly = await createAssignment({ allowTextSubmission: false });
@@ -296,6 +296,92 @@ describe('Student Submission (E2E)', () => {
     expect(teacherList.body.data.rows).toHaveLength(1);
     expect(teacherList.body.data.rows[0].submission).toBeNull();
   });
+
+  it('7. Giáo viên chấm điểm + nhận xét → sinh viên thấy điểm, không sửa được; bỏ chấm → sửa lại được', async () => {
+    const server = app.getHttpServer();
+    const assignmentId = await createAssignment({});
+    const submitted = await request(server)
+      .put(submissionUrl(assignmentId))
+      .set('Authorization', `Bearer ${student.token}`)
+      .field('content', '<p>Bài làm</p>');
+    const submissionId = submitted.body.data.id as string;
+    const gradeUrl = `/courses/${courseId.toString()}/assignments/${assignmentId}/submissions/${submissionId}/grade`;
+
+    // Điểm vượt thang → 400; sinh viên không được chấm → 403
+    expect((await request(server).put(gradeUrl).set('Authorization', `Bearer ${teacher.token}`).send({ score: 11 })).status).toBe(400);
+    expect((await request(server).put(gradeUrl).set('Authorization', `Bearer ${student.token}`).send({ score: 5 })).status).toBe(403);
+
+    const graded = await request(server)
+      .put(gradeUrl)
+      .set('Authorization', `Bearer ${teacher.token}`)
+      .send({ score: 8.5, feedback: '<p>Khá tốt <script>alert(1)</script></p>' });
+    expect(graded.status).toBe(200);
+    expect(graded.body.data).toMatchObject({ status: SubmissionStatus.GRADED, score: '8.50', feedback: '<p>Khá tốt </p>' });
+
+    // Chấm lại (idempotent: vẫn 1 Grade, thêm 1 dòng lịch sử)
+    const regraded = await request(server).put(gradeUrl).set('Authorization', `Bearer ${teacher.token}`).send({ score: 9 });
+    expect(regraded.body.data.score).toBe('9.00');
+    const gradeItem = await prisma.gradeItem.findUniqueOrThrow({ where: { assignmentId: BigInt(assignmentId) } });
+    const grades = await prisma.grade.findMany({ where: { gradeItemId: gradeItem.id }, include: { histories: true } });
+    expect(grades).toHaveLength(1);
+    expect(grades[0].histories).toHaveLength(2);
+    expect(grades[0].gradedBy).toBe(teacher.id);
+
+    // Sinh viên thấy điểm + nhận xét và bị chặn sửa (409)
+    const mine = await request(server).get(submissionUrl(assignmentId)).set('Authorization', `Bearer ${student.token}`);
+    expect(mine.body.data.submission).toMatchObject({ score: '9.00', feedback: '<p>Khá tốt </p>' });
+    expect(mine.body.data.window).toMatchObject({ canSubmit: false, reason: 'GRADED' });
+    const edit = await request(server).put(submissionUrl(assignmentId)).set('Authorization', `Bearer ${student.token}`).field('content', '<p>Sửa</p>');
+    expect(edit.status).toBe(409);
+
+    // Bỏ chấm → sinh viên sửa lại được
+    const ungraded = await request(server).delete(gradeUrl).set('Authorization', `Bearer ${teacher.token}`);
+    expect(ungraded.status).toBe(200);
+    expect(ungraded.body.data).toMatchObject({ status: SubmissionStatus.SUBMITTED, score: null });
+    const editAgain = await request(server).put(submissionUrl(assignmentId)).set('Authorization', `Bearer ${student.token}`).field('content', '<p>Sửa</p>');
+    expect(editAgain.status).toBe(200);
+  });
+
+  it('8. Tải toàn bộ tệp bài nộp: trả về .zip (tệp không có trên Cloudinary được ghi vào README)', async () => {
+    const server = app.getHttpServer();
+    const assignmentId = await createAssignment({});
+    const submitted = await request(server)
+      .put(submissionUrl(assignmentId))
+      .set('Authorization', `Bearer ${student.token}`)
+      .field('content', '<p>Bài làm</p>');
+    await prisma.resource.create({
+      data: {
+        parentType: 'SUBMISSION',
+        submissionId: BigInt(submitted.body.data.id),
+        uploadedBy: student.id,
+        fileName: 'bai-lam.pdf',
+        storageKey: 'raw:classroom-hub/e2e/khong-ton-tai.pdf',
+        fileSizeBytes: 10n,
+        mimeType: 'application/pdf',
+      },
+    });
+
+    const forbidden = await request(server)
+      .get(`/courses/${courseId.toString()}/assignments/${assignmentId}/submissions/download`)
+      .set('Authorization', `Bearer ${student.token}`);
+    expect(forbidden.status).toBe(403);
+
+    const res = await request(server)
+      .get(`/courses/${courseId.toString()}/assignments/${assignmentId}/submissions/download`)
+      .set('Authorization', `Bearer ${teacher.token}`)
+      .buffer(true)
+      .parse((r, cb) => {
+        const chunks: Buffer[] = [];
+        r.on('data', (c: Buffer) => chunks.push(c));
+        r.on('end', () => cb(null, Buffer.concat(chunks)));
+      });
+    expect(res.status).toBe(200);
+    expect(res.headers['content-type']).toContain('application/zip');
+    expect(res.headers['x-submission-files']).toBe('1');
+    const zip = res.body as Buffer;
+    expect(zip.subarray(0, 2).toString()).toBe('PK');
+    expect(zip.toString('latin1')).toContain('README.txt');
+  }, 30_000);
 
   it('6. Bài tập nháp: sinh viên không xem / nộp được (403)', async () => {
     const draft = await createAssignment({ status: ActivityStatus.DRAFT, publishedAt: null });

@@ -38,6 +38,8 @@ export interface AssignmentDto {
   allowLateSubmission: boolean;
   allowTextSubmission: boolean;
   allowFileSubmission: boolean;
+  /** Vị trí trong topic — cùng dãy số với Lesson.orderIndex (kéo thả xen kẽ) */
+  orderIndex: number;
   createdAt: string;
   updatedAt: string;
   gradeItemId?: string;

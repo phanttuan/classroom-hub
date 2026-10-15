@@ -17,6 +17,7 @@ import { UpdateModuleDto } from './dto/update-module.dto.js';
 import { CreateLessonDto } from './dto/create-lesson.dto.js';
 import { UpdateLessonDto } from './dto/update-lesson.dto.js';
 import { ReorderDto } from './dto/reorder.dto.js';
+import { ReorderItemsDto } from './dto/reorder-items.dto.js';
 import { ToggleProgressDto } from './dto/toggle-progress.dto.js';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard.js';
 import { RolesGuard } from '../../common/guards/roles.guard.js';
@@ -230,6 +231,23 @@ export class LearningContentController {
       dto.itemIds,
     );
     return result;
+  }
+
+  /** Sắp xếp xen kẽ bài học + bài tập trong topic (kéo thả trên trang khóa học) */
+  @Patch('modules/:moduleId/items/reorder')
+  @UseGuards(RolesGuard)
+  @Roles(UserRole.TEACHER, UserRole.ADMIN)
+  async reorderModuleItems(
+    @Req() req: RequestWithUser,
+    @Param('moduleId') moduleIdStr: string,
+    @Body() dto: ReorderItemsDto,
+  ) {
+    return this.learningContentService.reorderModuleItems(
+      BigInt(req.user!.id),
+      req.user!.role as UserRole,
+      BigInt(moduleIdStr),
+      dto.items,
+    );
   }
 
   // =========================================================================

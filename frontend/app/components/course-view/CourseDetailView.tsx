@@ -41,7 +41,7 @@ import {
   reorderModules,
   updateLesson,
   deleteLesson,
-  reorderLessons,
+  reorderModuleItems,
   toggleLessonProgress,
 } from "@/lib/api/learning-content-api";
 import { triggerResourceDownload } from "@/lib/api/resource-api";
@@ -60,6 +60,11 @@ import { formatDateTime, formatScore, submissionStateLabel, type SubmissionState
 import CourseShell, { coursePathOf, useCourseContent, useCurrentUser } from "./CourseShell";
 import CourseHero, { type HeroStatusTone } from "./CourseHero";
 import CourseSkeleton from "./CourseSkeleton";
+
+/** Một mục trong topic: bài học hoặc bài tập, sắp theo orderIndex chung */
+type ModuleItem =
+  | { kind: "lesson"; id: string; order: number; lesson: LessonDto }
+  | { kind: "assignment"; id: string; order: number; assignment: AssignmentDto };
 
 /** Màu badge trạng thái nộp bài của sinh viên trên dòng bài tập */
 const SUBMISSION_BADGE: Record<SubmissionStateTone, string> = {
@@ -242,7 +247,23 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
 
   // Drag & drop
   const [draggedModuleIndex, setDraggedModuleIndex] = useState<number | null>(null);
-  const [draggedLessonInfo, setDraggedLessonInfo] = useState<{ moduleId: string; lessonIndex: number } | null>(null);
+  // Mục đang kéo (bài học hoặc bài tập) — index tính trên danh sách gộp của topic
+  const [draggedItemInfo, setDraggedItemInfo] = useState<{ moduleId: string; index: number } | null>(null);
+
+  /** Bài học + bài tập của topic gộp thành một danh sách theo orderIndex (cùng dãy số ở backend) */
+  const moduleItems = useCallback(
+    (m: ModuleDto): ModuleItem[] => {
+      const items: ModuleItem[] = [
+        ...(m.lessons ?? []).map((lesson) => ({ kind: "lesson" as const, id: lesson.id, order: lesson.orderIndex, lesson })),
+        ...assignments
+          .filter((a) => a.moduleId === m.id)
+          .map((assignment) => ({ kind: "assignment" as const, id: assignment.id, order: assignment.orderIndex, assignment })),
+      ];
+      // orderIndex trùng (dữ liệu cũ) → bài học trước, bài tập sau
+      return items.sort((a, b) => a.order - b.order || (a.kind === b.kind ? 0 : a.kind === "lesson" ? -1 : 1));
+    },
+    [assignments],
+  );
 
   const isExpanded = (modId: string) => !collapsedModules[modId];
   const toggleModuleAccordion = (modId: string) =>
@@ -441,31 +462,42 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
     }
   };
 
-  const handleLessonDragStart = (e: React.DragEvent, moduleId: string, lessonIndex: number) => {
+  const handleItemDragStart = (e: React.DragEvent, moduleId: string, index: number) => {
     e.stopPropagation();
-    setDraggedLessonInfo({ moduleId, lessonIndex });
+    setDraggedItemInfo({ moduleId, index });
   };
 
-  const handleLessonDrop = async (e: React.DragEvent, targetModId: string, dropIndex: number) => {
+  /** Thả bài học / bài tập vào vị trí mới trong cùng topic → cập nhật orderIndex cả hai loại */
+  const handleItemDrop = async (e: React.DragEvent, targetModId: string, dropIndex: number) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!draggedLessonInfo || !course?.modules) return;
-    const sourceMod = course.modules.find((m) => m.id === draggedLessonInfo.moduleId);
-    if (!sourceMod || draggedLessonInfo.moduleId !== targetModId) return;
-    if (draggedLessonInfo.lessonIndex === dropIndex) return;
+    if (!draggedItemInfo || !course?.modules) return;
+    const sourceMod = course.modules.find((m) => m.id === draggedItemInfo.moduleId);
+    if (!sourceMod || draggedItemInfo.moduleId !== targetModId) return;
+    if (draggedItemInfo.index === dropIndex) return;
 
-    const updatedLessons = [...sourceMod.lessons];
-    const [moved] = updatedLessons.splice(draggedLessonInfo.lessonIndex, 1);
-    updatedLessons.splice(dropIndex, 0, moved);
+    const items = moduleItems(sourceMod);
+    const [moved] = items.splice(draggedItemInfo.index, 1);
+    items.splice(dropIndex, 0, moved);
+    const reordered = items.map((item, i) => ({ ...item, order: i + 1 }));
 
+    // Cập nhật ngay trên giao diện: bài học theo thứ tự mới, bài tập nhận orderIndex mới
+    const updatedLessons = reordered
+      .filter((i): i is Extract<ModuleItem, { kind: "lesson" }> => i.kind === "lesson")
+      .map((i) => ({ ...i.lesson, orderIndex: i.order }));
+    const assignmentOrder = new Map(reordered.filter((i) => i.kind === "assignment").map((i) => [i.id, i.order]));
     setCourse({
       ...course,
       modules: course.modules.map((m) => (m.id === targetModId ? { ...m, lessons: updatedLessons } : m)),
     });
-    setDraggedLessonInfo(null);
+    setAssignments((prev) => prev.map((a) => (assignmentOrder.has(a.id) ? { ...a, orderIndex: assignmentOrder.get(a.id)! } : a)));
+    setDraggedItemInfo(null);
 
     try {
-      await reorderLessons(targetModId, updatedLessons.map((l) => l.id));
+      await reorderModuleItems(
+        targetModId,
+        reordered.map((i) => ({ type: i.kind === "lesson" ? ("LESSON" as const) : ("ASSIGNMENT" as const), id: i.id })),
+      );
       showToast("Đã cập nhật thứ tự");
     } catch {
       showToast("Không lưu được thứ tự");
@@ -535,9 +567,9 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
       <div
         key={lesson.id}
         draggable={canDrag}
-        onDragStart={(e) => handleLessonDragStart(e, m.id, lIdx)}
+        onDragStart={(e) => handleItemDragStart(e, m.id, lIdx)}
         onDragOver={handleDragOver}
-        onDrop={(e) => handleLessonDrop(e, m.id, lIdx)}
+        onDrop={(e) => handleItemDrop(e, m.id, lIdx)}
         className={`group flex items-start gap-3 rounded-lg px-4 py-3.5 transition hover:bg-slate-50/80 ${hidden ? "bg-slate-50/60" : ""}`}
       >
         {canDrag && (
@@ -660,9 +692,10 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
     );
   };
 
-  /** Một dòng bài tập trong topic */
-  const renderAssignment = (assignment: AssignmentDto) => {
+  /** Một dòng bài tập trong topic — kéo thả đổi chỗ được như bài học */
+  const renderAssignment = (m: ModuleDto, assignment: AssignmentDto, idx: number) => {
     const hidden = assignment.status === "DRAFT";
+    const canDrag = role === "TEACHER" && editMode && !isSearching;
     const editHref = `/teacher/content/courses/${courseId}/lessons/new?section=${assignment.moduleId}&type=ASSIGNMENT&assignmentId=${assignment.id}`;
     const viewHref = `${coursePath}/assignments/${assignment.id}`;
     const isPastDue = new Date(assignment.dueAt).getTime() < openedAt;
@@ -673,8 +706,17 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
     return (
       <div
         key={`assignment-${assignment.id}`}
+        draggable={canDrag}
+        onDragStart={(e) => handleItemDragStart(e, m.id, idx)}
+        onDragOver={handleDragOver}
+        onDrop={(e) => handleItemDrop(e, m.id, idx)}
         className={`group flex items-start gap-3 rounded-lg px-4 py-3.5 transition hover:bg-slate-50/80 ${hidden ? "bg-slate-50/60" : ""}`}
       >
+        {canDrag && (
+          <span title="Kéo thả để đổi thứ tự" className="mt-2 cursor-grab text-slate-300 hover:text-slate-600">
+            <GripVertical className="h-4 w-4" />
+          </span>
+        )}
         <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-pink-50 text-pink-600 ${hidden ? "opacity-60" : ""}`}>
           <ClipboardList className="h-5 w-5" />
         </div>
@@ -1035,18 +1077,14 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
 
                     {expanded && (
                       <div className="divide-y divide-slate-100 px-2 py-1">
-                        {m.lessons && m.lessons.length > 0
-                          ? m.lessons.map((lesson, lIdx) => renderLesson(m, lesson, lIdx))
-                          : null}
-                        {assignments
-                          .filter((a) => a.moduleId === m.id)
-                          .map((assignment) => renderAssignment(assignment))}
-                        {(!m.lessons || m.lessons.length === 0) &&
-                          assignments.filter((a) => a.moduleId === m.id).length === 0 && (
-                            <div className="py-6 text-center text-xs text-slate-400">
-                              Chưa có nội dung trong topic này.
-                            </div>
-                          )}
+                        {moduleItems(m).map((item, idx) =>
+                          item.kind === "lesson" ? renderLesson(m, item.lesson, idx) : renderAssignment(m, item.assignment, idx),
+                        )}
+                        {moduleItems(m).length === 0 && (
+                          <div className="py-6 text-center text-xs text-slate-400">
+                            Chưa có nội dung trong topic này.
+                          </div>
+                        )}
                       </div>
                     )}
                   </section>

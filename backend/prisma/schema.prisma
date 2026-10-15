@@ -303,6 +303,8 @@ model Assignment {
   allowLateSubmission Boolean @default(false) @map("allow_late_submission")
   allowTextSubmission Boolean @default(true) @map("allow_text_submission")
   allowFileSubmission Boolean @default(true) @map("allow_file_submission")
+  /// Vị trí trong topic, dùng chung dãy số với Lesson.orderIndex để kéo thả xen kẽ bài học / bài tập
+  orderIndex  Int            @default(0) @map("order_index")
   createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 

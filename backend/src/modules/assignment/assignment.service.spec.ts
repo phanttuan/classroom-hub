@@ -23,6 +23,10 @@ describe('AssignmentService', () => {
       findUnique: ReturnType<typeof vi.fn>;
       findMany: ReturnType<typeof vi.fn>;
       update: ReturnType<typeof vi.fn>;
+      aggregate: ReturnType<typeof vi.fn>;
+    };
+    lesson: {
+      aggregate: ReturnType<typeof vi.fn>;
     };
     module: {
       findUnique: ReturnType<typeof vi.fn>;
@@ -68,6 +72,11 @@ describe('AssignmentService', () => {
         findUnique: vi.fn(),
         findMany: vi.fn(),
         update: vi.fn(),
+        aggregate: vi.fn().mockResolvedValue({ _max: { orderIndex: null } }),
+      },
+      // Topic đã có 3 bài học → bài tập mới xếp ở vị trí 4
+      lesson: {
+        aggregate: vi.fn().mockResolvedValue({ _max: { orderIndex: 3 } }),
       },
       module: {
         findUnique: vi.fn().mockResolvedValue({ id: moduleId, courseId }),
@@ -119,7 +128,9 @@ describe('AssignmentService', () => {
           openAt: new Date('2026-10-15T08:00:00.000Z'),
           dueAt: new Date('2026-10-20T23:59:59.000Z'),
           status: ActivityStatus.DRAFT,
-          // Mặc định: không nộp trễ, nhận cả bài làm trực tuyến lẫn tệp
+          // Xếp sau bài học cuối cùng của topic (orderIndex 3) → vị trí 4
+          orderIndex: 4,
+          // Mặc định: không nộp trễ, nhận cả bài làm văn bản lẫn tệp
           allowLateSubmission: false,
           allowTextSubmission: true,
           allowFileSubmission: true,
@@ -218,7 +229,7 @@ describe('AssignmentService', () => {
           courseId,
           status: { in: [ActivityStatus.PUBLISHED, ActivityStatus.CLOSED] },
         },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }],
       });
       expect(prisma.submission.findMany).toHaveBeenCalledTimes(1);
       expect(prisma.submission.findMany).toHaveBeenCalledWith({
@@ -246,7 +257,7 @@ describe('AssignmentService', () => {
 
       expect(prisma.assignment.findMany).toHaveBeenCalledWith({
         where: { courseId, status: ActivityStatus.DRAFT },
-        orderBy: { createdAt: 'desc' },
+        orderBy: [{ orderIndex: 'asc' }, { createdAt: 'asc' }],
         include: { submissions: { select: { isLate: true } } },
       });
       expect(result).toHaveLength(1);
