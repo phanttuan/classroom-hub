@@ -6,6 +6,9 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { rm } from 'node:fs/promises';
+import { extname } from 'node:path';
+import { Readable } from 'node:stream';
+import archiver from 'archiver';
 import { PrismaService } from '../../database/prisma.service.js';
 import { CloudinaryService } from '../resource/cloudinary.service.js';
 import {
@@ -19,13 +22,17 @@ import {
 } from '../learning-content/utils/html-sanitizer.js';
 import {
   ActivityStatus,
+  ActorType,
   CourseStatus,
   EnrollmentStatus,
+  GradeCategory,
+  GradingMethod,
   ResourceParent,
   SubmissionStatus,
 } from '../../generated/prisma/enums.js';
-import type { Prisma } from '../../generated/prisma/client.js';
+import { Prisma } from '../../generated/prisma/client.js';
 import type { UpsertSubmissionDto } from './dto/upsert-submission.dto.js';
+import type { GradeSubmissionDto } from './dto/grade-submission.dto.js';
 
 /** Lý do sinh viên chưa thể nộp / sửa bài vào lúc này */
 export type SubmissionBlockReason =
@@ -132,24 +139,30 @@ export class SubmissionService {
     });
   }
 
-  /** Điểm đã chấm (nếu có) của từng sinh viên cho bài tập — lấy từ Grade qua GradeItem */
-  private async loadScores(assignmentId: bigint, studentIds: bigint[]) {
-    const scores = new Map<bigint, string>();
-    if (!studentIds.length) return scores;
+  /** Điểm + nhận xét đã chấm (nếu có) của từng sinh viên cho bài tập — lấy từ Grade qua GradeItem */
+  private async loadGrades(assignmentId: bigint, studentIds: bigint[]) {
+    const grades = new Map<bigint, GradeSummary>();
+    if (!studentIds.length) return grades;
     const gradeItem = await this.prisma.gradeItem.findUnique({
       where: { assignmentId },
       select: { id: true },
     });
-    if (!gradeItem) return scores;
-    const grades = await this.prisma.grade.findMany({
+    if (!gradeItem) return grades;
+    const rows = await this.prisma.grade.findMany({
       where: { gradeItemId: gradeItem.id, studentId: { in: studentIds } },
-      select: { studentId: true, score: true },
+      select: { studentId: true, score: true, feedback: true, gradedAt: true, updatedAt: true },
     });
-    for (const g of grades) scores.set(g.studentId, g.score.toFixed(2));
-    return scores;
+    for (const g of rows) {
+      grades.set(g.studentId, {
+        score: g.score.toFixed(2),
+        feedback: g.feedback,
+        gradedAt: g.updatedAt,
+      });
+    }
+    return grades;
   }
 
-  private formatSubmission(s: SubmissionWithRelations, score: string | null = null) {
+  private formatSubmission(s: SubmissionWithRelations, grade: GradeSummary | null = null) {
     return {
       id: s.id.toString(),
       assignmentId: s.assignmentId.toString(),
@@ -165,7 +178,9 @@ export class SubmissionService {
       isLate: s.isLate,
       submittedAt: s.submittedAt,
       updatedAt: s.updatedAt,
-      score,
+      score: grade?.score ?? null,
+      feedback: grade?.feedback ?? null,
+      gradedAt: grade?.gradedAt ?? null,
       file: s.resource
         ? {
             id: s.resource.id.toString(),
@@ -195,10 +210,10 @@ export class SubmissionService {
       window.wouldBeLate = false;
       window.reason = 'GRADED';
     }
-    const scores = submission ? await this.loadScores(assignmentId, [studentId]) : new Map<bigint, string>();
+    const grades = submission ? await this.loadGrades(assignmentId, [studentId]) : new Map<bigint, GradeSummary>();
 
     return {
-      submission: submission ? this.formatSubmission(submission, scores.get(studentId) ?? null) : null,
+      submission: submission ? this.formatSubmission(submission, grades.get(studentId) ?? null) : null,
       window,
       rules: this.getFileRules(),
       serverTime: new Date(),
@@ -243,11 +258,11 @@ export class SubmissionService {
       throw new ConflictException(BLOCK_MESSAGES.GRADED);
     }
 
-    // --- Bài làm trực tuyến: chặn ở backend khi giáo viên không cho phép ---
+    // --- Bài làm văn bản: chặn ở backend khi giáo viên không cho phép ---
     const rawContent = dto.content ?? '';
     const hasTextInput = htmlToPlainText(rawContent).length > 0 || /<img\b/i.test(rawContent);
     if (hasTextInput && !assignment.allowTextSubmission) {
-      throw new BadRequestException('Bài tập này không nhận bài làm trực tuyến');
+      throw new BadRequestException('Bài tập này không nhận bài làm văn bản');
     }
     const content = assignment.allowTextSubmission && hasTextInput ? sanitizeRichHtml(rawContent) : null;
 
@@ -260,10 +275,10 @@ export class SubmissionService {
     if (!content && !file && !keepsPreviousFile) {
       throw new BadRequestException(
         assignment.allowTextSubmission && assignment.allowFileSubmission
-          ? 'Bài nộp cần có bài làm trực tuyến hoặc tệp đính kèm'
+          ? 'Bài nộp cần có bài làm văn bản hoặc tệp đính kèm'
           : assignment.allowFileSubmission
             ? 'Vui lòng đính kèm tệp bài làm'
-            : 'Vui lòng nhập bài làm trực tuyến',
+            : 'Vui lòng nhập bài làm văn bản',
       );
     }
 
@@ -386,7 +401,7 @@ export class SubmissionService {
         include: { resource: true, student: { select: studentSelect } },
       }),
     ]);
-    const scores = await this.loadScores(
+    const grades = await this.loadGrades(
       assignmentId,
       submissions.map((s) => s.studentId),
     );
@@ -401,7 +416,7 @@ export class SubmissionService {
           email: student.email,
           avatarUrl: student.avatarUrl,
         },
-        submission: s ? this.formatSubmission(s, scores.get(student.id) ?? null) : null,
+        submission: s ? this.formatSubmission(s, grades.get(student.id) ?? null) : null,
       };
     });
 
@@ -429,7 +444,185 @@ export class SubmissionService {
     if (!submission || submission.assignmentId !== assignmentId) {
       throw new NotFoundException('Bài nộp không tồn tại');
     }
-    const scores = await this.loadScores(assignmentId, [submission.studentId]);
-    return this.formatSubmission(submission, scores.get(submission.studentId) ?? null);
+    const grades = await this.loadGrades(assignmentId, [submission.studentId]);
+    return this.formatSubmission(submission, grades.get(submission.studentId) ?? null);
   }
+
+  /**
+   * Chấm điểm / chấm lại một bài nộp (idempotent — upsert Grade theo gradeItem + sinh viên).
+   * Trong một transaction: Grade (score, feedback, gradedBy, gradedAt) + GradeHistory + Submission.status = GRADED.
+   */
+  async grade(
+    courseId: bigint,
+    assignmentId: bigint,
+    submissionId: bigint,
+    teacherId: bigint,
+    dto: GradeSubmissionDto,
+  ) {
+    const assignment = await this.loadAssignment(courseId, assignmentId);
+    if (assignment.course.status === CourseStatus.ARCHIVED) {
+      throw new ConflictException(BLOCK_MESSAGES.COURSE_ARCHIVED.replace('nộp bài', 'chấm điểm'));
+    }
+    const submission = await this.prisma.submission.findUnique({
+      where: { id: submissionId },
+      select: { id: true, assignmentId: true, studentId: true },
+    });
+    if (!submission || submission.assignmentId !== assignmentId) {
+      throw new NotFoundException('Bài nộp không tồn tại');
+    }
+
+    const maxScore = Number(assignment.maxScore);
+    if (!Number.isFinite(dto.score) || dto.score < 0 || dto.score > maxScore) {
+      throw new BadRequestException(`Điểm phải nằm trong khoảng 0 – ${maxScore}`);
+    }
+    const score = new Prisma.Decimal(dto.score.toFixed(2));
+    // feedback không gửi → giữ nhận xét cũ; gửi chuỗi rỗng → xóa nhận xét
+    const feedbackProvided = dto.feedback !== undefined;
+    const sanitized = sanitizeRichHtml(dto.feedback);
+    const feedbackIsEmpty = htmlToPlainText(sanitized).length === 0 && !/<img\b/i.test(sanitized);
+    const nextFeedback = feedbackIsEmpty ? null : sanitized;
+
+    await this.prisma.$transaction(async (tx) => {
+      // GradeItem được tạo cùng bài tập; tạo bù nếu dữ liệu cũ thiếu
+      const gradeItem =
+        (await tx.gradeItem.findUnique({ where: { assignmentId }, select: { id: true } })) ??
+        (await tx.gradeItem.create({
+          data: { courseId, category: GradeCategory.ASSIGNMENT, assignmentId, maxScore: assignment.maxScore },
+          select: { id: true },
+        }));
+
+      const existing = await tx.grade.findUnique({
+        where: { uk_grades_grade_item_student: { gradeItemId: gradeItem.id, studentId: submission.studentId } },
+        select: { id: true, score: true, feedback: true },
+      });
+
+      const cleanFeedback = feedbackProvided ? nextFeedback : (existing?.feedback ?? null);
+      const saved = await tx.grade.upsert({
+        where: { uk_grades_grade_item_student: { gradeItemId: gradeItem.id, studentId: submission.studentId } },
+        create: {
+          gradeItemId: gradeItem.id,
+          studentId: submission.studentId,
+          score,
+          feedback: cleanFeedback,
+          gradingMethod: GradingMethod.MANUAL,
+          gradedBy: teacherId,
+          gradedAt: new Date(),
+        },
+        update: {
+          score,
+          feedback: cleanFeedback,
+          gradingMethod: GradingMethod.MANUAL,
+          gradedBy: teacherId,
+          gradedAt: new Date(),
+        },
+        select: { id: true },
+      });
+
+      // Lịch sử điểm: ghi mọi lần chấm / chấm lại để tra cứu
+      await tx.gradeHistory.create({
+        data: {
+          gradeId: saved.id,
+          oldScore: existing?.score ?? null,
+          newScore: score,
+          oldFeedback: existing?.feedback ?? null,
+          newFeedback: cleanFeedback,
+          actorType: ActorType.USER,
+          actorId: teacherId,
+          reason: existing ? 'Chấm lại bài nộp' : 'Chấm bài nộp',
+        },
+      });
+
+      await tx.submission.update({
+        where: { id: submission.id },
+        data: { status: SubmissionStatus.GRADED },
+      });
+    });
+
+    return this.getOneForTeacher(courseId, assignmentId, submissionId);
+  }
+
+  /** Bỏ chấm: xóa điểm (kèm lịch sử) và cho phép sinh viên nộp lại khi còn hạn */
+  async ungrade(courseId: bigint, assignmentId: bigint, submissionId: bigint) {
+    await this.loadAssignment(courseId, assignmentId);
+    const submission = await this.prisma.submission.findUnique({
+      where: { id: submissionId },
+      select: { id: true, assignmentId: true, studentId: true, status: true },
+    });
+    if (!submission || submission.assignmentId !== assignmentId) {
+      throw new NotFoundException('Bài nộp không tồn tại');
+    }
+    if (submission.status !== SubmissionStatus.GRADED) {
+      throw new ConflictException('Bài nộp chưa được chấm điểm');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      const gradeItem = await tx.gradeItem.findUnique({ where: { assignmentId }, select: { id: true } });
+      if (gradeItem) {
+        await tx.grade.deleteMany({ where: { gradeItemId: gradeItem.id, studentId: submission.studentId } });
+      }
+      await tx.submission.update({ where: { id: submission.id }, data: { status: SubmissionStatus.SUBMITTED } });
+    });
+
+    return this.getOneForTeacher(courseId, assignmentId, submissionId);
+  }
+
+  /**
+   * Gói toàn bộ tệp bài nộp của bài tập thành .zip (stream — không giữ cả gói trong RAM).
+   * Mỗi sinh viên một thư mục `<Họ tên> (<email>)/<tên tệp>`; tệp không tải được từ Cloudinary
+   * (ví dụ dữ liệu mẫu) được liệt kê trong README.txt thay vì làm hỏng cả gói.
+   */
+  async buildSubmissionsArchive(courseId: bigint, assignmentId: bigint) {
+    const assignment = await this.loadAssignment(courseId, assignmentId);
+    const submissions = await this.prisma.submission.findMany({
+      where: { assignmentId, resource: { isNot: null } },
+      include: { resource: true, student: { select: studentSelect } },
+      orderBy: { student: { fullName: 'asc' } },
+    });
+
+    const archive = archiver('zip', { zlib: { level: 6 } });
+    const missing: string[] = [];
+    const safe = (s: string) => s.replace(/[\\/:*?"<>|]+/g, '-').trim();
+
+    const fill = async () => {
+      for (const s of submissions) {
+        const r = s.resource!;
+        const folder = `${safe(s.student.fullName)} (${safe(s.student.email)})${s.isLate ? ' [NOP TRE]' : ''}`;
+        const entry = `${folder}/${safe(r.fileName)}`;
+        try {
+          const signed = this.cloudinary.generateSignedUrl(r.storageKey, {
+            isDownload: true,
+            expiresInSeconds: 600,
+            format: extname(r.fileName).slice(1),
+          });
+          const res = await fetch(signed.url);
+          if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+          archive.append(Readable.fromWeb(res.body as never), { name: entry, date: s.submittedAt });
+        } catch (error) {
+          missing.push(`${entry} — ${(error as Error).message}`);
+        }
+      }
+      const lines = [
+        `Bài tập: ${assignment.title}`,
+        `Số bài nộp có tệp: ${submissions.length}`,
+        `Tải lúc: ${new Date().toISOString()}`,
+        '',
+        missing.length ? `Không tải được ${missing.length} tệp:` : 'Đã tải đủ toàn bộ tệp.',
+        ...missing.map((m) => `  - ${m}`),
+      ];
+      archive.append(lines.join('\n'), { name: 'README.txt' });
+      await archive.finalize();
+    };
+
+    // Không chờ: controller pipe archive ra response trong lúc các tệp được nạp dần
+    void fill().catch((error) => archive.destroy(error as Error));
+
+    const fileName = `${safe(assignment.title).replace(/\s+/g, '-').slice(0, 80) || 'bai-nop'}-bai-nop.zip`;
+    return { archive, fileName, total: submissions.length };
+  }
+}
+
+interface GradeSummary {
+  score: string;
+  feedback: string | null;
+  gradedAt: Date;
 }

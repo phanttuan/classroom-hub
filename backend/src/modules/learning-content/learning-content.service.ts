@@ -561,6 +561,59 @@ export class LearningContentService {
     return { message: 'Đã cập nhật thứ tự bài học thành công' };
   }
 
+  /**
+   * Sắp xếp xen kẽ bài học + bài tập trong một topic: cả hai bảng dùng chung dãy orderIndex 1..n.
+   * Danh sách gửi lên phải chứa đúng toàn bộ mục của topic (không thiếu, không thừa, không trùng).
+   */
+  async reorderModuleItems(
+    userId: bigint,
+    role: UserRole,
+    moduleId: bigint,
+    items: { type: 'LESSON' | 'ASSIGNMENT'; id: string }[],
+  ) {
+    const module = await this.prisma.module.findUnique({
+      where: { id: moduleId },
+      select: { courseId: true },
+    });
+    if (!module) throw new NotFoundException('Topic không tồn tại');
+    await this.verifyCourseTeacherAccess(module.courseId, userId, role);
+
+    const lessonIds = items.filter((i) => i.type === 'LESSON').map((i) => BigInt(i.id));
+    const assignmentIds = items.filter((i) => i.type === 'ASSIGNMENT').map((i) => BigInt(i.id));
+    const unique = new Set(items.map((i) => `${i.type}:${i.id}`));
+    const [lessonTotal, assignmentTotal, lessonOwned, assignmentOwned] = await Promise.all([
+      this.prisma.lesson.count({ where: { moduleId } }),
+      this.prisma.assignment.count({ where: { moduleId } }),
+      this.prisma.lesson.count({ where: { id: { in: lessonIds }, moduleId } }),
+      this.prisma.assignment.count({ where: { id: { in: assignmentIds }, moduleId } }),
+    ]);
+    if (
+      unique.size !== items.length ||
+      lessonOwned !== lessonIds.length ||
+      assignmentOwned !== assignmentIds.length ||
+      lessonTotal !== lessonIds.length ||
+      assignmentTotal !== assignmentIds.length
+    ) {
+      throw new BadRequestException('Danh sách mục không hợp lệ hoặc không khớp với nội dung topic');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      // Chuyển tạm sang âm để không đụng ràng buộc / giá trị cũ, rồi gán vị trí mới 1-based
+      for (const [i, item] of items.entries()) {
+        const data = { orderIndex: -(i + 1) };
+        if (item.type === 'LESSON') await tx.lesson.update({ where: { id: BigInt(item.id) }, data });
+        else await tx.assignment.update({ where: { id: BigInt(item.id) }, data });
+      }
+      for (const [i, item] of items.entries()) {
+        const data = { orderIndex: i + 1 };
+        if (item.type === 'LESSON') await tx.lesson.update({ where: { id: BigInt(item.id) }, data });
+        else await tx.assignment.update({ where: { id: BigInt(item.id) }, data });
+      }
+    });
+
+    return { message: 'Đã cập nhật thứ tự nội dung topic' };
+  }
+
   // =========================================================================
   // 4. PROGRESS APIS (STUDENT)
   // =========================================================================

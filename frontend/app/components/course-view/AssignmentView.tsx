@@ -10,13 +10,17 @@ import {
   CalendarDays,
   Check,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   ClipboardList,
   Clock,
   Download,
   Eye,
   FileText,
   FileUp,
+  FolderDown,
   Info,
+  MessageSquareText,
   Loader2,
   Lock,
   Paperclip,
@@ -36,7 +40,12 @@ import type {
   TeacherSubmissionListResponse,
 } from "@/lib/types/submission";
 import { fetchAssignmentDetail } from "@/lib/api/assignment-api";
-import { fetchAssignmentSubmissions, fetchMySubmission, removeSubmission } from "@/lib/api/submission-api";
+import {
+  downloadAllSubmissions,
+  fetchAssignmentSubmissions,
+  fetchMySubmission,
+  removeSubmission,
+} from "@/lib/api/submission-api";
 import { triggerResourceDownload } from "@/lib/api/resource-api";
 import {
   BLOCK_REASON_TEXT,
@@ -85,17 +94,20 @@ function Card({
   children,
   className = "",
   aside,
+  centerTitle,
 }: {
   title?: string;
   icon?: typeof FileText;
   children: React.ReactNode;
   className?: string;
   aside?: React.ReactNode;
+  /** Căn giữa tiêu đề (khi thẻ không có nút ở góc phải) */
+  centerTitle?: boolean;
 }) {
   return (
     <section className={`rounded-2xl border border-slate-200/90 bg-white shadow-xs ${className}`}>
       {title && (
-        <h2 className="flex items-center gap-2 border-b border-slate-100 px-5 py-3.5 text-[14px] font-bold text-slate-800">
+        <h2 className={`flex items-center gap-2 border-b border-slate-100 px-5 py-3.5 text-[14px] font-bold text-slate-800 ${centerTitle ? "justify-center" : ""}`}>
           {Icon && <Icon className="h-4 w-4 text-[#0f6cbf]" />}
           {title}
           {aside && <span className="ml-auto">{aside}</span>}
@@ -126,10 +138,15 @@ function StatusRow({ label, children, highlight }: { label: string; children: Re
   );
 }
 
-function StateBadge({ submission, isPastDue }: { submission: SubmissionDto | null | undefined; isPastDue?: boolean }) {
+/** `fixed`: cùng chiều rộng để các dòng trong bảng thẳng hàng */
+function StateBadge({ submission, isPastDue, fixed }: { submission: SubmissionDto | null | undefined; isPastDue?: boolean; fixed?: boolean }) {
   const s = submissionStateLabel(submission, { isPastDue: Boolean(isPastDue) });
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[12px] font-semibold ${TONE_BADGE[s.tone]}`}>
+    <span
+      className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-[12px] font-semibold ${TONE_BADGE[s.tone]} ${
+        fixed ? "w-[148px] justify-center" : ""
+      }`}
+    >
       {s.tone === "success" || s.tone === "info" ? (
         <CheckCircle2 className="h-3.5 w-3.5" />
       ) : s.tone === "warning" ? (
@@ -176,7 +193,7 @@ function SubmissionFileRow({ file, onPreview }: { file: SubmissionFileDto; onPre
         type="button"
         onClick={async () => {
           setBusy(true);
-          await triggerResourceDownload(file.id, file.fileName).catch(() => toast.error("Không tải được tệp"));
+          await triggerResourceDownload(file.id, file.fileName).catch(() => toast.error("Không tải được tệp", "Vui lòng thử lại sau ít phút."));
           setBusy(false);
         }}
         title="Tải xuống"
@@ -188,7 +205,7 @@ function SubmissionFileRow({ file, onPreview }: { file: SubmissionFileDto; onPre
   );
 }
 
-/** Bài làm trực tuyến: thu gọn, bấm để xem đầy đủ */
+/** Bài làm văn bản: thu gọn, bấm để xem đầy đủ */
 function OnlineTextPreview({ html }: { html: string }) {
   const [expanded, setExpanded] = useState(false);
   return (
@@ -207,6 +224,70 @@ function OnlineTextPreview({ html }: { html: string }) {
   );
 }
 
+/** Số dòng mỗi trang trong bảng bài nộp */
+const PAGE_SIZE = 10;
+
+/** Các số trang hiển thị: luôn có đầu / cuối, quanh trang hiện tại, chỗ bỏ qua là "…" */
+function pageNumbers(current: number, count: number): (number | "…")[] {
+  if (count <= 7) return Array.from({ length: count }, (_, i) => i + 1);
+  const pages = new Set([1, count, current - 1, current, current + 1].filter((p) => p >= 1 && p <= count));
+  const sorted = [...pages].sort((a, b) => a - b);
+  const out: (number | "…")[] = [];
+  sorted.forEach((p, i) => {
+    if (i > 0 && p - sorted[i - 1] > 1) out.push("…");
+    out.push(p);
+  });
+  return out;
+}
+
+function Pagination({
+  page,
+  pageCount,
+  from,
+  to,
+  total,
+  onChange,
+}: {
+  page: number;
+  pageCount: number;
+  from: number;
+  to: number;
+  total: number;
+  onChange: (page: number) => void;
+}) {
+  const btn = "grid h-8 min-w-8 place-items-center rounded-lg px-2 text-[12.5px] font-semibold transition disabled:cursor-not-allowed disabled:opacity-40";
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 px-5 py-3">
+      <p className="text-[12.5px] text-slate-500">
+        Hiển thị <b className="text-slate-700">{from}–{to}</b> trong <b className="text-slate-700">{total}</b> sinh viên
+      </p>
+      <div className="flex items-center gap-1">
+        <button type="button" disabled={page <= 1} onClick={() => onChange(page - 1)} aria-label="Trang trước" className={`${btn} text-slate-600 hover:bg-slate-100`}>
+          <ChevronLeft className="h-4 w-4" />
+        </button>
+        {pageNumbers(page, pageCount).map((p, i) =>
+          p === "…" ? (
+            <span key={`gap-${i}`} className="px-1 text-slate-400">…</span>
+          ) : (
+            <button
+              key={p}
+              type="button"
+              onClick={() => onChange(p)}
+              aria-current={p === page ? "page" : undefined}
+              className={`${btn} ${p === page ? "bg-[#0f6cbf] text-white" : "text-slate-600 hover:bg-slate-100"}`}
+            >
+              {p}
+            </button>
+          ),
+        )}
+        <button type="button" disabled={page >= pageCount} onClick={() => onChange(page + 1)} aria-label="Trang sau" className={`${btn} text-slate-600 hover:bg-slate-100`}>
+          <ChevronRight className="h-4 w-4" />
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function StatTile({ label, value, tone }: { label: string; value: number; tone: "slate" | "emerald" | "amber" | "red" | "sky" }) {
   const cls = {
     slate: "bg-slate-50 text-slate-700",
@@ -216,7 +297,7 @@ function StatTile({ label, value, tone }: { label: string; value: number; tone: 
     sky: "bg-sky-50 text-sky-700",
   }[tone];
   return (
-    <div className={`rounded-xl px-4 py-3 ${cls}`}>
+    <div className={`rounded-xl px-4 py-3 text-center ${cls}`}>
       <p className="text-[22px] font-extrabold leading-none">{value}</p>
       <p className="mt-1 text-[12px] font-medium opacity-80">{label}</p>
     </div>
@@ -236,6 +317,24 @@ export default function AssignmentView({ courseId, assignmentId, role, backHref 
   const [removing, setRemoving] = useState(false);
   const [previewFile, setPreviewFile] = useState<SubmissionFileDto | null>(null);
   const [viewing, setViewing] = useState<SubmissionDto | null>(null);
+  // Bộ lọc bảng bài nộp của giáo viên + trạng thái tải gói .zip
+  const [filter, setFilter] = useState<"all" | "ungraded" | "graded" | "late" | "missing">("all");
+  // Phân trang bảng bài nộp (phía client — danh sách lớp thường vài chục sinh viên)
+  const [page, setPage] = useState(1);
+  const [zipping, setZipping] = useState(false);
+
+  const handleDownloadAll = async () => {
+    if (!assignment) return;
+    setZipping(true);
+    try {
+      const total = await downloadAllSubmissions(courseId, assignmentId);
+      toast.success("Đang tải gói bài nộp", `${total} tệp đính kèm — tệp không tải được (nếu có) ghi trong README.txt`);
+    } catch (err) {
+      toast.error("Không tải được gói bài nộp", (err as Error)?.message || "Vui lòng thử lại sau ít phút.");
+    } finally {
+      setZipping(false);
+    }
+  };
   // Đồng hồ cập nhật "thời gian còn lại" mỗi phút
   const [now, setNow] = useState(() => Date.now());
 
@@ -281,7 +380,7 @@ export default function AssignmentView({ courseId, assignmentId, role, backHref 
       title: "Loại bỏ bài nộp?",
       message: (
         <>
-          Bài làm trực tuyến và tệp đính kèm sẽ bị xóa, bài tập trở về trạng thái <b>chưa nộp</b>.
+          Bài làm văn bản và tệp đính kèm sẽ bị xóa, bài tập trở về trạng thái <b>chưa nộp</b>.
           {window_?.isPastDue && assignment?.allowLateSubmission && (
             <>
               {" "}
@@ -297,10 +396,10 @@ export default function AssignmentView({ courseId, assignmentId, role, backHref 
     setRemoving(true);
     try {
       await removeSubmission(courseId, assignmentId);
-      toast.success("Đã loại bỏ bài nộp");
+      toast.success("Đã loại bỏ bài nộp", "Bài tập trở về trạng thái chưa nộp. Bạn có thể nộp lại khi còn hạn.");
       await load();
     } catch (err) {
-      toast.error((err as Error)?.message || "Không thể loại bỏ bài nộp");
+      toast.error("Không thể loại bỏ bài nộp", (err as Error)?.message || "Vui lòng thử lại.");
     } finally {
       setRemoving(false);
     }
@@ -353,6 +452,11 @@ export default function AssignmentView({ courseId, assignmentId, role, backHref 
             href={`/teacher/content/courses/${courseId}/lessons/new?section=${assignment.moduleId}&type=ASSIGNMENT&assignmentId=${assignment.id}`}
           >
             <Pencil className="h-4 w-4" /> Chỉnh sửa
+          </HeroButton>
+        )}
+        {teacherData && teacherData.rows.some((r) => r.submission?.file) && (
+          <HeroButton onClick={handleDownloadAll} disabled={zipping}>
+            {zipping ? <Loader2 className="h-4 w-4 animate-spin" /> : <FolderDown className="h-4 w-4" />} Tải tất cả tệp (.zip)
           </HeroButton>
         )}
         <HeroButton href={`${coursePath}#module-section-${assignment?.moduleId ?? ""}`}>
@@ -449,6 +553,22 @@ export default function AssignmentView({ courseId, assignmentId, role, backHref 
               <span className="text-slate-600">Chưa chấm</span>
             )}
           </StatusRow>
+          {submission?.status === "GRADED" && (
+            <StatusRow label="Nhận xét của giáo viên" highlight>
+              {submission.feedback ? (
+                <div className="rounded-xl border border-sky-200 bg-white px-4 py-3">
+                  <RichContent html={submission.feedback} className="!text-[13.5px]" />
+                  {submission.gradedAt && (
+                    <p className="mt-2 flex items-center gap-1.5 text-[11.5px] text-slate-400">
+                      <MessageSquareText className="h-3.5 w-3.5" /> Chấm lúc {formatDateTime(submission.gradedAt)}
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <span className="text-slate-400">Giáo viên không để lại nhận xét.</span>
+              )}
+            </StatusRow>
+          )}
           <StatusRow label="Hạn nộp">{formatDateTimeLong(assignment.dueAt)}</StatusRow>
           <StatusRow label="Thời gian còn lại" highlight={remaining?.tone === "danger" && !submission}>
             {remaining && <span className={`font-semibold ${REMAIN_TONE[remaining.tone]}`}>{remaining.text}</span>}
@@ -466,7 +586,7 @@ export default function AssignmentView({ courseId, assignmentId, role, backHref 
             )}
           </StatusRow>
           {assignment.allowTextSubmission && (
-            <StatusRow label="Bài làm trực tuyến">
+            <StatusRow label="Bài làm văn bản">
               {submission?.content ? <OnlineTextPreview html={submission.content} /> : <span className="text-slate-400">Chưa có</span>}
             </StatusRow>
           )}
@@ -489,6 +609,25 @@ export default function AssignmentView({ courseId, assignmentId, role, backHref 
   const renderTeacherTable = () => {
     if (!assignment || !teacherData) return null;
     const { summary, rows } = teacherData;
+    const ungraded = summary.submitted - summary.graded;
+    const gradeHref = (id: string) => `${coursePath}/assignments/${assignmentId}/submissions/${id}`;
+    const filters: { key: typeof filter; label: string; count: number }[] = [
+      { key: "all", label: "Tất cả", count: rows.length },
+      { key: "ungraded", label: "Chưa chấm", count: ungraded },
+      { key: "graded", label: "Đã chấm", count: summary.graded },
+      { key: "late", label: "Nộp trễ", count: summary.late },
+      { key: "missing", label: "Chưa nộp", count: summary.notSubmitted },
+    ];
+    const visibleRows = rows.filter(({ submission: s }) => {
+      if (filter === "ungraded") return s && s.status !== "GRADED";
+      if (filter === "graded") return s?.status === "GRADED";
+      if (filter === "late") return s?.isLate;
+      if (filter === "missing") return !s;
+      return true;
+    });
+    const pageCount = Math.max(1, Math.ceil(visibleRows.length / PAGE_SIZE));
+    const currentPage = Math.min(page, pageCount);
+    const pagedRows = visibleRows.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
     return (
       <>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
@@ -499,26 +638,55 @@ export default function AssignmentView({ courseId, assignmentId, role, backHref 
           <StatTile label="Đã chấm" value={summary.graded} tone="sky" />
         </div>
 
-        <Card title="Bài nộp của sinh viên" icon={Users}>
+        <Card
+          title="Bài nộp của sinh viên"
+          icon={Users}
+          centerTitle
+        >
           {rows.length === 0 ? (
             <p className="px-5 py-10 text-center text-[13.5px] text-slate-500">Khóa học chưa có sinh viên nào.</p>
           ) : (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] text-left text-[13px]">
+              <div className="flex flex-wrap gap-1.5 border-b border-slate-100 px-4 py-2.5">
+                {filters.map((f) => (
+                  <button
+                    key={f.key}
+                    type="button"
+                    onClick={() => {
+                      setFilter(f.key);
+                      setPage(1);
+                    }}
+                    className={`rounded-full px-3 py-1 text-[12.5px] font-semibold transition ${
+                      filter === f.key ? "bg-[#0f6cbf] text-white" : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                    }`}
+                  >
+                    {f.label} <span className={filter === f.key ? "text-blue-100" : "text-slate-400"}>{f.count}</span>
+                  </button>
+                ))}
+              </div>
+              <table className="w-full min-w-[860px] text-left text-[13px]">
                 <thead className="bg-slate-50 text-[11.5px] uppercase tracking-wide text-slate-500">
                   <tr>
                     <th className="px-5 py-2.5 font-semibold">Sinh viên</th>
-                    <th className="px-3 py-2.5 font-semibold">Trạng thái</th>
-                    <th className="px-3 py-2.5 font-semibold">Thời gian nộp</th>
-                    <th className="px-3 py-2.5 font-semibold">Bài nộp</th>
-                    <th className="px-5 py-2.5 text-right font-semibold">Điểm</th>
+                    <th className="px-3 py-2.5 text-center font-semibold">Trạng thái</th>
+                    <th className="px-3 py-2.5 text-center font-semibold">Thời gian nộp</th>
+                    <th className="px-3 py-2.5 text-center font-semibold">Bài nộp</th>
+                    <th className="px-3 py-2.5 text-center font-semibold">Điểm</th>
+                    <th className="px-5 py-2.5 text-center font-semibold">Chấm bài</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {rows.map(({ student, submission: s }) => {
+                  {visibleRows.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-5 py-8 text-center text-[13px] text-slate-400">
+                        Không có sinh viên nào trong bộ lọc này.
+                      </td>
+                    </tr>
+                  )}
+                  {pagedRows.map(({ student, submission: s }) => {
                     const lateBy = s?.isLate ? timeRemainingLabel(assignment.dueAt, s, now) : null;
                     return (
-                      <tr key={student.id} className={`align-top ${s?.isLate ? "bg-amber-50/40" : ""}`}>
+                      <tr key={student.id} className={`align-middle ${s?.isLate ? "bg-amber-50/40" : ""}`}>
                         <td className="px-5 py-3">
                           <div className="flex items-center gap-2.5">
                             {/* eslint-disable-next-line @next/next/no-img-element -- avatar từ Cloudinary / ảnh tĩnh */}
@@ -533,10 +701,10 @@ export default function AssignmentView({ courseId, assignmentId, role, backHref 
                             </span>
                           </div>
                         </td>
-                        <td className="px-3 py-3">
-                          <StateBadge submission={s} isPastDue={teacherData.window.isPastDue} />
+                        <td className="px-3 py-3 text-center">
+                          <StateBadge submission={s} isPastDue={teacherData.window.isPastDue} fixed />
                         </td>
-                        <td className="px-3 py-3 text-slate-700">
+                        <td className="whitespace-nowrap px-3 py-3 text-center text-slate-700">
                           {s ? (
                             <>
                               {formatDateTime(s.submittedAt)}
@@ -546,16 +714,17 @@ export default function AssignmentView({ courseId, assignmentId, role, backHref 
                             "—"
                           )}
                         </td>
-                        <td className="px-3 py-3">
+                        <td className="px-3 py-3 text-center">
                           {s ? (
-                            <div className="flex flex-wrap items-center gap-1.5">
+                            // Thẻ cùng kích thước để các dòng thẳng hàng; tên tệp dài hiện "…" (xem đầy đủ khi mở)
+                            <div className="inline-flex flex-col items-stretch gap-1.5">
                               {s.content && (
                                 <button
                                   type="button"
                                   onClick={() => setViewing(s)}
-                                  className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[12px] font-semibold text-slate-700 hover:bg-slate-50"
+                                  className="inline-flex h-8 w-[176px] items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-[12px] font-semibold text-slate-700 hover:bg-slate-50"
                                 >
-                                  <Eye className="h-3.5 w-3.5" /> Bài làm
+                                  <Eye className="h-3.5 w-3.5 shrink-0" /> Xem bài làm
                                 </button>
                               )}
                               {s.file && (
@@ -563,10 +732,10 @@ export default function AssignmentView({ courseId, assignmentId, role, backHref 
                                   type="button"
                                   onClick={() => setPreviewFile(s.file)}
                                   title={s.file.fileName}
-                                  className="inline-flex max-w-[220px] items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[12px] font-semibold text-[#0f6cbf] hover:bg-blue-50"
+                                  className="inline-flex h-8 w-[176px] items-center justify-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50/60 px-2.5 text-[12px] font-semibold text-[#0f6cbf] hover:bg-blue-50"
                                 >
                                   <Paperclip className="h-3.5 w-3.5 shrink-0" />
-                                  <span className="truncate">{s.file.fileName}</span>
+                                  <span className="min-w-0 truncate">{s.file.fileName}</span>
                                 </button>
                               )}
                             </div>
@@ -574,14 +743,41 @@ export default function AssignmentView({ courseId, assignmentId, role, backHref 
                             <span className="text-slate-400">—</span>
                           )}
                         </td>
-                        <td className="px-5 py-3 text-right font-semibold text-slate-800">
+                        <td className="px-3 py-3 text-center font-semibold text-slate-800">
                           {s?.status === "GRADED" ? `${formatScore(s.score)}/${formatScore(assignment.maxScore)}` : "—"}
+                        </td>
+                        <td className="px-5 py-3 text-center">
+                          {s ? (
+                            <button
+                              type="button"
+                              onClick={() => router.push(gradeHref(s.id))}
+                              className={`inline-flex h-9 w-[124px] items-center justify-center gap-1.5 whitespace-nowrap rounded-lg text-[12.5px] font-semibold transition ${
+                                s.status === "GRADED"
+                                  ? "border border-[#0f6cbf]/40 bg-white text-[#0f6cbf] hover:bg-blue-50"
+                                  : "bg-[#0f6cbf] text-white hover:bg-[#0c599e]"
+                              }`}
+                            >
+                              <PencilLine className="h-3.5 w-3.5" /> {s.status === "GRADED" ? "Sửa điểm" : "Chấm điểm"}
+                            </button>
+                          ) : (
+                            <span className="text-slate-300">—</span>
+                          )}
                         </td>
                       </tr>
                     );
                   })}
                 </tbody>
               </table>
+              {visibleRows.length > PAGE_SIZE && (
+                <Pagination
+                  page={currentPage}
+                  pageCount={pageCount}
+                  from={(currentPage - 1) * PAGE_SIZE + 1}
+                  to={Math.min(currentPage * PAGE_SIZE, visibleRows.length)}
+                  total={visibleRows.length}
+                  onChange={setPage}
+                />
+              )}
             </div>
           )}
         </Card>

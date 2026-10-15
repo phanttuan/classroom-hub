@@ -14,10 +14,24 @@ export interface ApiFetchOptions extends RequestInit {
   skipAuthRedirect?: boolean;
 }
 
+/**
+ * Gọi API và trả về JSON đã parse (dùng cho hầu hết endpoint).
+ */
 export async function apiFetch<T = unknown>(
   input: RequestInfo | URL,
   init?: ApiFetchOptions
 ): Promise<T> {
+  const response = await apiFetchRaw(input, init);
+  return (await response.json()) as T;
+}
+
+/**
+ * Gọi API và trả về Response thô (tải tệp nhị phân như .zip) — vẫn gắn token, tự refresh phiên và ném lỗi khi !ok.
+ */
+export async function apiFetchRaw(
+  input: RequestInfo | URL,
+  init?: ApiFetchOptions
+): Promise<Response> {
   // 1. Tự động ghép tiền tố API_BASE_URL nếu truyền đường dẫn tương đối (vd: '/profile')
   let url = input;
   if (typeof input === 'string') {
@@ -86,5 +100,5 @@ export async function apiFetch<T = unknown>(
     throw new Error(errorData?.message || `Lỗi hệ thống: ${response.statusText}`);
   }
 
-  return (await response.json()) as T;
+  return response;
 }

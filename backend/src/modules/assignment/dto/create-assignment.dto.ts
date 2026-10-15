@@ -17,9 +17,9 @@ export class CreateAssignmentDto {
   @IsBoolean({ message: 'Tùy chọn cho phép nộp trễ phải là true/false' })
   allowLateSubmission?: boolean;
 
-  /** Cho phép sinh viên trả lời bằng trình soạn thảo (bài làm trực tuyến) */
+  /** Cho phép sinh viên trả lời bằng trình soạn thảo (bài làm văn bản) */
   @IsOptional()
-  @IsBoolean({ message: 'Tùy chọn bài làm trực tuyến phải là true/false' })
+  @IsBoolean({ message: 'Tùy chọn bài làm văn bản phải là true/false' })
   allowTextSubmission?: boolean;
 
   /** Cho phép sinh viên đính kèm tệp */

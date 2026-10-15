@@ -1,5 +1,6 @@
-import { apiFetch } from './http-client';
+import { apiFetch, apiFetchRaw } from './http-client';
 import type {
+  GradeSubmissionPayload,
   MySubmissionResponse,
   SubmissionDto,
   TeacherSubmissionListResponse,
@@ -30,7 +31,7 @@ export async function fetchMySubmission(courseId: string, assignmentId: string):
 }
 
 export interface SaveSubmissionInput {
-  /** HTML bài làm trực tuyến (bỏ trống nếu không dùng) */
+  /** HTML bài làm văn bản (bỏ trống nếu không dùng) */
   content?: string;
   /** Tệp mới (thay thế tệp cũ) */
   file?: File | null;
@@ -63,6 +64,64 @@ export async function removeSubmission(courseId: string, assignmentId: string): 
     { method: 'DELETE', skipAuthRedirect: true },
   );
   return unwrap(res);
+}
+
+/** Giáo viên: chi tiết một bài nộp */
+export async function fetchSubmissionDetail(
+  courseId: string,
+  assignmentId: string,
+  submissionId: string,
+): Promise<SubmissionDto> {
+  const res = await apiFetch<ApiEnvelope<SubmissionDto>>(`${base(courseId, assignmentId)}/submissions/${submissionId}`, {
+    skipAuthRedirect: true,
+  });
+  return unwrap(res);
+}
+
+/** Giáo viên: chấm điểm / chấm lại (idempotent) */
+export async function gradeSubmission(
+  courseId: string,
+  assignmentId: string,
+  submissionId: string,
+  payload: GradeSubmissionPayload,
+): Promise<SubmissionDto> {
+  const res = await apiFetch<ApiEnvelope<SubmissionDto>>(
+    `${base(courseId, assignmentId)}/submissions/${submissionId}/grade`,
+    { method: 'PUT', body: JSON.stringify(payload), skipAuthRedirect: true },
+  );
+  return unwrap(res);
+}
+
+/** Giáo viên: bỏ chấm — bài nộp trở về trạng thái đã nộp */
+export async function ungradeSubmission(
+  courseId: string,
+  assignmentId: string,
+  submissionId: string,
+): Promise<SubmissionDto> {
+  const res = await apiFetch<ApiEnvelope<SubmissionDto>>(
+    `${base(courseId, assignmentId)}/submissions/${submissionId}/grade`,
+    { method: 'DELETE', skipAuthRedirect: true },
+  );
+  return unwrap(res);
+}
+
+/** Giáo viên: tải toàn bộ tệp bài nộp của bài tập dưới dạng .zip */
+export async function downloadAllSubmissions(courseId: string, assignmentId: string, preferredName?: string): Promise<number> {
+  const res = await apiFetchRaw(`${base(courseId, assignmentId)}/submissions/download`, { skipAuthRedirect: true });
+  const total = Number(res.headers.get('X-Submission-Files') ?? 0);
+  const disposition = res.headers.get('Content-Disposition') ?? '';
+  const encoded = /filename\*=UTF-8''([^;]+)/i.exec(disposition)?.[1];
+  const fileName = preferredName ?? (encoded ? decodeURIComponent(encoded) : 'bai-nop.zip');
+
+  const objectUrl = URL.createObjectURL(await res.blob());
+  const link = document.createElement('a');
+  link.href = objectUrl;
+  link.download = fileName;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  window.setTimeout(() => URL.revokeObjectURL(objectUrl), 10_000);
+  return total;
 }
 
 /** Giáo viên: danh sách bài nộp theo từng sinh viên */

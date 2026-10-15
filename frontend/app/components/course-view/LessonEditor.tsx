@@ -122,7 +122,7 @@ const TYPE_TIPS: Record<EditorActivityType, string[]> = {
   ASSIGNMENT: [
     "Hạn nộp bài phải sau thời gian mở bài tập.",
     "Điểm tối đa mặc định là 10. Điểm này sẽ tự động được đưa vào Sổ điểm (Gradebook) của khóa học.",
-    "Chọn hình thức nộp: bài làm trực tuyến, tệp đính kèm hoặc cả hai. Mỗi sinh viên nộp tối đa 1 tệp — nhiều tệp thì nén .zip.",
+    "Chọn hình thức nộp: bài làm văn bản, tệp đính kèm hoặc cả hai. Mỗi sinh viên nộp tối đa 1 tệp — nhiều tệp thì nén .zip.",
     "Bật “Cho phép nộp bài sau hạn” nếu muốn nhận bài trễ; bài nộp sau hạn luôn được đánh dấu “Nộp trễ”.",
     "Chọn 'Lưu bản nháp' nếu bài tập chưa sẵn sàng hiển thị cho sinh viên.",
     "Bài tập đã xuất bản vẫn chỉnh sửa được (gia hạn, bật nộp trễ, đổi hình thức nộp…); chỉ bài tập đã đóng mới bị khóa.",
@@ -409,14 +409,14 @@ export default function LessonEditor({
     try {
       if (assignmentId) {
         await updateAssignment(courseId, assignmentId, payload);
-        toast.success("Đã cập nhật bài tập");
+        toast.success("Đã cập nhật bài tập", "Thay đổi có hiệu lực ngay với sinh viên trong khóa học.");
       } else {
         const created = await createAssignment(courseId, payload);
         if (mode === "course") {
           await publishAssignment(courseId, created.id);
-          toast.success("Đã tạo và xuất bản bài tập");
+          toast.success("Đã tạo và xuất bản bài tập", "Sinh viên có thể xem và nộp bài khi đến thời gian mở.");
         } else {
-          toast.success("Đã lưu bài tập ở trạng thái bản nháp");
+          toast.success("Đã lưu bản nháp bài tập", "Bài tập đang ẩn với sinh viên cho đến khi bạn xuất bản.");
         }
       }
       setDirty(false);
@@ -704,43 +704,43 @@ export default function LessonEditor({
                     />
                   </Field>
 
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <Field
-                      label="Thời gian mở"
-                      required
-                      error={errors.openAt}
-                      hint="Sinh viên bắt đầu nộp bài từ thời điểm này"
-                    >
-                      <input
-                        type="datetime-local"
-                        value={openAt}
-                        onChange={(e) => {
-                          setOpenAt(e.target.value);
-                          setErrors((er) => ({ ...er, openAt: "" }));
-                          markDirty();
-                        }}
-                        className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-[#0f6cbf] focus:ring-4 focus:ring-blue-100"
-                      />
-                    </Field>
-
-                    <Field
-                      label="Hạn nộp"
-                      required
-                      error={errors.dueAt}
-                      hint="Hạn cuối cùng để sinh viên nộp bài"
-                    >
-                      <input
-                        type="datetime-local"
-                        value={dueAt}
-                        onChange={(e) => {
-                          setDueAt(e.target.value);
-                          setErrors((er) => ({ ...er, dueAt: "" }));
-                          markDirty();
-                        }}
-                        className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-[#0f6cbf] focus:ring-4 focus:ring-blue-100"
-                      />
-                    </Field>
-                  </div>
+                  {/* Hai mốc thời gian chung một nhãn để ô "Hạn nộp" không bị đẩy xa sang phải */}
+                  <Field label="Thời gian nộp bài" required error={errors.openAt || errors.dueAt}>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      <label className="block">
+                        <span className="text-[13px] font-medium text-slate-600">Thời gian mở</span>
+                        <input
+                          type="datetime-local"
+                          value={openAt}
+                          onChange={(e) => {
+                            setOpenAt(e.target.value);
+                            setErrors((er) => ({ ...er, openAt: "" }));
+                            markDirty();
+                          }}
+                          className={`mt-1.5 h-10 w-full rounded-lg border px-3 text-sm outline-none focus:border-[#0f6cbf] focus:ring-4 focus:ring-blue-100 ${
+                            errors.openAt ? "border-red-400" : "border-slate-300"
+                          }`}
+                        />
+                        <span className="mt-1.5 block text-[12.5px] text-slate-500">Sinh viên bắt đầu nộp bài từ thời điểm này</span>
+                      </label>
+                      <label className="block">
+                        <span className="text-[13px] font-medium text-slate-600">Hạn nộp</span>
+                        <input
+                          type="datetime-local"
+                          value={dueAt}
+                          onChange={(e) => {
+                            setDueAt(e.target.value);
+                            setErrors((er) => ({ ...er, dueAt: "" }));
+                            markDirty();
+                          }}
+                          className={`mt-1.5 h-10 w-full rounded-lg border px-3 text-sm outline-none focus:border-[#0f6cbf] focus:ring-4 focus:ring-blue-100 ${
+                            errors.dueAt ? "border-red-400" : "border-slate-300"
+                          }`}
+                        />
+                        <span className="mt-1.5 block text-[12.5px] text-slate-500">Hạn cuối cùng để sinh viên nộp bài</span>
+                      </label>
+                    </div>
+                  </Field>
                 </Fieldset>
 
                 {/* ============ TÙY CHỌN NỘP BÀI ============ */}
@@ -749,8 +749,11 @@ export default function LessonEditor({
                     label="Hình thức nộp bài"
                     required
                     error={errors.submissionTypes}
-                    hint="Hình thức không được chọn sẽ bị ẩn ở trang nộp bài và bị chặn ở máy chủ."
                   >
+                    {/* Câu dẫn đặt trước các lựa chọn, thẳng lề với ô tick */}
+                    <p className="mb-2.5 text-[12.5px] text-slate-500">
+                      Chọn ít nhất một hình thức. Hình thức không được chọn sẽ bị ẩn ở trang nộp bài và bị chặn ở máy chủ.
+                    </p>
                     <div className="space-y-3">
                       <Checkbox
                         checked={allowTextSubmission}
@@ -759,7 +762,7 @@ export default function LessonEditor({
                           setErrors((er) => ({ ...er, submissionTypes: "" }));
                           markDirty();
                         }}
-                        label="Bài làm trực tuyến"
+                        label="Bài làm văn bản"
                         hint="Sinh viên soạn câu trả lời ngay trên trình soạn thảo (có đầy đủ công cụ định dạng)."
                       />
                       <Checkbox
@@ -775,10 +778,7 @@ export default function LessonEditor({
                     </div>
                   </Field>
 
-                  <Field
-                    label="Nộp trễ"
-                    hint="Không bật: sau hạn nộp sinh viên không thể nộp hay sửa bài. Bật: vẫn nhận bài nhưng đánh dấu rõ “Nộp trễ” ở cả hai phía."
-                  >
+                  <Field label="Nộp trễ">
                     <Checkbox
                       checked={allowLateSubmission}
                       onChange={(v) => {
@@ -786,6 +786,7 @@ export default function LessonEditor({
                         markDirty();
                       }}
                       label="Cho phép nộp bài sau hạn"
+                      hint="Không bật: sau hạn nộp sinh viên không thể nộp hay sửa bài. Bật: vẫn nhận bài nhưng đánh dấu rõ “Nộp trễ” ở cả hai phía."
                     />
                   </Field>
                 </Fieldset>

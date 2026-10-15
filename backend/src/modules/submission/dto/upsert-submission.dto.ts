@@ -1,7 +1,7 @@
 import { IsBoolean, IsOptional, IsString, MaxLength } from 'class-validator';
 import { Transform } from 'class-transformer';
 
-/** Giới hạn độ dài HTML bài làm trực tuyến (ký tự) — tránh gửi nội dung quá lớn */
+/** Giới hạn độ dài HTML bài làm văn bản (ký tự) — tránh gửi nội dung quá lớn */
 export const SUBMISSION_CONTENT_MAX_LENGTH = 200_000;
 
 /**
@@ -9,11 +9,11 @@ export const SUBMISSION_CONTENT_MAX_LENGTH = 200_000;
  * Tệp đính kèm gửi ở field `file`; các trường bên dưới là text nên boolean tới dạng chuỗi "true"/"false".
  */
 export class UpsertSubmissionDto {
-  /** Bài làm trực tuyến (HTML từ trình soạn thảo) — bị từ chối nếu bài tập không cho phép */
+  /** Bài làm văn bản (HTML từ trình soạn thảo) — bị từ chối nếu bài tập không cho phép */
   @IsOptional()
-  @IsString({ message: 'Bài làm trực tuyến phải là chuỗi' })
+  @IsString({ message: 'Bài làm văn bản phải là chuỗi' })
   @MaxLength(SUBMISSION_CONTENT_MAX_LENGTH, {
-    message: 'Bài làm trực tuyến quá dài',
+    message: 'Bài làm văn bản quá dài',
   })
   content?: string;
 

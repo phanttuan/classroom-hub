@@ -22,14 +22,22 @@ export interface SubmissionDto {
   studentId: string;
   student: SubmissionStudentDto;
   status: SubmissionStatus;
-  /** Bài làm trực tuyến (HTML đã được backend làm sạch) */
+  /** Bài làm văn bản (HTML đã được backend làm sạch) */
   content: string | null;
   isLate: boolean;
   submittedAt: string;
   updatedAt: string;
   /** Điểm đã chấm ("8.50") — null khi chưa chấm */
   score: string | null;
+  /** Nhận xét của giáo viên (HTML đã làm sạch) */
+  feedback: string | null;
+  gradedAt: string | null;
   file: SubmissionFileDto | null;
+}
+
+export interface GradeSubmissionPayload {
+  score: number;
+  feedback?: string;
 }
 
 export type SubmissionBlockReason =

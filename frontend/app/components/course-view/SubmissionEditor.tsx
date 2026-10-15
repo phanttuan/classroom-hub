@@ -42,7 +42,7 @@ interface SubmissionEditorProps {
 const hasText = (html: string) => /<img\b/i.test(html) || html.replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim().length > 0;
 
 const TIPS = [
-  "Bài làm trực tuyến hỗ trợ đầy đủ định dạng: tiêu đề, danh sách, bảng, khối mã, liên kết…",
+  "Bài làm văn bản hỗ trợ đầy đủ định dạng: tiêu đề, danh sách, bảng, khối mã, liên kết…",
   "Chỉ đính kèm được 1 tệp — nhiều tệp (mã nguồn, ảnh, báo cáo) thì nén thành .zip trước khi nộp.",
   "Tệp thực thi (.exe, .bat, .js, .html…) bị từ chối để bảo đảm an toàn cho hệ thống.",
   "Sau khi nộp vẫn có thể chỉnh sửa hoặc loại bỏ bài nộp cho tới hạn nộp (hoặc muộn hơn nếu giáo viên cho phép nộp trễ).",
@@ -155,10 +155,10 @@ export default function SubmissionEditor({ courseId, assignmentId }: SubmissionE
     if (!textProvided && !fileProvided) {
       next.form =
         assignment.allowTextSubmission && assignment.allowFileSubmission
-          ? "Hãy nhập bài làm trực tuyến hoặc đính kèm tệp trước khi nộp."
+          ? "Hãy nhập bài làm văn bản hoặc đính kèm tệp trước khi nộp."
           : assignment.allowFileSubmission
             ? "Hãy đính kèm tệp bài làm."
-            : "Hãy nhập bài làm trực tuyến.";
+            : "Hãy nhập bài làm văn bản.";
     }
     if (Object.keys(next).length) {
       setErrors((er) => ({ ...er, ...next }));
@@ -291,7 +291,7 @@ export default function SubmissionEditor({ courseId, assignmentId }: SubmissionE
 
               {/* ============ BÀI LÀM TRỰC TUYẾN ============ */}
               {assignment.allowTextSubmission && (
-                <Fieldset title="Bài làm trực tuyến">
+                <Fieldset title="Bài làm văn bản">
                   <Field
                     label="Nội dung bài làm"
                     required={!assignment.allowFileSubmission}

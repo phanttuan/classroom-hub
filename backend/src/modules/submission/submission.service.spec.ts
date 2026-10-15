@@ -14,6 +14,7 @@ import {
   CourseStatus,
   SubmissionStatus,
 } from '../../generated/prisma/enums.js';
+import { Prisma } from '../../generated/prisma/client.js';
 
 const courseId = 1n;
 const assignmentId = 100n;
@@ -25,6 +26,7 @@ const student = { id: studentId, fullName: 'Trần Thị Mai', email: 's1@x.vn',
 const openAssignment = {
   id: assignmentId,
   courseId,
+  maxScore: new Prisma.Decimal(10),
   status: ActivityStatus.PUBLISHED,
   openAt: new Date('2026-10-10T00:00:00.000Z'),
   dueAt: new Date('2026-10-20T23:59:00.000Z'),
@@ -70,12 +72,19 @@ describe('SubmissionService', () => {
       findUniqueOrThrow: ReturnType<typeof vi.fn>;
       findMany: ReturnType<typeof vi.fn>;
       upsert: ReturnType<typeof vi.fn>;
+      update: ReturnType<typeof vi.fn>;
       delete: ReturnType<typeof vi.fn>;
     };
     resource: { create: ReturnType<typeof vi.fn>; delete: ReturnType<typeof vi.fn> };
     enrollment: { findMany: ReturnType<typeof vi.fn> };
-    gradeItem: { findUnique: ReturnType<typeof vi.fn> };
-    grade: { findMany: ReturnType<typeof vi.fn> };
+    gradeItem: { findUnique: ReturnType<typeof vi.fn>; create: ReturnType<typeof vi.fn> };
+    grade: {
+      findMany: ReturnType<typeof vi.fn>;
+      findUnique: ReturnType<typeof vi.fn>;
+      upsert: ReturnType<typeof vi.fn>;
+      deleteMany: ReturnType<typeof vi.fn>;
+    };
+    gradeHistory: { create: ReturnType<typeof vi.fn> };
     $transaction: ReturnType<typeof vi.fn>;
   };
   let cloudinary: { uploadFile: ReturnType<typeof vi.fn>; destroy: ReturnType<typeof vi.fn> };
@@ -97,12 +106,19 @@ describe('SubmissionService', () => {
         findUniqueOrThrow: vi.fn().mockResolvedValue(submissionRow()),
         findMany: vi.fn().mockResolvedValue([]),
         upsert: vi.fn().mockResolvedValue({ id: 900n }),
+        update: vi.fn().mockResolvedValue(undefined),
         delete: vi.fn().mockResolvedValue(undefined),
       },
       resource: { create: vi.fn(), delete: vi.fn() },
       enrollment: { findMany: vi.fn().mockResolvedValue([]) },
-      gradeItem: { findUnique: vi.fn().mockResolvedValue(null) },
-      grade: { findMany: vi.fn().mockResolvedValue([]) },
+      gradeItem: { findUnique: vi.fn().mockResolvedValue(null), create: vi.fn().mockResolvedValue({ id: 5n }) },
+      grade: {
+        findMany: vi.fn().mockResolvedValue([]),
+        findUnique: vi.fn().mockResolvedValue(null),
+        upsert: vi.fn().mockResolvedValue({ id: 77n }),
+        deleteMany: vi.fn().mockResolvedValue({ count: 1 }),
+      },
+      gradeHistory: { create: vi.fn() },
       $transaction: vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => fn(prisma)),
     };
     cloudinary = {
@@ -160,11 +176,13 @@ describe('SubmissionService', () => {
     it('bài nộp đã chấm → không cho sửa (GRADED) và kèm điểm', async () => {
       prisma.submission.findUnique.mockResolvedValue(submissionRow({ status: SubmissionStatus.GRADED }));
       prisma.gradeItem.findUnique.mockResolvedValue({ id: 5n });
-      prisma.grade.findMany.mockResolvedValue([{ studentId, score: { toFixed: () => '8.50' } }]);
+      prisma.grade.findMany.mockResolvedValue([
+        { studentId, score: { toFixed: () => '8.50' }, feedback: '<p>Khá tốt</p>', updatedAt: now },
+      ]);
 
       const res = await service.getMySubmission(courseId, assignmentId, studentId);
       expect(res.window).toMatchObject({ canSubmit: false, reason: 'GRADED' });
-      expect(res.submission?.score).toBe('8.50');
+      expect(res.submission).toMatchObject({ score: '8.50', feedback: '<p>Khá tốt</p>', gradedAt: now });
     });
 
     it('sinh viên không xem được bài tập nháp', async () => {
@@ -179,7 +197,7 @@ describe('SubmissionService', () => {
   });
 
   describe('upsert', () => {
-    it('nộp bài làm trực tuyến: làm sạch HTML, submittedAt = hiện tại, không trễ', async () => {
+    it('nộp bài làm văn bản: làm sạch HTML, submittedAt = hiện tại, không trễ', async () => {
       await service.upsert(courseId, assignmentId, studentId, {
         content: '<p>Bài làm <script>alert(1)</script><b>đậm</b></p>',
       });
@@ -213,7 +231,7 @@ describe('SubmissionService', () => {
       expect(prisma.submission.upsert).not.toHaveBeenCalled();
     });
 
-    it('giáo viên tắt bài làm trực tuyến → chặn nội dung text ở backend', async () => {
+    it('giáo viên tắt bài làm văn bản → chặn nội dung text ở backend', async () => {
       prisma.assignment.findUnique.mockResolvedValue({ ...openAssignment, allowTextSubmission: false });
       await expect(
         service.upsert(courseId, assignmentId, studentId, { content: '<p>Văn bản</p>' }),
@@ -317,6 +335,79 @@ describe('SubmissionService', () => {
       prisma.assignment.findUnique.mockResolvedValue(pastDueAssignment);
       await expect(service.remove(courseId, assignmentId, studentId)).rejects.toThrow(ConflictException);
       expect(prisma.submission.delete).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('grade', () => {
+    const gradeInput = { score: 8.5, feedback: '<p>Tốt <script>x</script><b>lắm</b></p>' };
+
+    beforeEach(() => {
+      prisma.submission.findUnique.mockResolvedValue(submissionRow());
+      prisma.gradeItem.findUnique.mockResolvedValue({ id: 5n });
+    });
+
+    it('chấm lần đầu: upsert Grade, ghi GradeHistory (oldScore null), đặt bài nộp GRADED — trong transaction', async () => {
+      await service.grade(courseId, assignmentId, 900n, 10n, gradeInput);
+
+      expect(prisma.$transaction).toHaveBeenCalledTimes(1);
+      expect(prisma.grade.upsert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { uk_grades_grade_item_student: { gradeItemId: 5n, studentId } },
+          create: expect.objectContaining({ feedback: '<p>Tốt <b>lắm</b></p>', gradedBy: 10n }),
+        }),
+      );
+      const upsertArg = prisma.grade.upsert.mock.calls[0][0];
+      expect(upsertArg.create.score.toFixed(2)).toBe('8.50');
+      expect(prisma.gradeHistory.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ gradeId: 77n, oldScore: null, actorId: 10n, reason: 'Chấm bài nộp' }),
+      });
+      expect(prisma.submission.update).toHaveBeenCalledWith({
+        where: { id: 900n },
+        data: { status: SubmissionStatus.GRADED },
+      });
+    });
+
+    it('chấm lại: lịch sử lưu điểm cũ, lý do "Chấm lại"', async () => {
+      prisma.grade.findUnique.mockResolvedValue({ id: 77n, score: { toFixed: () => '6.00' }, feedback: 'cũ' });
+      await service.grade(courseId, assignmentId, 900n, 10n, { score: 9 });
+      expect(prisma.gradeHistory.create).toHaveBeenCalledWith({
+        data: expect.objectContaining({ oldFeedback: 'cũ', reason: 'Chấm lại bài nộp' }),
+      });
+    });
+
+    it('điểm vượt thang điểm hoặc âm → 400', async () => {
+      prisma.assignment.findUnique.mockResolvedValue({ ...openAssignment, maxScore: new Prisma.Decimal(10) });
+      await expect(service.grade(courseId, assignmentId, 900n, 10n, { score: 10.5 })).rejects.toThrow(BadRequestException);
+      await expect(service.grade(courseId, assignmentId, 900n, 10n, { score: -1 })).rejects.toThrow(BadRequestException);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('bài nộp không thuộc bài tập → 404; khóa học lưu trữ → 409', async () => {
+      prisma.submission.findUnique.mockResolvedValue(submissionRow({ assignmentId: 999n }));
+      await expect(service.grade(courseId, assignmentId, 900n, 10n, { score: 5 })).rejects.toThrow(NotFoundException);
+
+      prisma.submission.findUnique.mockResolvedValue(submissionRow());
+      prisma.assignment.findUnique.mockResolvedValue({ ...openAssignment, course: { status: CourseStatus.ARCHIVED } });
+      await expect(service.grade(courseId, assignmentId, 900n, 10n, { score: 5 })).rejects.toThrow(ConflictException);
+    });
+
+    it('tạo bù GradeItem nếu dữ liệu cũ thiếu', async () => {
+      prisma.gradeItem.findUnique.mockResolvedValue(null);
+      await service.grade(courseId, assignmentId, 900n, 10n, { score: 7 });
+      expect(prisma.gradeItem.create).toHaveBeenCalled();
+    });
+  });
+
+  describe('ungrade', () => {
+    it('xóa điểm và trả bài nộp về SUBMITTED; chưa chấm → 409', async () => {
+      prisma.submission.findUnique.mockResolvedValue(submissionRow({ status: SubmissionStatus.GRADED }));
+      prisma.gradeItem.findUnique.mockResolvedValue({ id: 5n });
+      await service.ungrade(courseId, assignmentId, 900n);
+      expect(prisma.grade.deleteMany).toHaveBeenCalledWith({ where: { gradeItemId: 5n, studentId } });
+      expect(prisma.submission.update).toHaveBeenCalledWith({ where: { id: 900n }, data: { status: SubmissionStatus.SUBMITTED } });
+
+      prisma.submission.findUnique.mockResolvedValue(submissionRow());
+      await expect(service.ungrade(courseId, assignmentId, 900n)).rejects.toThrow(ConflictException);
     });
   });
 

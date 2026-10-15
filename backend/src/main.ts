@@ -51,6 +51,8 @@ async function bootstrap() {
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'Accept'],
+    // Cho frontend đọc tên tệp / số tệp khi tải gói .zip bài nộp
+    exposedHeaders: ['Content-Disposition', 'X-Submission-Files'],
   });
 
   // 3. Thiết lập tiền tố API toàn cục

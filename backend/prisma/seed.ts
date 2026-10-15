@@ -110,7 +110,7 @@ interface SeedModule {
 
 interface SeedSubmission {
   student: UserKey;
-  /** HTML bài làm trực tuyến (hoặc văn bản thuần) */
+  /** HTML bài làm văn bản (hoặc văn bản thuần) */
   content?: string;
   /** Tệp mẫu đính kèm (không có trên Cloudinary — chỉ để hiển thị) */
   file?: SeedResource;
@@ -292,7 +292,7 @@ const COURSES: SeedCourse[] = [
         module: 'Chương 1: Tổng quan & chuẩn bị môi trường',
         title: 'Bài tập 1: Thiết lập môi trường và Git',
         description:
-          '<p>Cài đặt Node.js, PostgreSQL và tạo repository trên GitHub.</p><ul><li>Nộp <strong>đường dẫn repository</strong> trong bài làm trực tuyến.</li><li>Đính kèm ảnh chụp màn hình <code>npm run start:dev</code> chạy thành công (nén .zip nếu nhiều ảnh).</li></ul>',
+          '<p>Cài đặt Node.js, PostgreSQL và tạo repository trên GitHub.</p><ul><li>Nộp <strong>đường dẫn repository</strong> trong bài làm văn bản.</li><li>Đính kèm ảnh chụp màn hình <code>npm run start:dev</code> chạy thành công (nén .zip nếu nhiều ảnh).</li></ul>',
         opensInDays: -7,
         dueInDays: 5,
         submissions: [
@@ -316,7 +316,7 @@ const COURSES: SeedCourse[] = [
       {
         module: 'Chương 2: Backend với NestJS & Prisma',
         title: 'Bài tập 3: Viết REST API CRUD cho Course (chỉ nhận tệp)',
-        description: '<p>Nén mã nguồn thành <strong>.zip</strong> (không kèm node_modules) và nộp. Không nhận bài làm trực tuyến, <strong>không nhận bài nộp trễ</strong>.</p>',
+        description: '<p>Nén mã nguồn thành <strong>.zip</strong> (không kèm node_modules) và nộp. Không nhận bài làm văn bản, <strong>không nhận bài nộp trễ</strong>.</p>',
         maxScore: 100,
         opensInDays: -10,
         dueInDays: -1,
@@ -325,8 +325,8 @@ const COURSES: SeedCourse[] = [
       },
       {
         module: 'Chương 3: Frontend với Next.js',
-        title: 'Bài tập 4: Trang danh sách khóa học với Next.js (chỉ bài làm trực tuyến)',
-        description: '<p>Trình bày cách tổ chức component và gọi API trong bài làm trực tuyến. Không cần đính kèm tệp.</p>',
+        title: 'Bài tập 4: Trang danh sách khóa học với Next.js (chỉ bài làm văn bản)',
+        description: '<p>Trình bày cách tổ chức component và gọi API trong bài làm văn bản. Không cần đính kèm tệp.</p>',
         opensInDays: 3,
         dueInDays: 14,
         allowFileSubmission: false,
@@ -589,9 +589,14 @@ async function seedAssignments(
   moduleIds: Map<string, bigint>,
   userIds: Record<UserKey, bigint>,
 ) {
+  // Bài tập xếp sau các bài học của topic (cùng dãy orderIndex với Lesson)
+  const positionByModule = new Map<string, number>();
   for (const a of c.assignments ?? []) {
     const moduleId = moduleIds.get(a.module);
     if (!moduleId) throw new Error(`Seed ${c.code}: không tìm thấy module "${a.module}" cho bài tập "${a.title}"`);
+    const lessonCount = c.modules.find((m) => m.title === a.module)?.lessons.length ?? 0;
+    const orderIndex = lessonCount + (positionByModule.get(a.module) ?? 0) + 1;
+    positionByModule.set(a.module, orderIndex - lessonCount);
     const status = a.status ?? ActivityStatus.PUBLISHED;
     const maxScore = new Prisma.Decimal(a.maxScore ?? 10);
     const dueAt = daysFromNow(a.dueInDays);
@@ -608,6 +613,7 @@ async function seedAssignments(
         dueAt,
         status,
         publishedAt: status === ActivityStatus.PUBLISHED ? new Date() : null,
+        orderIndex,
         allowLateSubmission: a.allowLateSubmission ?? false,
         allowTextSubmission: a.allowTextSubmission ?? true,
         allowFileSubmission: a.allowFileSubmission ?? true,
