@@ -558,7 +558,7 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
 
       if (movedItem.kind === "assignment") {
         if (movedItem.assignment.status !== "DRAFT") {
-          showToast("Chỉ bài tập ở trạng thái nháp (DRAFT) mới có thể chuyển topic");
+          showToast("Chỉ bài tập ở trạng thái nháp mới có thể chuyển topic");
           return;
         }
         try {
@@ -573,7 +573,7 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
       }
 
       if (movedItem.quiz.status !== "DRAFT") {
-        showToast("Chỉ đề kiểm tra ở trạng thái nháp (DRAFT) mới có thể chuyển topic");
+        showToast("Chỉ đề kiểm tra ở trạng thái nháp mới có thể chuyển topic");
         return;
       }
       try {
@@ -964,8 +964,8 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
     const hidden = quiz.status === "DRAFT";
     const canDrag = role === "TEACHER" && editMode && !isSearching;
     const editHref = `/teacher/content/courses/${courseId}/lessons/new?section=${quiz.moduleId}&type=QUIZ&quizId=${quiz.id}`;
-    const viewHref =
-      role === "TEACHER" ? `/teacher/quizzes?course=${courseId}&quiz=${quiz.id}` : "/student/quizzes";
+    // Giáo viên dùng chung giao diện soạn thảo cho mọi trạng thái; đề đã khóa sẽ ở chế độ chỉ xem
+    const viewHref = role === "TEACHER" ? editHref : "/student/quizzes";
     const isPastDue = new Date(quiz.dueAt).getTime() < openedAt;
     const attempts = quiz.attemptStats;
 
@@ -1034,17 +1034,12 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
                 <KebabMenu
                   items={[
                     {
-                      label: "Xem chi tiết",
-                      icon: Eye,
-                      onClick: () => router.push(viewHref),
+                      label: "Chỉnh sửa đề kiểm tra",
+                      icon: Pencil,
+                      onClick: () => router.push(editHref),
                     },
                     ...(quiz.status === "DRAFT"
                       ? [
-                          {
-                            label: "Chỉnh sửa đề kiểm tra",
-                            icon: Pencil,
-                            onClick: () => router.push(editHref),
-                          },
                           {
                             label: "Xuất bản đề kiểm tra",
                             icon: Eye,

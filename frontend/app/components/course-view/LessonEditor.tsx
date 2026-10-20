@@ -457,6 +457,7 @@ export default function LessonEditor({
           : undefined;
   const backToCourse = `${coursePath}#module-section-${targetModuleId}`;
   const quizLocked = isQuiz && quizStatus !== null && quizStatus !== "DRAFT";
+  const quizEditDraft = isEdit && isQuiz && quizStatus === "DRAFT";
   const quizScoreTotal = chosenQuestions.reduce((sum, question) => {
     const score = Number(question.maxScore);
     return sum + (Number.isFinite(score) ? score : 0);
@@ -966,9 +967,7 @@ export default function LessonEditor({
                 <Eye className="h-4 w-4" /> Xem trang hiện tại
               </HeroButton>
             ) : isEdit && quizId ? (
-              <HeroButton href={`/teacher/quizzes?course=${courseId}&quiz=${quizId}`}>
-                <Eye className="h-4 w-4" /> Xem đề kiểm tra
-              </HeroButton>
+              undefined
             ) : isEdit && assignmentId ? (
               <HeroButton href={`${coursePath}/assignments/${assignmentId}`}>
                 <Eye className="h-4 w-4" /> Xem bài tập
@@ -1241,7 +1240,7 @@ export default function LessonEditor({
                 noValidate
                 onSubmit={(e) => {
                   e.preventDefault();
-                  void handleSaveQuiz("course");
+                  void handleSaveQuiz(quizEditDraft ? "draft" : "course");
                 }}
                 className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xs"
               >
@@ -1782,19 +1781,33 @@ export default function LessonEditor({
                     disabled={!!saving || quizLocked}
                     className="flex items-center gap-2 rounded-lg bg-[#0f6cbf] px-5 py-2.5 text-[14px] font-semibold text-white shadow-xs hover:bg-[#0c599e] disabled:opacity-60"
                   >
-                    {saving === "course" && <Loader2 className="h-4 w-4 animate-spin" />}
-                    {isEdit && quizStatus === "DRAFT" ? "Lưu và xuất bản" : isEdit ? "Lưu thay đổi" : "Lưu và xuất bản"}
+                    {saving === (quizEditDraft ? "draft" : "course") && (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    )}
+                    {isEdit ? "Lưu thay đổi" : "Lưu và xuất bản"}
                   </button>
-                  <button
-                    type="button"
-                    disabled={!!saving || quizLocked}
-                    onClick={() => void handleSaveQuiz("draft")}
-                    title="Lưu ở trạng thái bản nháp (DRAFT) rồi quay lại khóa học"
-                    className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-[14px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                  >
-                    {saving === "draft" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FilePen className="h-4 w-4" />}
-                    Lưu bản nháp
-                  </button>
+                  {(quizEditDraft || !isEdit) && (
+                    <button
+                      type="button"
+                      disabled={!!saving || quizLocked}
+                      onClick={() => void handleSaveQuiz(quizEditDraft ? "course" : "draft")}
+                      title={
+                        quizEditDraft
+                          ? "Xuất bản đề để sinh viên có thể làm bài"
+                          : "Lưu ở trạng thái bản nháp (DRAFT) rồi quay lại khóa học"
+                      }
+                      className="flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-5 py-2.5 text-[14px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                    >
+                      {saving === (quizEditDraft ? "course" : "draft") ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : quizEditDraft ? (
+                        <Eye className="h-4 w-4" />
+                      ) : (
+                        <FilePen className="h-4 w-4" />
+                      )}
+                      {quizEditDraft ? "Xuất bản đề" : "Lưu bản nháp"}
+                    </button>
+                  )}
                   <button
                     type="button"
                     disabled={!!saving}
@@ -2220,21 +2233,33 @@ export default function LessonEditor({
                     <button
                       type="button"
                       disabled={!!saving || quizLocked}
-                      onClick={() => void handleSaveQuiz("course")}
+                      onClick={() => void handleSaveQuiz(quizEditDraft ? "draft" : "course")}
                       className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#0f6cbf] px-4 py-2.5 text-[14px] font-semibold text-white hover:bg-[#0c599e] disabled:opacity-60"
                     >
-                      {saving === "course" ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                      {isEdit && quizStatus === "DRAFT" ? "Lưu và xuất bản" : isEdit ? "Lưu thay đổi" : "Lưu và xuất bản"}
+                      {saving === (quizEditDraft ? "draft" : "course") ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4" />
+                      )}
+                      {isEdit ? "Lưu thay đổi" : "Lưu và xuất bản"}
                     </button>
-                    <button
-                      type="button"
-                      disabled={!!saving || quizLocked}
-                      onClick={() => void handleSaveQuiz("draft")}
-                      className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-[14px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
-                    >
-                      {saving === "draft" ? <Loader2 className="h-4 w-4 animate-spin" /> : <FilePen className="h-4 w-4" />}
-                      Lưu bản nháp
-                    </button>
+                    {(quizEditDraft || !isEdit) && (
+                      <button
+                        type="button"
+                        disabled={!!saving || quizLocked}
+                        onClick={() => void handleSaveQuiz(quizEditDraft ? "course" : "draft")}
+                        className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-[14px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                      >
+                        {saving === (quizEditDraft ? "course" : "draft") ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : quizEditDraft ? (
+                          <Eye className="h-4 w-4" />
+                        ) : (
+                          <FilePen className="h-4 w-4" />
+                        )}
+                        {quizEditDraft ? "Xuất bản đề" : "Lưu bản nháp"}
+                      </button>
+                    )}
                   </>
                 ) : isAssignment ? (
                   <>

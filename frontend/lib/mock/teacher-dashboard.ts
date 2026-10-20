@@ -52,7 +52,7 @@ export const dashboardStats: DashboardStat[] = [
     value: 4,
     tone: "purple",
     icon: "assignments",
-    detailHref: "/teacher/assignments",
+    detailHref: "/teacher/content/courses",
   },
   {
     id: "stat-quizzes",
@@ -60,7 +60,7 @@ export const dashboardStats: DashboardStat[] = [
     value: 2,
     tone: "orange",
     icon: "quizzes",
-    detailHref: "/teacher/quizzes",
+    detailHref: "/teacher/content/courses",
   },
 ];
 

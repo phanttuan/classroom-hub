@@ -22,9 +22,6 @@ export function PendingAssignments({
     <section className="flex h-full flex-col rounded-xl border border-slate-200/70 bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.05)]">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-[16px] font-bold text-slate-900">Bài tập cần chấm</h2>
-        <a href="/teacher/assignments" className="text-[13px] font-medium text-blue-600 hover:text-blue-700">
-          Xem tất cả <ArrowRight className="inline h-3.5 w-3.5" />
-        </a>
       </div>
       <ul className="flex-1 space-y-3">
         {items.map((a) => (
