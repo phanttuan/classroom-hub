@@ -149,6 +149,7 @@ model User {
   givenGrades           Grade[]           @relation("TeacherGraded")
   gradeHistories        GradeHistory[]    @relation("GradeHistoryActor")
   questionBanks         QuestionBank[]    @relation("QuestionBankOwner")
+  questionSets          QuestionSet[]     @relation("QuestionSetOwner")
   createdQuizzes        Quiz[]            @relation("QuizCreator")
   quizAttempts          QuizAttempt[]
   authoredAnnouncements Announcement[]    @relation("AnnouncementAuthor")
@@ -216,6 +217,7 @@ model Module {
   course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
   lessons     Lesson[]
   assignments Assignment[]
+  quizzes     Quiz[]
 
   @@unique([courseId, orderIndex], name: "uk_modules_course_order")
   @@map("modules")
@@ -408,9 +410,24 @@ model GradeConfig {
 // 5. QUESTION BANK & QUIZ DOMAIN (NGÂN HÀNG CÂU HỎI & TRẮC NGHIỆM)
 // ==============================================================================
 
+model QuestionSet {
+  id        BigInt   @id @default(autoincrement())
+  ownerId   BigInt   @map("owner_id")
+  name      String   @db.VarChar(255)
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  owner     User           @relation("QuestionSetOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  questions QuestionBank[]
+
+  @@unique([ownerId, name], name: "uk_question_sets_owner_name")
+  @@map("question_sets")
+}
+
 model QuestionBank {
   id           BigInt         @id @default(autoincrement())
   ownerId      BigInt         @map("owner_id")
+  setId        BigInt?        @map("set_id")
   questionKey  String         @default(uuid()) @map("question_key") @db.Uuid
   content      String         @db.Text
   questionType QuestionType   @map("question_type")
@@ -421,10 +438,12 @@ model QuestionBank {
   updatedAt    DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   owner         User             @relation("QuestionBankOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  set           QuestionSet?     @relation(fields: [setId], references: [id], onDelete: SetNull)
   choices       QuestionChoice[]
   quizQuestions QuizQuestion[]
 
   @@unique([questionKey, version], name: "uk_question_bank_key_version")
+  @@index([setId], map: "idx_question_bank_set_id")
   @@map("question_bank")
 }
 
@@ -445,6 +464,7 @@ model QuestionChoice {
 model Quiz {
   id                     BigInt         @id @default(autoincrement())
   courseId               BigInt         @map("course_id")
+  moduleId               BigInt         @map("module_id")
   createdBy              BigInt         @map("created_by")
   title                  String         @db.VarChar(255)
   instructions           String?        @db.Text
@@ -460,6 +480,7 @@ model Quiz {
   updatedAt              DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   course        Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  module        Module         @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   creator       User           @relation("QuizCreator", fields: [createdBy], references: [id], onDelete: Restrict)
   quizQuestions QuizQuestion[]
   attempts      QuizAttempt[]

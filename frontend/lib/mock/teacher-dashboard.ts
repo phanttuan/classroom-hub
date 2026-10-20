@@ -52,7 +52,7 @@ export const dashboardStats: DashboardStat[] = [
     value: 4,
     tone: "purple",
     icon: "assignments",
-    detailHref: "/teacher/assignments",
+    detailHref: "/teacher/content/courses",
   },
   {
     id: "stat-quizzes",
@@ -60,7 +60,7 @@ export const dashboardStats: DashboardStat[] = [
     value: 2,
     tone: "orange",
     icon: "quizzes",
-    detailHref: "/teacher/quizzes",
+    detailHref: "/teacher/content/courses",
   },
 ];
 
@@ -193,6 +193,12 @@ export const teacherSidebarNav: SidebarItem[] = [
     label: "Khóa học",
     icon: "content",
     href: "/teacher/content/courses",
+  },
+  {
+    id: "question-bank",
+    label: "Ngân hàng câu hỏi",
+    icon: "quiz",
+    href: "/teacher/question-bank",
   },
   { id: "grades", label: "Sổ điểm", icon: "gradebook", href: "/teacher/grades" },
   { id: "notifs", label: "Thông báo", icon: "bell", href: "/teacher/notifications" },

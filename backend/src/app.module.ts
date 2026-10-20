@@ -15,6 +15,8 @@ import { ResourceModule } from './modules/resource/resource.module.js';
 import { LearningContentModule } from './modules/learning-content/learning-content.module.js';
 import { AssignmentModule } from './modules/assignment/assignment.module.js';
 import { SubmissionModule } from './modules/submission/submission.module.js';
+import { QuizModule } from './modules/quiz/quiz.module.js';
+import { QuestionBankModule } from './modules/question-bank/question-bank.module.js';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor.js';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
 
@@ -41,6 +43,8 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
     LearningContentModule,
     AssignmentModule,
     SubmissionModule,
+    QuizModule,
+    QuestionBankModule,
   ],
   controllers: [AppController],
   providers: [
