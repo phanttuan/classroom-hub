@@ -127,6 +127,7 @@ export class QuizService {
 
       const quizzes = await this.prisma.quiz.findMany({
         where,
+        // Quiz không có orderIndex: giữ thứ tự tạo (cũ → mới) theo trình tự nội dung.
         orderBy: { createdAt: 'asc' },
         include: {
           gradeItem: { select: { id: true } },
@@ -150,6 +151,7 @@ export class QuizService {
 
     const quizzes = await this.prisma.quiz.findMany({
       where,
+      // Quiz không có orderIndex: giữ thứ tự tạo (cũ → mới) theo trình tự nội dung.
       orderBy: { createdAt: 'asc' },
       include: {
         gradeItem: { select: { id: true } },

@@ -408,6 +408,30 @@ describe('QuizService', () => {
       expect(result.totalMaxScore).toBe('10.00');
       expect(result.questionCount).toBe(3);
     });
+
+    it('should publish an unscored quiz without creating a GradeItem', async () => {
+      prisma.quiz.findFirst.mockResolvedValue({
+        ...baseQuiz,
+        scoringEnabled: false,
+        gradeItem: null,
+      });
+      prisma.quizQuestion.findMany.mockResolvedValue([
+        { maxScore: new Prisma.Decimal(2.5) },
+      ]);
+      prisma.quiz.update.mockResolvedValue({
+        ...baseQuiz,
+        scoringEnabled: false,
+        status: ActivityStatus.PUBLISHED,
+        publishedAt: new Date(),
+        gradeItem: null,
+      });
+
+      const result = await service.publish(courseId, quizId);
+
+      expect(prisma.gradeItem.upsert).not.toHaveBeenCalled();
+      expect(result.status).toBe(ActivityStatus.PUBLISHED);
+      expect(result.gradeItemId).toBeNull();
+    });
   });
 
   describe('close', () => {
@@ -659,7 +683,7 @@ describe('QuizService', () => {
       expect(result[0]).not.toHaveProperty('questions');
     });
 
-    it('should return every quiz plus attempt stats for teacher', async () => {
+    it('should return every quiz in createdAt asc order plus attempt stats for teacher', async () => {
       prisma.quiz.findMany.mockResolvedValue([
         {
           ...baseQuiz,
@@ -684,6 +708,7 @@ describe('QuizService', () => {
       expect(prisma.quiz.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
           where: { courseId, status: ActivityStatus.DRAFT },
+          orderBy: { createdAt: 'asc' },
         }),
       );
       expect(result[0]?.attemptStats).toEqual({ submitted: 1, total: 2 });
