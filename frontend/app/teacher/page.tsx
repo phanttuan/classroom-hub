@@ -5,14 +5,14 @@ import GreetingHeader from "../components/common/GreetingHeader";
 import TeacherSidebar from "./components/TeacherSidebar";
 import TeacherTopbar from "./components/TeacherTopbar";
 import StatCards from "./components/StatCards";
-import ClassList from "./components/ClassList";
+import CourseList from "./components/CourseList";
 import { PendingAssignments, RecentResults } from "./components/AssignmentPanels";
 import SchedulePanel from "./components/SchedulePanel";
 import NotificationsPanel from "./components/NotificationsPanel";
 import {
-  ClassDetailModal,
-  ConfirmDeleteModal,
-  CreateClassModal,
+  CourseDetailModal,
+  ConfirmStatusChangeModal,
+  CreateCourseModal,
   EventDetailModal,
   GradeModal,
   NotificationModal,
@@ -23,7 +23,6 @@ import {
   pendingAssignments,
   recentResults,
   scheduleEvents,
-  teacherClasses,
   teacherNotifications,
   teacherProfile,
 } from "@/lib/mock/teacher-dashboard";
@@ -35,17 +34,48 @@ import type {
   TeacherProfile,
 } from "@/lib/types/teacher";
 import { fetchUserProfile } from "@/lib/api/user-api";
+import {
+  fetchTeacherCourses,
+  createCourse,
+  updateCourse,
+  updateCourseStatus,
+} from "@/lib/api/course-api";
+import {
+  mapCourseDtoToTeacherClass,
+  type BackendCourseStatus,
+} from "@/lib/types/course";
 import { useSidebar } from "@/lib/context/sidebar-context";
 
 export default function TeacherDashboardPage() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [classes, setClasses] = useState<TeacherClass[]>(teacherClasses);
+  const [classes, setClasses] = useState<TeacherClass[]>([]);
   const [profile, setProfile] = useState<TeacherProfile>(teacherProfile);
   const { collapsed, toggleCollapse } = useSidebar();
 
+  // popup states
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editingClass, setEditingClass] = useState<TeacherClass | null>(null);
+  const [viewingClass, setViewingClass] = useState<TeacherClass | null>(null);
+  const [statusConfirm, setStatusConfirm] = useState<{
+    classInfo: TeacherClass;
+    targetStatus: "active" | "closed" | "archived";
+  } | null>(null);
+  const [grading, setGrading] = useState<PendingAssignment | null>(null);
+  const [selectedEvent, setSelectedEvent] = useState<ScheduleEvent | null>(null);
+  const [selectedNoti, setSelectedNoti] = useState<TeacherNotification | null | undefined>(
+    undefined,
+  );
+  const [toast, setToast] = useState("");
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    window.clearTimeout((showToast as unknown as { t?: number }).t);
+    (showToast as unknown as { t?: number }).t = window.setTimeout(() => setToast(""), 2600);
+  };
+
   useEffect(() => {
-    // 1. Tải ngay từ localStorage nếu có
+    // 1. Tải profile ngay từ localStorage nếu có
     try {
       const raw = localStorage.getItem("user");
       if (raw) {
@@ -59,7 +89,7 @@ export default function TeacherDashboardPage() {
       }
     } catch {}
 
-    // 2. Fetch dữ liệu mới nhất từ CSDL qua /users/me
+    // 2. Fetch profile mới nhất từ CSDL qua /users/me
     fetchUserProfile()
       .then((data) => {
         if (data) {
@@ -73,7 +103,18 @@ export default function TeacherDashboardPage() {
       })
       .catch(() => {});
 
-    // 3. Lắng nghe sự kiện cập nhật hồ sơ để đồng bộ ngay lập tức
+    // 3. Tải danh sách môn học thật từ API
+    fetchTeacherCourses({ status: "all" })
+      .then((res) => {
+        if (res && res.items) {
+          setClasses(res.items.map(mapCourseDtoToTeacherClass));
+        }
+      })
+      .catch(() => {
+        setClasses([]);
+      });
+
+    // 4. Lắng nghe sự kiện cập nhật hồ sơ để đồng bộ ngay lập tức
     const handleUpdate = (e: Event) => {
       const detail = (e as CustomEvent).detail;
       if (detail) {
@@ -89,18 +130,6 @@ export default function TeacherDashboardPage() {
     return () => window.removeEventListener("user-profile-updated", handleUpdate);
   }, []);
 
-  // popup states
-  const [createOpen, setCreateOpen] = useState(false);
-  const [editingClass, setEditingClass] = useState<TeacherClass | null>(null);
-  const [viewingClass, setViewingClass] = useState<TeacherClass | null>(null);
-  const [deletingClass, setDeletingClass] = useState<TeacherClass | null>(null);
-  const [grading, setGrading] = useState<PendingAssignment | null>(null);
-  const [selectedEvent, setSelectedEvent] = useState<ScheduleEvent | null>(null);
-  const [selectedNoti, setSelectedNoti] = useState<TeacherNotification | null | undefined>(
-    undefined,
-  );
-  const [toast, setToast] = useState("");
-
   const filteredClasses = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return classes;
@@ -109,41 +138,85 @@ export default function TeacherDashboardPage() {
     );
   }, [classes, searchQuery]);
 
-  const showToast = (msg: string) => {
-    setToast(msg);
-    window.clearTimeout((showToast as unknown as { t?: number }).t);
-    (showToast as unknown as { t?: number }).t = window.setTimeout(() => setToast(""), 2600);
+  // Thống kê động đồng bộ số môn thực tế
+  const dynamicStats = useMemo(() => {
+    return dashboardStats.map((s, idx) => {
+      if (idx === 0) {
+        return { ...s, value: classes.length };
+      }
+      return s;
+    });
+  }, [classes.length]);
+
+  const handleCreateSubmit = async (v: {
+    name: string;
+    description?: string;
+  }) => {
+    if (editingClass) {
+      try {
+        const res = await updateCourse(editingClass.id, {
+          name: v.name,
+          description: v.description,
+        });
+        const updated = mapCourseDtoToTeacherClass(res);
+        setClasses((prev) =>
+          prev.map((c) => (c.id === editingClass.id ? updated : c)),
+        );
+        showToast(`Đã lưu thay đổi khóa học ${res.courseCode}`);
+        setEditingClass(null);
+        setCreateOpen(false);
+      } catch (err: unknown) {
+        const error = err as { message?: string };
+        showToast(error?.message || "Không thể lưu thay đổi khóa học");
+      }
+    } else {
+      try {
+        const res = await createCourse({
+          name: v.name,
+          description: v.description,
+        });
+        const newClass = mapCourseDtoToTeacherClass(res);
+        setClasses((prev) => [newClass, ...prev]);
+        showToast(`Đã tạo khóa học ${res.courseCode} thành công!`);
+        setCreateOpen(false);
+      } catch (err: unknown) {
+        const error = err as { message?: string };
+        showToast(error?.message || "Không thể tạo khóa học");
+      }
+    }
   };
 
-  const handleCreateSubmit = (v: { name: string; code: string; status: TeacherClass["status"] }) => {
-    if (editingClass) {
-      setClasses((prev) =>
-        prev.map((c) => (c.id === editingClass.id ? { ...c, ...v, updatedAt: "15/09/2026" } : c)),
-      );
-      showToast(`Đã lưu thay đổi lớp ${v.code}`);
-      setEditingClass(null);
-    } else {
-      setClasses((prev) => [
-        {
-          id: `cls-${Date.now()}`,
-          name: v.name,
-          code: v.code,
-          status: v.status,
-          studentCount: 0,
-          courseCount: 0,
-          updatedAt: "15/09/2026",
-          coverGradient: "from-blue-100 via-sky-100 to-slate-200",
-          coverEmoji: "📚",
-        },
-        ...prev,
-      ]);
-      showToast(`Đã tạo lớp ${v.code} thành công`);
+  const handleConfirmStatusChange = async () => {
+    if (!statusConfirm) return;
+    const { classInfo, targetStatus } = statusConfirm;
+
+    const statusMap: Record<"active" | "closed" | "archived", BackendCourseStatus> = {
+      active: "ACTIVE",
+      closed: "CLOSED",
+      archived: "ARCHIVED",
+    };
+
+    try {
+      const res = await updateCourseStatus(classInfo.id, statusMap[targetStatus]);
+      const updated = mapCourseDtoToTeacherClass(res);
+      setClasses((prev) => prev.map((c) => (c.id === classInfo.id ? updated : c)));
+
+      const labelMap = {
+        active: classInfo.status === "archived" ? "Đã khôi phục khóa học" : "Đã mở lại cho sinh viên tham gia khóa học",
+        closed: "Đã ngừng nhận sinh viên mới cho khóa học",
+        archived: "Đã lưu trữ khóa học",
+      };
+      showToast(`${labelMap[targetStatus]} ${res.courseCode}`);
+    } catch (err: unknown) {
+      const error = err as { message?: string };
+      showToast(error?.message || "Không thể thay đổi trạng thái khóa học");
+    } finally {
+      setStatusConfirm(null);
     }
-    setCreateOpen(false);
   };
 
   return (
-    <div className="min-h-screen bg-[#F6F8FB] text-slate-900">
+    <div className="min-h-screen bg-slate-50 text-slate-800">
       <TeacherSidebar
         mobileOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
@@ -173,9 +246,9 @@ export default function TeacherDashboardPage() {
           <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(0,1fr)_330px]">
             {/* ===== Cột trái ===== */}
             <div className="min-w-0 space-y-5">
-              <StatCards stats={dashboardStats} />
+              <StatCards stats={dynamicStats} />
 
-              <ClassList
+              <CourseList
                 classes={filteredClasses}
                 onCreate={() => {
                   setEditingClass(null);
@@ -186,7 +259,9 @@ export default function TeacherDashboardPage() {
                   setEditingClass(c);
                   setCreateOpen(true);
                 }}
-                onDelete={setDeletingClass}
+                onChangeStatus={(c, targetStatus) => {
+                  setStatusConfirm({ classInfo: c, targetStatus });
+                }}
               />
 
               <div className="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-2">
@@ -213,7 +288,7 @@ export default function TeacherDashboardPage() {
       </div>
 
       {/* ===== Popups ===== */}
-      <CreateClassModal
+      <CreateCourseModal
         open={createOpen}
         initial={editingClass}
         onClose={() => {
@@ -222,17 +297,12 @@ export default function TeacherDashboardPage() {
         }}
         onSubmit={handleCreateSubmit}
       />
-      <ClassDetailModal classInfo={viewingClass} onClose={() => setViewingClass(null)} />
-      <ConfirmDeleteModal
-        classInfo={deletingClass}
-        onClose={() => setDeletingClass(null)}
-        onConfirm={() => {
-          if (deletingClass) {
-            setClasses((prev) => prev.filter((c) => c.id !== deletingClass.id));
-            showToast(`Đã xóa lớp ${deletingClass.code}`);
-          }
-          setDeletingClass(null);
-        }}
+      <CourseDetailModal classInfo={viewingClass} onClose={() => setViewingClass(null)} />
+      <ConfirmStatusChangeModal
+        classInfo={statusConfirm?.classInfo ?? null}
+        targetStatus={statusConfirm?.targetStatus ?? null}
+        onClose={() => setStatusConfirm(null)}
+        onConfirm={handleConfirmStatusChange}
       />
       <GradeModal
         assignment={grading}

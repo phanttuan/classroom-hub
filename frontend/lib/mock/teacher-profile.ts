@@ -25,7 +25,7 @@ export const workInfo: WorkInfo = {
 };
 
 export const profileQuickStats = [
-  { id: "classes", label: "Lớp học đang dạy", value: 3 },
+  { id: "classes", label: "Khóa học đang dạy", value: 3 },
   { id: "courses", label: "Khóa học", value: 2 },
   { id: "assignments", label: "Bài tập đã giao", value: 12 },
   { id: "quizzes", label: "Bài kiểm tra đã tạo", value: 8 },

@@ -26,13 +26,15 @@ export interface StudentClass {
   code: string;
   name: string;
   teacher: string;
-  progress: number; // 0-100
   status: StudentClassStatus;
-  lessonsDone: number;
-  lessonsTotal: number;
-  currentScore: number | null; // thang 10
-  coverGradient: string;
-  coverEmoji: string;
+  memberCount?: number; // Sĩ số học sinh
+  coverGradient?: string;
+  coverEmoji?: string;
+  coverImageUrl?: string | null;
+  progress?: number; // 0-100 (tùy chọn)
+  lessonsDone?: number;
+  lessonsTotal?: number;
+  currentScore?: number | null; // thang 10
   timeRange?: string;
   scheduleText?: string;
   room?: string;

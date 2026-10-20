@@ -29,7 +29,7 @@ function tagOf(n: StudentInboxItem): { label: string; cls: string } {
   if (/tài liệu/i.test(n.title)) return { label: "Tài liệu", cls: "bg-orange-100/80 text-orange-600" };
   if (/kiểm tra 2/i.test(n.title) && n.category === "schedule") return { label: "Kiểm tra", cls: "bg-green-100/80 text-green-700" };
   switch (n.category) {
-    case "class": return { label: "Lớp học", cls: "bg-purple-100/80 text-purple-600" };
+    case "class": return { label: "Khóa học", cls: "bg-purple-100/80 text-purple-600" };
     case "assignment": return { label: "Bài tập", cls: "bg-red-100/70 text-red-500" };
     case "schedule": return { label: "Lịch học", cls: "bg-blue-100/80 text-blue-600" };
     case "grade": return { label: "Điểm số", cls: "bg-green-100/80 text-green-700" };
@@ -109,20 +109,20 @@ export default function StudentNotificationsPage() {
   const pills: { id: Pill; label: string; icon: React.ReactNode }[] = [
     { id: "all", label: `Tất cả (${counts.all})`, icon: null },
     { id: "important", label: `Quan trọng (${counts.important})`, icon: <AlertCircle className="h-4 w-4 text-red-500" /> },
-    { id: "class", label: `Lớp học (${counts.class})`, icon: <GraduationCap className="h-4 w-4 text-slate-400" /> },
+    { id: "class", label: `Khóa học (${counts.class})`, icon: <GraduationCap className="h-4 w-4 text-slate-400" /> },
     { id: "assignment", label: `Bài tập (${counts.assignment})`, icon: <FileText className="h-4 w-4 text-slate-400" /> },
     { id: "schedule", label: `Lịch học (${counts.schedule})`, icon: <CalendarDays className="h-4 w-4 text-slate-400" /> },
     { id: "system", label: `Hệ thống (${counts.system})`, icon: <Settings className="h-4 w-4 text-slate-400" /> },
   ];
 
   return (
-    <StudentShell activeId="notifs" searchPlaceholder="Tìm kiếm thông báo, lớp học, giảng viên, nội dung..." searchValue={topSearch} onSearchChange={setTopSearch}>
+    <StudentShell activeId="notifs" searchPlaceholder="Tìm kiếm thông báo, khóa học, giảng viên, nội dung..." searchValue={topSearch} onSearchChange={setTopSearch}>
       <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1fr)_330px]">
         <div className="min-w-0">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <h1 className="text-[26px] font-extrabold tracking-tight">Thông báo</h1>
-              <p className="mt-0.5 text-[14px] text-slate-500">Cập nhật các thông báo mới nhất từ giảng viên, lớp học và hệ thống</p>
+              <p className="mt-0.5 text-[14px] text-slate-500">Cập nhật các thông báo mới nhất từ giảng viên, khóa học và hệ thống</p>
             </div>
             <span className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
@@ -239,13 +239,13 @@ export default function StudentNotificationsPage() {
 
           <section className="rounded-xl border border-slate-200/70 bg-white p-4">
             <div className="flex items-center justify-between">
-              <h2 className="text-[15px] font-extrabold">🎓 Thông báo theo lớp học</h2>
+              <h2 className="text-[15px] font-extrabold">🎓 Thông báo theo khóa học</h2>
               <button onClick={() => setPill("class")} className="text-[12.5px] font-medium text-blue-600">Xem tất cả →</button>
             </div>
             <ul className="mt-3 space-y-3">
               {byClass.map((g) => (
                 <li key={g.code}>
-                  <button onClick={() => showToast(`Lọc lớp ${g.code} (demo) — dùng thanh tìm kiếm để lọc`)} className="flex w-full items-center gap-2.5 text-left">
+                  <button onClick={() => showToast(`Lọc khóa học ${g.code} (demo) — dùng thanh tìm kiếm để lọc`)} className="flex w-full items-center gap-2.5 text-left">
                     <span className="grid h-9 w-12 shrink-0 place-items-center rounded-lg bg-blue-50 text-[11px] font-bold text-blue-600">{g.code}</span>
                     <span className="min-w-0 flex-1">
                       <b className="block truncate text-[12.5px]">{g.name}</b>

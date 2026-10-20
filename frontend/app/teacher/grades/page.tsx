@@ -196,16 +196,16 @@ export default function TeacherGradesPage() {
     }
     setWeights({ assignment: a, quiz: q });
     setWeightOpen(false);
-    setHistory((h) => [{ id: histId.current++, text: `Đổi trọng số lớp ${classCode}: Bài tập ${a}%, Kiểm tra ${q}%`, time: "Vừa xong" }, ...h]);
+    setHistory((h) => [{ id: histId.current++, text: `Đổi trọng số khóa học ${classCode}: Bài tập ${a}%, Kiểm tra ${q}%`, time: "Vừa xong" }, ...h]);
     showToast("Đã cập nhật trọng số điểm");
   };
 
   return (
-    <TeacherShell activeId="grades" searchPlaceholder="Tìm kiếm học sinh, lớp học, bài tập, kiểm tra..." searchValue={topSearch} onSearchChange={(v) => { setTopSearch(v); setPage(1); }}>
+    <TeacherShell activeId="grades" searchPlaceholder="Tìm kiếm học sinh, khóa học, bài tập, kiểm tra..." searchValue={topSearch} onSearchChange={(v) => { setTopSearch(v); setPage(1); }}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-[26px] font-extrabold tracking-tight">Sổ điểm</h1>
-          <p className="mt-0.5 text-[14px] text-slate-500">Theo dõi và quản lý điểm của học sinh trong lớp học</p>
+          <p className="mt-0.5 text-[14px] text-slate-500">Theo dõi và quản lý điểm của học sinh trong khóa học</p>
         </div>
         <div className="flex gap-2.5">
           <button onClick={() => exportCsv(filtered)} className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-white px-4 py-2.5 text-[13.5px] font-semibold text-blue-600 hover:bg-blue-50">
@@ -223,12 +223,24 @@ export default function TeacherGradesPage() {
           <button onClick={() => setClassOpen((v) => !v)} className="flex items-center gap-3 rounded-xl px-2 py-1 text-left hover:bg-slate-50">
             <span className="grid h-12 w-16 place-items-center overflow-hidden rounded-lg bg-gradient-to-br from-amber-100 to-stone-300 text-2xl">💻</span>
             <span>
-              <span className="block text-[11px] font-medium text-slate-400">Lớp học <span className="text-red-500">*</span></span>
+              <span className="block text-[11px] font-medium text-slate-400">Khóa học <span className="text-red-500">*</span></span>
               <span className="block text-[14px] font-bold">{cls.name}</span>
               <span className="block text-[11.5px] text-slate-400">{cls.code} <span className="mx-0.5">•</span> {cls.studentCount} học sinh</span>
             </span>
             <ChevronDown className="h-4 w-4 text-slate-400" />
           </button>
+          {classOpen && (
+            <button
+              type="button"
+              aria-label="Đóng menu"
+              tabIndex={-1}
+              onClick={(e) => {
+                e.stopPropagation();
+                setClassOpen(false);
+              }}
+              className="fixed inset-0 z-10 cursor-default"
+            />
+          )}
           {classOpen && (
             <span className="absolute left-0 top-[calc(100%+6px)] z-20 w-80 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-xl">
               {gradeClasses.map((c) => (
@@ -445,7 +457,7 @@ export default function TeacherGradesPage() {
                     <span className="min-w-0">
                       <span className="block text-[15px] font-bold leading-snug">{selected.name}</span>
                       <span className="block whitespace-nowrap text-[12px] text-slate-400">MSSV: {selected.mssv}</span>
-                      <span className="block text-[12px] leading-snug text-slate-400">Lớp: {selected.classCode} - {cls.name}</span>
+                      <span className="block text-[12px] leading-snug text-slate-400">Khóa học: {selected.classCode} - {cls.name}</span>
                     </span>
                   </div>
                   <div className="mt-3 grid grid-cols-3 gap-2 text-center">

@@ -43,10 +43,30 @@ export function proxy(request: NextRequest) {
     pathname.startsWith('/favicon.ico') ||
     pathname.startsWith('/images') ||
     pathname === '/' ||
-    pathname === '/login' ||
-    pathname === '/register' ||
     pathname === '/forbidden'
   ) {
+    return NextResponse.next();
+  }
+
+  // 1. Nếu đã đăng nhập mà truy cập /login hoặc /register -> chuyển hướng vào trang quản lý tương ứng
+  if (pathname === '/login' || pathname === '/register') {
+    const token =
+      request.cookies.get(AUTH_COOKIE_NAME)?.value ||
+      request.cookies.get('access_token')?.value;
+    let role = extractRoleFromToken(token);
+    if (!role) {
+      const roleCookie = request.cookies.get(ROLE_COOKIE_NAME)?.value?.toUpperCase();
+      if (roleCookie && VALID_ROLES.includes(roleCookie as ValidRole)) {
+        role = roleCookie as ValidRole;
+      }
+    }
+
+    if (token && role) {
+      if (role === 'ADMIN') return NextResponse.redirect(new URL('/admin', request.url));
+      if (role === 'TEACHER') return NextResponse.redirect(new URL('/teacher', request.url));
+      if (role === 'STUDENT') return NextResponse.redirect(new URL('/student', request.url));
+    }
+
     return NextResponse.next();
   }
 
@@ -95,5 +115,11 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/teacher/:path*', '/student/:path*'],
+  matcher: [
+    '/admin/:path*',
+    '/teacher/:path*',
+    '/student/:path*',
+    '/login',
+    '/register',
+  ],
 };

@@ -48,8 +48,8 @@ export const inboxNotifications: InboxNotification[] = [
   },
   {
     id: "in-4",
-    title: "Học sinh mới tham gia lớp học",
-    description: "Phạm Gia Linh đã được thêm vào lớp WEB301.",
+    title: "Học sinh mới tham gia khóa học",
+    description: "Phạm Gia Linh đã được thêm vào khóa học WEB301.",
     classCode: "WEB301",
     className: "Lập trình Web nâng cao",
     category: "class",
@@ -61,7 +61,7 @@ export const inboxNotifications: InboxNotification[] = [
   {
     id: "in-5",
     title: "Cập nhật trọng số điểm",
-    description: "Bạn đã cập nhật trọng số điểm cho lớp WEB301: Bài tập 40%, Kiểm tra 60%.",
+    description: "Bạn đã cập nhật trọng số điểm cho khóa học WEB301: Bài tập 40%, Kiểm tra 60%.",
     classCode: "WEB301",
     className: "Lập trình Web nâng cao",
     category: "system",
@@ -120,7 +120,7 @@ export const inboxNotifications: InboxNotification[] = [
   },
   {
     id: "in-10",
-    title: "Nhắc lịch dạy bù lớp PY101",
+    title: "Nhắc lịch dạy bù khóa học PY101",
     description: "Buổi học bù được xếp vào sáng thứ 7 tuần này.",
     classCode: "PY101",
     className: "Lập trình Python cơ bản",
@@ -168,8 +168,8 @@ export const inboxNotifications: InboxNotification[] = [
   },
   {
     id: "in-14",
-    title: "Mở lớp học mới CS201 thành công",
-    description: "Lớp Cấu trúc dữ liệu và giải thuật đã sẵn sàng thêm sinh viên.",
+    title: "Mở khóa học mới CS201 thành công",
+    description: "Khóa học Cấu trúc dữ liệu và giải thuật đã sẵn sàng thêm sinh viên.",
     classCode: "CS201",
     className: "Cấu trúc dữ liệu và giải thuật",
     category: "class",
@@ -180,12 +180,12 @@ export const inboxNotifications: InboxNotification[] = [
   },
 ];
 
-export const inboxClassOptions = ["Tất cả lớp học", "WEB301", "PY101", "CS201"];
+export const inboxClassOptions = ["Tất cả khóa học", "WEB301", "PY101", "CS201"];
 export const inboxTypeOptions = [
   "Tất cả loại thông báo",
   "Bài tập",
   "Kiểm tra",
-  "Lớp học",
+  "Khóa học",
   "Hệ thống",
 ];
 export const inboxStatusOptions = ["Tất cả trạng thái", "Chưa đọc", "Quan trọng", "Đã lưu trữ"];

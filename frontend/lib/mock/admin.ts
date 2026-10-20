@@ -24,7 +24,7 @@ export const adminGreetingDateLabel = "Thứ Tư, 24 tháng 9, 2026";
 export const adminSidebarNav: AdminSidebarItem[] = [
   { id: "home", label: "Tổng quan", href: "/admin", icon: "home" },
   { id: "users", label: "Quản lý người dùng", href: "/admin/users", icon: "users" },
-  { id: "classes", label: "Giám sát lớp học", href: "/admin/classes", icon: "classes" },
+  { id: "classes", label: "Giám sát khóa học", href: "/admin/classes", icon: "classes" },
 ];
 
 /* ================= Trang chủ ================= */
@@ -52,7 +52,7 @@ export const adminDashboardStats: AdminStat[] = [
   },
   {
     id: "total-classes",
-    label: "Tổng lớp học",
+    label: "Tổng khóa học",
     value: "48",
     delta: "9%",
     deltaUp: true,
@@ -229,7 +229,7 @@ export const adminActivities: SystemActivity[] = [
   {
     id: "a-2",
     kind: "class-created",
-    text: "Lớp học WEB301 được tạo bởi Nguyễn Văn A",
+    text: "Khóa học WEB301 được tạo bởi Nguyễn Văn A",
     timeAgo: "4 giờ trước",
   },
   {
@@ -241,7 +241,7 @@ export const adminActivities: SystemActivity[] = [
   {
     id: "a-4",
     kind: "teacher-create",
-    text: "Giảng viên Trần Thị B đã tạo lớp học PY101",
+    text: "Giảng viên Trần Thị B đã tạo khóa học PY101",
     timeAgo: "3 ngày trước",
   },
 ];
@@ -302,7 +302,7 @@ export const adminUsers: AdminUser[] = [
     enrolled: [enrolledWeb, enrolledUI, enrolledDB],
     activity: [
       { text: "Đăng nhập hệ thống", time: "24/09/2026 08:45" },
-      { text: "Tham gia lớp WEB301", time: "24/09/2026 08:32" },
+      { text: "Tham gia khóa học WEB301", time: "24/09/2026 08:32" },
       { text: "Tạo tài khoản mới", time: "24/09/2026 08:30" },
     ],
   },
@@ -383,7 +383,7 @@ export const adminUsers: AdminUser[] = [
     phone: "0903 111 222",
     enrolled: [enrolledWeb],
     activity: [
-      { text: "Tạo lớp học WEB301", time: "18/09/2026 15:00" },
+      { text: "Tạo khóa học WEB301", time: "18/09/2026 15:00" },
       { text: "Tạo tài khoản mới", time: "18/09/2026 08:00" },
     ],
   },
@@ -399,7 +399,7 @@ export const adminUsers: AdminUser[] = [
     birthDate: "22/08/1988",
     gender: "Nữ",
     phone: "0903 333 444",
-    activity: [{ text: "Tạo lớp học PY101", time: "17/09/2026 13:20" }],
+    activity: [{ text: "Tạo khóa học PY101", time: "17/09/2026 13:20" }],
   },
   {
     id: "u-gv-c",
@@ -485,7 +485,7 @@ export const adminUsers: AdminUser[] = [
     birthDate: "11/03/1980",
     gender: "Nam",
     phone: "0902 101 202",
-    activity: [{ text: "Tạo lớp học NET101", time: "02/09/2026 09:00" }],
+    activity: [{ text: "Tạo khóa học NET101", time: "02/09/2026 09:00" }],
   },
   {
     id: "u-gv-h",
@@ -499,7 +499,7 @@ export const adminUsers: AdminUser[] = [
     birthDate: "06/09/1986",
     gender: "Nữ",
     phone: "0902 303 404",
-    activity: [{ text: "Tạo lớp học OS201", time: "30/08/2026 14:00" }],
+    activity: [{ text: "Tạo khóa học OS201", time: "30/08/2026 14:00" }],
   },
   {
     id: "u-gv-k",
@@ -513,7 +513,7 @@ export const adminUsers: AdminUser[] = [
     birthDate: "19/12/1984",
     gender: "Nam",
     phone: "0902 505 606",
-    activity: [{ text: "Tạo lớp học AI101", time: "28/08/2026 10:30" }],
+    activity: [{ text: "Tạo khóa học AI101", time: "28/08/2026 10:30" }],
   },
   {
     id: "u-gv-l",
@@ -527,7 +527,7 @@ export const adminUsers: AdminUser[] = [
     birthDate: "08/07/1990",
     gender: "Nữ",
     phone: "0902 707 808",
-    activity: [{ text: "Tạo lớp học MOB301", time: "25/08/2026 16:00" }],
+    activity: [{ text: "Tạo khóa học MOB301", time: "25/08/2026 16:00" }],
   },
   {
     id: "u-gv-m",
@@ -541,7 +541,7 @@ export const adminUsers: AdminUser[] = [
     birthDate: "23/02/1979",
     gender: "Nam",
     phone: "0902 909 010",
-    activity: [{ text: "Tạo lớp học SEC201", time: "20/08/2026 08:00" }],
+    activity: [{ text: "Tạo khóa học SEC201", time: "20/08/2026 08:00" }],
   },
   {
     id: "u-extra-1",
@@ -599,7 +599,7 @@ export const adminUserSortOptions = [
 export const adminClassStats: AdminStat[] = [
   {
     id: "total-classes",
-    label: "Tổng lớp học",
+    label: "Tổng khóa học",
     value: "48",
     delta: "9%",
     deltaUp: true,
@@ -629,7 +629,7 @@ export const adminClassStats: AdminStat[] = [
   },
   {
     id: "inactive-classes",
-    label: "Lớp không hoạt động",
+    label: "Khóa học không hoạt động",
     value: "5",
     delta: "17%",
     deltaUp: false,
@@ -846,14 +846,14 @@ export const adminNotifications = [
   {
     id: "n-2",
     title: "Báo cáo vi phạm",
-    description: "Ngô Thị Hương bị báo cáo vi phạm nội quy lớp học.",
+    description: "Ngô Thị Hương bị báo cáo vi phạm nội quy khóa học.",
     timeAgo: "3 ngày trước",
     unread: true,
   },
   {
     id: "n-3",
-    title: "Lớp học mới",
-    description: "Giảng viên Trần Thị B đã tạo lớp PY101.",
+    title: "Khóa học mới",
+    description: "Giảng viên Trần Thị B đã tạo khóa học PY101.",
     timeAgo: "3 ngày trước",
     unread: false,
   },

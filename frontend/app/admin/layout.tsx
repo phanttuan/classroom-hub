@@ -4,7 +4,7 @@ import { SidebarProvider } from "@/lib/context/sidebar-context";
 
 export const metadata: Metadata = {
   title: "EduLearn | Quản trị viên",
-  description: "Tổng quan hệ thống, quản lý người dùng và giám sát lớp học.",
+  description: "Tổng quan hệ thống, quản lý người dùng và giám sát khóa học.",
 };
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

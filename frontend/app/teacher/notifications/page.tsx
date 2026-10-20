@@ -34,7 +34,7 @@ type InboxTab = "all" | "unread" | "important" | InboxCategory;
 const CAT_META: Record<InboxCategory, { label: string; pill: string; box: string; Icon: typeof FileText }> = {
   assignment: { label: "Bài tập", pill: "bg-pink-100/80 text-pink-600", box: "bg-red-50 text-red-500", Icon: FileText },
   quiz: { label: "Kiểm tra", pill: "bg-purple-100/80 text-purple-600", box: "bg-purple-50 text-purple-600", Icon: FileText },
-  class: { label: "Lớp học", pill: "bg-blue-100/80 text-blue-600", box: "bg-orange-50 text-orange-500", Icon: Users },
+  class: { label: "Khóa học", pill: "bg-blue-100/80 text-blue-600", box: "bg-orange-50 text-orange-500", Icon: Users },
   system: { label: "Hệ thống", pill: "bg-sky-100/80 text-sky-600", box: "bg-blue-50 text-blue-600", Icon: Settings },
 };
 
@@ -117,9 +117,9 @@ export default function TeacherNotificationsPage() {
       if (statusFilter === "Chưa đọc") list = list.filter((i) => i.unread);
       if (statusFilter === "Quan trọng") list = list.filter((i) => i.important);
     }
-    if (classFilter !== "Tất cả lớp học") list = list.filter((i) => i.classCode === classFilter);
+    if (classFilter !== "Tất cả khóa học") list = list.filter((i) => i.classCode === classFilter);
     if (typeFilter !== "Tất cả loại thông báo") {
-      const map: Record<string, InboxCategory> = { "Bài tập": "assignment", "Kiểm tra": "quiz", "Lớp học": "class", "Hệ thống": "system" };
+      const map: Record<string, InboxCategory> = { "Bài tập": "assignment", "Kiểm tra": "quiz", "Khóa học": "class", "Hệ thống": "system" };
       list = list.filter((i) => i.category === map[typeFilter]);
     }
     if (q) list = list.filter((i) => `${i.title} ${i.description} ${i.classCode}`.toLowerCase().includes(q));
@@ -176,7 +176,7 @@ export default function TeacherNotificationsPage() {
     { id: "important", label: `Quan trọng (${counts.important})` },
     { id: "assignment", label: `Bài tập (${counts.assignment})` },
     { id: "quiz", label: `Kiểm tra (${counts.quiz})` },
-    { id: "class", label: `Lớp học (${counts.class})` },
+    { id: "class", label: `Khóa học (${counts.class})` },
     { id: "system", label: `Hệ thống (${counts.system})` },
   ];
 
@@ -188,11 +188,11 @@ export default function TeacherNotificationsPage() {
   ];
 
   return (
-    <TeacherShell activeId="notifs" searchPlaceholder="Tìm kiếm học sinh, lớp học, bài tập, kiểm tra..." searchValue={topSearch} onSearchChange={(v) => { setTopSearch(v); resetPage(); }}>
+    <TeacherShell activeId="notifs" searchPlaceholder="Tìm kiếm học sinh, khóa học, bài tập, kiểm tra..." searchValue={topSearch} onSearchChange={(v) => { setTopSearch(v); resetPage(); }}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-[26px] font-extrabold tracking-tight">Thông báo</h1>
-          <p className="mt-0.5 text-[14px] text-slate-500">Xem và quản lý các thông báo liên quan đến lớp học của bạn</p>
+          <p className="mt-0.5 text-[14px] text-slate-500">Xem và quản lý các thông báo liên quan đến khóa học của bạn</p>
         </div>
         <button onClick={() => setSettingsOpen(true)} className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-white px-4 py-2.5 text-[13.5px] font-semibold text-blue-600 hover:bg-blue-50">
           <Settings className="h-4 w-4" /> Cài đặt thông báo
@@ -222,7 +222,7 @@ export default function TeacherNotificationsPage() {
           </div>
 
           <div className="mt-3 grid grid-cols-2 gap-2 xl:grid-cols-[1fr_1fr_1fr_1.4fr_auto]">
-            <select value={classFilter} onChange={(e) => { setClassFilter(e.target.value); resetPage(); }} className="h-10 rounded-lg border border-slate-200 bg-white px-2.5 text-[12.5px] outline-none" aria-label="Lọc lớp học">
+            <select value={classFilter} onChange={(e) => { setClassFilter(e.target.value); resetPage(); }} className="h-10 rounded-lg border border-slate-200 bg-white px-2.5 text-[12.5px] outline-none" aria-label="Lọc khóa học">
               {inboxClassOptions.map((o) => (<option key={o}>{o}</option>))}
             </select>
             <select value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); resetPage(); }} className="h-10 rounded-lg border border-slate-200 bg-white px-2.5 text-[12.5px] outline-none" aria-label="Lọc loại">
@@ -264,7 +264,7 @@ export default function TeacherNotificationsPage() {
                     <span className="block text-[13.5px] font-bold leading-snug">{n.title}</span>
                     <span className="mt-0.5 line-clamp-2 block text-[12.5px] text-slate-500">{n.description}</span>
                     <span className="mt-1.5 flex flex-wrap items-center gap-2 text-[12px] text-slate-400">
-                      Lớp: {n.classCode} - {n.className}
+                      Khóa học: {n.classCode} - {n.className}
                       <span className={`whitespace-nowrap rounded-md px-2 py-0.5 font-medium ${meta.pill}`}>{meta.label}</span>
                     </span>
                   </span>
@@ -327,7 +327,7 @@ export default function TeacherNotificationsPage() {
               <li className="flex items-center gap-3">
                 <span className="grid h-4 w-4 shrink-0 place-items-center rounded border border-slate-300" />
                 <span className="grid h-10 w-10 place-items-center rounded-xl bg-blue-50 text-blue-600"><Users className="h-5 w-5" /></span>
-                <span><span className="block text-[11.5px] text-slate-400">Lớp học</span><span className="block font-medium">{selected.classCode} - {selected.className}</span></span>
+                <span><span className="block text-[11.5px] text-slate-400">Khóa học</span><span className="block font-medium">{selected.classCode} - {selected.className}</span></span>
               </li>
               {(selected.category === "assignment" || selected.category === "quiz") && (
                 <li className="flex items-center gap-3">
@@ -380,7 +380,7 @@ export default function TeacherNotificationsPage() {
             ["push", "Push", "Nhận thông báo đẩy trên trình duyệt"],
             ["assignment", "Bài tập", "Nộp bài, đến hạn, chấm điểm"],
             ["quiz", "Kiểm tra", "Hoàn thành, sắp đến hạn"],
-            ["classN", "Lớp học", "Thành viên mới, lịch học"],
+            ["classN", "Khóa học", "Thành viên mới, lịch học"],
             ["system", "Hệ thống", "Bảo trì, cập nhật"],
           ] as const).map(([key, label, desc]) => (
             <div key={key} className="flex items-center gap-3 rounded-xl bg-slate-50 px-3.5 py-2.5">

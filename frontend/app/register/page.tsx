@@ -376,6 +376,21 @@ function RegisterFormContent() {
     }
   };
 
+
+  // Tài khoản đã tạo xong: nút "Tiếp tục" hoặc bấm ra ngoài popup đều vào trang chính
+  const continueAfterRegister = () => {
+    toast.flash(
+      "success",
+      "Chào mừng bạn đến với EduHub!",
+      `Tài khoản ${fullName} đã sẵn sàng bắt đầu hành trình.`,
+      {
+        icon: "register",
+        badge: role === "TEACHER" ? "Giảng viên" : "Học sinh",
+      },
+    );
+    router.push(role === "TEACHER" ? "/teacher" : "/student");
+  };
+
   return (
     <div className="relative min-h-screen flex flex-col pt-16 selection:bg-blue-600 selection:text-white">
       {/* 1. Header chung với trang chủ */}
@@ -876,7 +891,14 @@ function RegisterFormContent() {
       {/* Modal Chúc mừng tạo tài khoản thành công */}
       {successModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fadeIn">
-          <div className="w-full max-w-[560px] bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-100 text-center space-y-5">
+          <button
+            type="button"
+            aria-label="Đóng"
+            tabIndex={-1}
+            onClick={continueAfterRegister}
+            className="absolute inset-0 cursor-default"
+          />
+          <div className="relative w-full max-w-[560px] bg-white rounded-3xl p-6 sm:p-8 shadow-2xl border border-slate-100 text-center space-y-5">
             <div className="w-16 h-16 rounded-full bg-emerald-50 text-emerald-600 mx-auto flex items-center justify-center">
               <CheckCircle2 className="w-10 h-10" />
             </div>
@@ -902,18 +924,7 @@ function RegisterFormContent() {
             <div className="pt-2">
               <button
                 type="button"
-                onClick={() => {
-                  toast.flash(
-                    "success",
-                    "Chào mừng bạn đến với EduHub!",
-                    `Tài khoản ${fullName} đã sẵn sàng bắt đầu hành trình.`,
-                    {
-                      icon: "register",
-                      badge: role === "TEACHER" ? "Giảng viên" : "Học sinh",
-                    },
-                  );
-                  router.push(role === "TEACHER" ? "/teacher" : "/student");
-                }}
+                onClick={continueAfterRegister}
                 className="w-full py-3 px-4 text-sm font-semibold rounded-xl bg-blue-600 text-white hover:bg-blue-700 shadow-md shadow-blue-600/25 flex items-center justify-center gap-2 cursor-pointer transition-all hover:shadow-lg hover:shadow-blue-600/30"
               >
                 <span>Tiếp tục khám phá</span>
@@ -928,6 +939,7 @@ function RegisterFormContent() {
 }
 
 export default function RegisterPage() {
+
   return (
     <Suspense
       fallback={

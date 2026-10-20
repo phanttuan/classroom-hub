@@ -32,11 +32,11 @@ export const greetingDateLabel = "Thứ Hai, 15 tháng 9, 2026";
 export const dashboardStats: DashboardStat[] = [
   {
     id: "stat-classes",
-    label: "Tổng lớp học",
+    label: "Tổng khóa học",
     value: 3,
     tone: "blue",
     icon: "classes",
-    detailHref: "/teacher/classes",
+    detailHref: "/teacher/content/courses",
   },
   {
     id: "stat-students",
@@ -64,41 +64,7 @@ export const dashboardStats: DashboardStat[] = [
   },
 ];
 
-export const teacherClasses: TeacherClass[] = [
-  {
-    id: "cls-web301",
-    code: "WEB301",
-    name: "Lập trình Web nâng cao",
-    studentCount: 42,
-    courseCount: 3,
-    updatedAt: "12/09/2026",
-    status: "active",
-    coverGradient: "from-amber-100 via-orange-100 to-stone-200",
-    coverEmoji: "💻",
-  },
-  {
-    id: "cls-py101",
-    code: "PY101",
-    name: "Lập trình Python cơ bản",
-    studentCount: 56,
-    courseCount: 4,
-    updatedAt: "10/09/2026",
-    status: "active",
-    coverGradient: "from-slate-900 via-blue-950 to-slate-800",
-    coverEmoji: "🐍",
-  },
-  {
-    id: "cls-cs201",
-    code: "CS201",
-    name: "Cấu trúc dữ liệu và giải thuật",
-    studentCount: 30,
-    courseCount: 2,
-    updatedAt: "05/09/2026",
-    status: "closed",
-    coverGradient: "from-sky-950 via-blue-900 to-cyan-800",
-    coverEmoji: "📈",
-  },
-];
+export const teacherClasses: TeacherClass[] = [];
 
 export const pendingAssignments: PendingAssignment[] = [
   {
@@ -207,7 +173,7 @@ export const teacherNotifications: TeacherNotification[] = [
   {
     id: "noti-web301",
     kind: "announcement",
-    title: "Thông báo từ lớp WEB301",
+    title: "Thông báo từ khóa học WEB301",
     description: "Lịch học tuần này đã được cập nhật.",
     timeAgo: "5 giờ trước",
   },
@@ -222,26 +188,12 @@ export const teacherNotifications: TeacherNotification[] = [
 
 export const teacherSidebarNav: SidebarItem[] = [
   { id: "home", label: "Tổng quan", icon: "home", href: "/teacher" },
-  { id: "classes", label: "Lớp học", icon: "classes", href: "/teacher/classes" },
   {
     id: "content",
-    label: "Nội dung học tập",
+    label: "Khóa học",
     icon: "content",
-    href: "/teacher/content",
-    expandable: true,
-    children: [
-      { label: "Khóa học", href: "/teacher/content/courses" },
-      { label: "Bài học", href: "/teacher/content/lessons" },
-      { label: "Tài liệu", href: "/teacher/content/docs" },
-    ],
+    href: "/teacher/content/courses",
   },
-  {
-    id: "assignments",
-    label: "Bài tập",
-    icon: "assignment",
-    href: "/teacher/assignments",
-  },
-  { id: "quizzes", label: "Kiểm tra trắc nghiệm", icon: "quiz", href: "/teacher/quizzes" },
   { id: "grades", label: "Sổ điểm", icon: "gradebook", href: "/teacher/grades" },
   { id: "notifs", label: "Thông báo", icon: "bell", href: "/teacher/notifications" },
   { id: "schedule", label: "Lịch", icon: "calendar", href: "/teacher/schedule" },

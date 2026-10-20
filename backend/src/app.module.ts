@@ -10,6 +10,11 @@ import { DatabaseModule } from './database/database.module.js';
 import { UserModule } from './user/user.module.js';
 import { MailModule } from './modules/mail/mail.module.js';
 import { AuthModule } from './modules/auth/auth.module.js';
+import { CourseModule } from './modules/course/course.module.js';
+import { ResourceModule } from './modules/resource/resource.module.js';
+import { LearningContentModule } from './modules/learning-content/learning-content.module.js';
+import { AssignmentModule } from './modules/assignment/assignment.module.js';
+import { SubmissionModule } from './modules/submission/submission.module.js';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor.js';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
 
@@ -31,6 +36,11 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
     UserModule,
     MailModule,
     AuthModule,
+    CourseModule,
+    ResourceModule,
+    LearningContentModule,
+    AssignmentModule,
+    SubmissionModule,
   ],
   controllers: [AppController],
   providers: [

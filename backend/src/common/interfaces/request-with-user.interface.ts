@@ -1,5 +1,5 @@
 import type { Request } from 'express';
-import type { Classroom, ClassMembership } from '../../generated/prisma/client.js';
+import type { Course, Enrollment } from '../../generated/prisma/client.js';
 import type { UserRole } from '../../generated/prisma/enums.js';
 
 export interface AuthenticatedUser {
@@ -13,7 +13,7 @@ export interface RequestWithUser extends Request {
   user?: AuthenticatedUser;
 }
 
-export interface RequestWithClassContext extends RequestWithUser {
-  classroom?: Classroom;
-  classMembership?: ClassMembership;
+export interface RequestWithCourseContext extends RequestWithUser {
+  course?: Course;
+  enrollment?: Enrollment;
 }

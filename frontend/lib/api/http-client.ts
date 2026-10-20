@@ -10,10 +10,28 @@ function getAuthToken(): string | null {
   return localStorage.getItem(AUTH_COOKIE_NAME);
 }
 
+export interface ApiFetchOptions extends RequestInit {
+  skipAuthRedirect?: boolean;
+}
+
+/**
+ * Gọi API và trả về JSON đã parse (dùng cho hầu hết endpoint).
+ */
 export async function apiFetch<T = unknown>(
   input: RequestInfo | URL,
-  init?: RequestInit
+  init?: ApiFetchOptions
 ): Promise<T> {
+  const response = await apiFetchRaw(input, init);
+  return (await response.json()) as T;
+}
+
+/**
+ * Gọi API và trả về Response thô (tải tệp nhị phân như .zip) — vẫn gắn token, tự refresh phiên và ném lỗi khi !ok.
+ */
+export async function apiFetchRaw(
+  input: RequestInfo | URL,
+  init?: ApiFetchOptions
+): Promise<Response> {
   // 1. Tự động ghép tiền tố API_BASE_URL nếu truyền đường dẫn tương đối (vd: '/profile')
   let url = input;
   if (typeof input === 'string') {
@@ -71,8 +89,8 @@ export async function apiFetch<T = unknown>(
     }
   }
 
-  // 6. Bắt lỗi 401/403 của auth-guard khi không thể khôi phục phiên
-  if (response.status === 401 || response.status === 403) {
+  // 6. Bắt lỗi 401/403 của auth-guard khi không thể khôi phục phiên (trừ khi yêu cầu bỏ qua chuyển hướng)
+  if ((response.status === 401 || response.status === 403) && !init?.skipAuthRedirect) {
     handleAuthError(response.status);
     throw new Error(`HTTP Error ${response.status}: ${response.statusText}`);
   }
@@ -82,5 +100,5 @@ export async function apiFetch<T = unknown>(
     throw new Error(errorData?.message || `Lỗi hệ thống: ${response.statusText}`);
   }
 
-  return (await response.json()) as T;
+  return response;
 }

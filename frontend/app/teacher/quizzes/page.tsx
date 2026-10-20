@@ -77,9 +77,9 @@ function QuizForm({
       </div>
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">Lớp học</label>
+          <label className="mb-1.5 block text-[13px] font-semibold text-slate-700">Khóa học</label>
           <select value={classCode} onChange={(e) => setClassCode(e.target.value)} className="h-11 w-full rounded-lg border border-slate-200 bg-white px-3 text-sm outline-none">
-            {assignmentClassOptions.filter((o) => o !== "Tất cả lớp học").map((o) => (<option key={o}>{o}</option>))}
+            {assignmentClassOptions.filter((o) => o !== "Tất cả khóa học").map((o) => (<option key={o}>{o}</option>))}
           </select>
         </div>
         <div>
@@ -161,7 +161,7 @@ export default function TeacherQuizzesPage() {
   const filtered = useMemo(() => {
     const q = (query || topSearch).trim().toLowerCase();
     let list = [...items];
-    if (classFilter !== "Tất cả lớp học") list = list.filter((i) => i.classCode === classFilter);
+    if (classFilter !== "Tất cả khóa học") list = list.filter((i) => i.classCode === classFilter);
     if (courseFilter !== "Tất cả khóa học") list = list.filter((i) => i.courseName === courseFilter);
     if (kindFilter !== "Tất cả loại") list = list.filter((i) => i.kind === KIND_MAP[kindFilter]);
     if (statusFilter !== "Tất cả trạng thái") list = list.filter((i) => i.status === STATUS_MAP[statusFilter]);
@@ -190,11 +190,11 @@ export default function TeacherQuizzesPage() {
   ];
 
   return (
-    <TeacherShell activeId="quizzes" searchPlaceholder="Tìm kiếm lớp học, khóa học, bài tập, kiểm tra..." searchValue={topSearch} onSearchChange={(v) => { setTopSearch(v); resetPage(); }}>
+    <TeacherShell activeId="quizzes" searchPlaceholder="Tìm kiếm khóa học, bài tập, kiểm tra..." searchValue={topSearch} onSearchChange={(v) => { setTopSearch(v); resetPage(); }}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-[26px] font-extrabold tracking-tight">Kiểm tra trắc nghiệm</h1>
-          <p className="mt-0.5 text-[14px] text-slate-500">Tạo và quản lý các bài kiểm tra trắc nghiệm cho các lớp học của bạn</p>
+          <p className="mt-0.5 text-[14px] text-slate-500">Tạo và quản lý các bài kiểm tra trắc nghiệm cho các khóa học của bạn</p>
         </div>
         <button onClick={() => { setEditing(null); setCreateOpen(true); }} className="inline-flex items-center gap-1.5 rounded-lg bg-blue-600 px-5 py-2.5 text-[14px] font-semibold text-white shadow-sm shadow-blue-600/30 hover:bg-blue-700">
           <Plus className="h-4 w-4" /> Tạo bài kiểm tra
@@ -213,7 +213,7 @@ export default function TeacherQuizzesPage() {
 
       <div className="mt-4 rounded-xl border border-slate-200/70 bg-white p-4">
         <div className="grid grid-cols-2 gap-3 xl:grid-cols-[1fr_1fr_1fr_1fr_1.5fr_auto]">
-          <FilterSelect label="Lớp học" value={classFilter} onChange={(v) => { setClassFilter(v); resetPage(); }} options={assignmentClassOptions} />
+          <FilterSelect label="Khóa học" value={classFilter} onChange={(v) => { setClassFilter(v); resetPage(); }} options={assignmentClassOptions} />
           <FilterSelect label="Khóa học" value={courseFilter} onChange={(v) => { setCourseFilter(v); resetPage(); }} options={assignmentCourseOptions} />
           <FilterSelect label="Loại kiểm tra" value={kindFilter} onChange={(v) => { setKindFilter(v); resetPage(); }} options={quizKindOptions} />
           <FilterSelect label="Trạng thái" value={statusFilter} onChange={(v) => { setStatusFilter(v); resetPage(); }} options={quizStatusOptions} />
@@ -243,7 +243,7 @@ export default function TeacherQuizzesPage() {
                 <span className="block text-[14.5px] font-bold">{it.title}</span>
                 <span className="mt-0.5 line-clamp-1 block text-[12.5px] text-slate-500">{it.description}</span>
                 <span className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[12.5px] text-slate-500">
-                  <span>Lớp: {it.classCode}</span>
+                  <span>Khóa học: {it.classCode}</span>
                   <span>Khóa học: {it.courseName}</span>
                 </span>
               </span>
@@ -309,7 +309,7 @@ export default function TeacherQuizzesPage() {
           <div className="space-y-2.5 text-sm">
             <p className="text-[16px] font-bold">{detail.title}</p>
             <p className="text-slate-500">{detail.description}</p>
-            <p className="text-slate-500">Lớp {detail.classCode} • {detail.courseName} • {KIND_LABEL[detail.kind]}</p>
+            <p className="text-slate-500">Khóa học {detail.classCode} • {detail.courseName} • {KIND_LABEL[detail.kind]}</p>
             <div className="grid grid-cols-2 gap-2 pt-1 sm:grid-cols-4">
               <div className="rounded-lg bg-slate-50 p-3"><p className="text-xs text-slate-500">Số câu</p><p className="font-bold">{detail.questionCount}</p></div>
               <div className="rounded-lg bg-slate-50 p-3"><p className="text-xs text-slate-500">Thời gian</p><p className="font-bold">{detail.durationMinutes} phút</p></div>

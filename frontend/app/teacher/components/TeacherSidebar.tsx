@@ -135,7 +135,7 @@ export default function TeacherSidebar({
 
         {/* Header logo */}
         <div
-          className={`flex items-center pt-5 pb-3 border-b border-slate-100/70 transition-all ${
+          className={`flex h-[68px] items-center border-b border-slate-200/80 bg-white transition-all ${
             collapsed ? "justify-center px-2" : "px-4"
           }`}
         >
@@ -144,7 +144,7 @@ export default function TeacherSidebar({
 
         <nav className={`flex-1 overflow-y-auto pb-4 pt-3 ${collapsed ? "px-2" : "px-3"}`}>
           <ul className="space-y-1.5">
-            {teacherSidebarNav.slice(0, 8).map((item) => {
+            {teacherSidebarNav.filter((item) => item.id !== "profile").map((item) => {
               const Icon = ICON_MAP[item.icon] ?? FileText;
               const isOpen = expanded.includes(item.id);
 

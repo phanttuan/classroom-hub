@@ -441,7 +441,7 @@ export function GoogleAuthButton({
                     )}
                   </div>
                   <p className="text-xs text-slate-500 mt-0.5 leading-snug">
-                    Tạo lớp học, đăng tài liệu, giao bài tập và chấm điểm sinh viên.
+                    Tạo khóa học, đăng tài liệu, giao bài tập và chấm điểm sinh viên.
                   </p>
                 </div>
               </button>
@@ -475,7 +475,7 @@ export function GoogleAuthButton({
                     )}
                   </div>
                   <p className="text-xs text-slate-500 mt-0.5 leading-snug">
-                    Tham gia lớp học, làm bài tập và theo dõi tiến độ học tập.
+                    Tham gia khóa học, làm bài tập và theo dõi tiến độ học tập.
                   </p>
                 </div>
               </button>

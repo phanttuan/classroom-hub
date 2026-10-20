@@ -44,6 +44,39 @@ $ npm run start:dev
 $ npm run start:prod
 ```
 
+## Đồng bộ database sau khi pull
+
+Sau khi `git pull`, chỉ cần chạy như bình thường — mọi thứ tự đồng bộ:
+
+```bash
+cd backend && npm run start:dev    # tự chạy npm run db:sync trước khi khởi động
+cd frontend && npm run dev         # tự npm install nếu dependencies thay đổi
+```
+
+`npm run db:sync` gồm:
+
+1. `npm install` — **chỉ khi** `package-lock.json` thay đổi (`scripts/sync-deps.mjs`)
+2. `prisma migrate deploy` — áp các migration mới (không xóa dữ liệu)
+3. `prisma generate` — sinh lại Prisma Client (`src/generated/prisma` không được commit)
+4. Seed dữ liệu mẫu **khi DB trống hoặc `prisma/seed.ts` đã thay đổi** so với lần seed trước trên DB đó.
+   Seed chỉ xóa & tạo lại các môn học seed — dữ liệu khác được giữ nguyên.
+   Không muốn tự seed lại khi seed thay đổi: đặt `SEED_AUTO=false` trong `.env`.
+
+Trạng thái (hash lockfile, hash seed theo từng `DATABASE_URL`) lưu tại `node_modules/.cache`, mỗi máy tự quản lý.
+
+```bash
+# Nạp lại dữ liệu mẫu (xóa & tạo lại các môn học seed, giữ dữ liệu khác)
+$ npm run seed
+
+# Làm sạch hoàn toàn: XÓA toàn bộ DB, chạy lại migration và seed
+$ npm run db:reset
+```
+
+Tài khoản mẫu: xem cuối `prisma/seed.ts` — mật khẩu chung `Password123@`.
+
+> Thay đổi `schema.prisma` thì luôn tạo migration bằng `npx prisma migrate dev --name <ten>` và commit thư mục migration,
+> đừng dùng `prisma db push` — nếu không, máy người khác sẽ không đồng bộ được.
+
 ## Run tests
 
 ```bash

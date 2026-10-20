@@ -82,7 +82,7 @@ export const courseList: TeacherCourse[] = [
   },
 ];
 
-export const courseClassOptions = ["Tất cả lớp học", "WEB301", "PY101", "CS201"];
+export const courseClassOptions = ["Tất cả khóa học", "WEB301", "PY101", "CS201"];
 export const courseStatusOptions = [
   "Tất cả trạng thái",
   "Đang hoạt động",

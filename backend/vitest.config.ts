@@ -8,6 +8,7 @@ export default defineConfig({
   test: {
     globals: true,
     root: './',
+    fileParallelism: false,
     include: ['**/*.spec.ts'],
     env: {
       DATABASE_URL: process.env.DATABASE_URL || 'postgresql://postgres:123456@localhost:5432/classroom_hub?schema=public',
