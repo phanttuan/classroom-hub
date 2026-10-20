@@ -216,6 +216,7 @@ model Module {
   course      Course       @relation(fields: [courseId], references: [id], onDelete: Cascade)
   lessons     Lesson[]
   assignments Assignment[]
+  quizzes     Quiz[]
 
   @@unique([courseId, orderIndex], name: "uk_modules_course_order")
   @@map("modules")
@@ -445,6 +446,7 @@ model QuestionChoice {
 model Quiz {
   id                     BigInt         @id @default(autoincrement())
   courseId               BigInt         @map("course_id")
+  moduleId               BigInt         @map("module_id")
   createdBy              BigInt         @map("created_by")
   title                  String         @db.VarChar(255)
   instructions           String?        @db.Text
@@ -460,6 +462,7 @@ model Quiz {
   updatedAt              DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   course        Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  module        Module         @relation(fields: [moduleId], references: [id], onDelete: Cascade)
   creator       User           @relation("QuizCreator", fields: [createdBy], references: [id], onDelete: Restrict)
   quizQuestions QuizQuestion[]
   attempts      QuizAttempt[]

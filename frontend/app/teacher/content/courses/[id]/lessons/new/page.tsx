@@ -5,27 +5,29 @@ import { useParams, useSearchParams } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import LessonEditor, { type EditorActivityType } from "@/app/components/course-view/LessonEditor";
 
-const TYPES: EditorActivityType[] = ["PAGE", "FILE", "FOLDER", "URL", "LABEL", "ASSIGNMENT"];
+const TYPES: EditorActivityType[] = ["PAGE", "FILE", "FOLDER", "URL", "LABEL", "ASSIGNMENT", "QUIZ"];
 
 function NewLessonContent() {
   const params = useParams();
   const search = useSearchParams();
   const rawType = search.get("type")?.toUpperCase() as EditorActivityType | undefined;
   const assignmentId = search.get("assignmentId") ?? undefined;
+  const quizId = search.get("quizId") ?? undefined;
   const sectionId = search.get("section") ?? undefined;
 
   return (
     <LessonEditor
-      key={`${sectionId}-${rawType}-${assignmentId ?? "new"}`}
+      key={`${sectionId}-${rawType}-${assignmentId ?? "new"}-${quizId ?? "new"}`}
       courseId={String(params.id)}
       sectionId={sectionId}
       type={rawType && TYPES.includes(rawType) ? rawType : undefined}
       assignmentId={assignmentId}
+      quizId={quizId}
     />
   );
 }
 
-/** Thêm hoặc chỉnh sửa hoạt động / tài nguyên / bài tập: ?section=<topicId>&type=<PAGE|FILE|FOLDER|URL|LABEL|ASSIGNMENT>&assignmentId=... */
+/** Thêm hoặc chỉnh sửa hoạt động / tài nguyên / bài tập / đề kiểm tra: ?section=<topicId>&type=<PAGE|FILE|FOLDER|URL|LABEL|ASSIGNMENT|QUIZ>&assignmentId=...&quizId=... */
 export default function NewLessonPage() {
   return (
     <Suspense

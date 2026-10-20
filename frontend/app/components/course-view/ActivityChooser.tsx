@@ -15,10 +15,11 @@ const TABS = [
 interface ActivityChooserProps {
   onSelect: (type: LessonTypeKey) => void;
   onSelectAssign?: () => void;
+  onSelectQuiz?: () => void;
 }
 
 /** Bộ chọn "Thêm hoạt động hoặc tài nguyên" — theo activity chooser của Moodle */
-export default function ActivityChooser({ onSelect, onSelectAssign }: ActivityChooserProps) {
+export default function ActivityChooser({ onSelect, onSelectAssign, onSelectQuiz }: ActivityChooserProps) {
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("all");
   const [query, setQuery] = useState("");
   const [info, setInfo] = useState<ChooserItem | null>(null);
@@ -61,11 +62,18 @@ export default function ActivityChooser({ onSelect, onSelectAssign }: ActivityCh
         {items.map((item) => {
           const Icon = item.icon;
           const isAssign = item.key === "assign";
-          const disabled = isAssign ? !onSelectAssign : !item.type;
+          const isQuiz = item.key === "quiz";
+          const disabled = isAssign
+            ? !onSelectAssign
+            : isQuiz
+              ? !onSelectQuiz
+              : !item.type;
 
           const handleItemClick = () => {
             if (isAssign && onSelectAssign) {
               onSelectAssign();
+            } else if (isQuiz && onSelectQuiz) {
+              onSelectQuiz();
             } else if (item.type) {
               onSelect(item.type);
             }
@@ -139,6 +147,13 @@ export default function ActivityChooser({ onSelect, onSelectAssign }: ActivityCh
                 className="mt-2.5 rounded-lg bg-[#0f6cbf] px-4 py-1.5 text-[13px] font-semibold text-white hover:bg-[#0c599e]"
               >
                 Tạo bài tập
+              </button>
+            ) : info.key === "quiz" && onSelectQuiz ? (
+              <button
+                onClick={() => onSelectQuiz()}
+                className="mt-2.5 rounded-lg bg-[#0f6cbf] px-4 py-1.5 text-[13px] font-semibold text-white hover:bg-[#0c599e]"
+              >
+                Tạo đề kiểm tra
               </button>
             ) : (
               <p className="mt-2 text-[12.5px] font-medium text-slate-500">Chức năng này đang được phát triển.</p>

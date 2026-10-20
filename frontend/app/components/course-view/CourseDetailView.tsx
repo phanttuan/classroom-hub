@@ -24,6 +24,7 @@ import {
   FileText,
   Download,
   ClipboardList,
+  CheckSquare,
   AlertTriangle,
   CalendarDays,
   Loader2,
@@ -34,6 +35,7 @@ import {
 import type { LessonDto, ModuleDto, ResourceDto } from "@/lib/types/learning-content";
 import type { CourseMembersResponse, CourseMemberDto } from "@/lib/types/course";
 import type { AssignmentDto } from "@/lib/types/assignment";
+import type { QuizDto } from "@/lib/types/quiz";
 import {
   createModule,
   updateModule,
@@ -50,7 +52,16 @@ import {
   fetchCourseAssignments,
   publishAssignment,
   closeAssignment,
+  updateAssignment,
 } from "@/lib/api/assignment-api";
+import {
+  fetchCourseQuizzes,
+  publishQuiz,
+  closeQuiz,
+  deleteQuiz,
+  updateQuiz,
+  formatQuizApiError,
+} from "@/lib/api/quiz-api";
 import DocumentPreview from "@/components/resource/DocumentPreview";
 import RichContent from "@/components/content/RichContent";
 import KebabMenu from "@/components/ui/KebabMenu";
@@ -61,10 +72,17 @@ import CourseShell, { coursePathOf, useCourseContent, useCurrentUser } from "./C
 import CourseHero, { type HeroStatusTone } from "./CourseHero";
 import CourseSkeleton from "./CourseSkeleton";
 
-/** Một mục trong topic: bài học hoặc bài tập, sắp theo orderIndex chung */
+/** Một mục trong topic: bài học, bài tập hoặc đề kiểm tra, sắp theo orderIndex chung */
 type ModuleItem =
   | { kind: "lesson"; id: string; order: number; lesson: LessonDto }
-  | { kind: "assignment"; id: string; order: number; assignment: AssignmentDto };
+  | { kind: "assignment"; id: string; order: number; assignment: AssignmentDto }
+  | { kind: "quiz"; id: string; order: number; quiz: QuizDto };
+
+const ITEM_KIND_RANK: Record<ModuleItem["kind"], number> = {
+  lesson: 0,
+  assignment: 1,
+  quiz: 2,
+};
 
 /** Màu badge trạng thái nộp bài của sinh viên trên dòng bài tập */
 const SUBMISSION_BADGE: Record<SubmissionStateTone, string> = {
@@ -236,6 +254,29 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
     };
   }, [courseId]);
 
+  // Danh sách đề kiểm tra trong khóa học
+  const [quizzes, setQuizzes] = useState<QuizDto[]>([]);
+  const refreshQuizzes = useCallback(async () => {
+    try {
+      const data = await fetchCourseQuizzes(courseId);
+      setQuizzes(data);
+    } catch {
+      // Bỏ qua lỗi tải đề kiểm tra phụ
+    }
+  }, [courseId]);
+
+  useEffect(() => {
+    let active = true;
+    fetchCourseQuizzes(courseId)
+      .then((data) => {
+        if (active) setQuizzes(data);
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [courseId]);
+
   // Toast
   const [toastMessage, setToastMessage] = useState("");
   const toastTimer = useRef<number | undefined>(undefined);
@@ -250,7 +291,7 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
   // Mục đang kéo (bài học hoặc bài tập) — index tính trên danh sách gộp của topic
   const [draggedItemInfo, setDraggedItemInfo] = useState<{ moduleId: string; index: number } | null>(null);
 
-  /** Bài học + bài tập của topic gộp thành một danh sách theo orderIndex (cùng dãy số ở backend) */
+  /** Bài học + bài tập + đề kiểm tra của topic gộp thành một danh sách để hiển thị và kéo thả */
   const moduleItems = useCallback(
     (m: ModuleDto): ModuleItem[] => {
       const items: ModuleItem[] = [
@@ -258,11 +299,19 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
         ...assignments
           .filter((a) => a.moduleId === m.id)
           .map((assignment) => ({ kind: "assignment" as const, id: assignment.id, order: assignment.orderIndex, assignment })),
+        // Quiz không có orderIndex: xếp sau bài học/bài tập, trong nhóm quiz theo createdAt tăng dần
+        ...quizzes
+          .filter((quiz) => quiz.moduleId === m.id)
+          .map((quiz) => ({
+            kind: "quiz" as const,
+            id: quiz.id,
+            order: 1_000_000 + (Date.parse(quiz.createdAt) || 0),
+            quiz,
+          })),
       ];
-      // orderIndex trùng (dữ liệu cũ) → bài học trước, bài tập sau
-      return items.sort((a, b) => a.order - b.order || (a.kind === b.kind ? 0 : a.kind === "lesson" ? -1 : 1));
+      return items.sort((a, b) => a.order - b.order || ITEM_KIND_RANK[a.kind] - ITEM_KIND_RANK[b.kind]);
     },
-    [assignments],
+    [assignments, quizzes],
   );
 
   const isExpanded = (modId: string) => !collapsedModules[modId];
@@ -441,7 +490,16 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
   const handleModuleDrop = async (e: React.DragEvent, dropIndex: number) => {
     e.preventDefault();
     e.stopPropagation();
-    if (draggedModuleIndex === null || draggedModuleIndex === dropIndex || !course?.modules) return;
+    if (!course?.modules) return;
+
+    // Đang kéo một mục (bài tập / đề kiểm tra) → thả vào header topic = chuyển sang topic đó
+    if (draggedItemInfo) {
+      const target = course.modules[dropIndex];
+      if (target) await handleItemDrop(e, target.id, 0);
+      return;
+    }
+
+    if (draggedModuleIndex === null || draggedModuleIndex === dropIndex) return;
 
     let updated = [...course.modules];
     const [moved] = updated.splice(draggedModuleIndex, 1);
@@ -467,16 +525,76 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
     setDraggedItemInfo({ moduleId, index });
   };
 
-  /** Thả bài học / bài tập vào vị trí mới trong cùng topic → cập nhật orderIndex cả hai loại */
+  /**
+   * Thả một mục vào topic / vị trí mới.
+   * - Cùng topic: đổi thứ tự bài học & bài tập (quiz không có orderIndex nên không đổi chỗ).
+   * - Khác topic: chỉ bài tập / đề kiểm tra đang DRAFT mới được chuyển.
+   */
   const handleItemDrop = async (e: React.DragEvent, targetModId: string, dropIndex: number) => {
     e.preventDefault();
     e.stopPropagation();
     if (!draggedItemInfo || !course?.modules) return;
-    const sourceMod = course.modules.find((m) => m.id === draggedItemInfo.moduleId);
-    if (!sourceMod || draggedItemInfo.moduleId !== targetModId) return;
-    if (draggedItemInfo.index === dropIndex) return;
 
-    const items = moduleItems(sourceMod);
+    const sourceMod = course.modules.find((m) => m.id === draggedItemInfo.moduleId);
+    if (!sourceMod) return;
+
+    const sourceItems = moduleItems(sourceMod);
+    const movedItem = sourceItems[draggedItemInfo.index];
+    if (!movedItem) return;
+
+    if (sourceMod.id === targetModId && draggedItemInfo.index === dropIndex) {
+      setDraggedItemInfo(null);
+      return;
+    }
+
+    // ===== Chuyển sang topic khác =====
+    if (sourceMod.id !== targetModId) {
+      setDraggedItemInfo(null);
+
+      if (movedItem.kind === "lesson") {
+        showToast("Chỉ bài tập và đề kiểm tra mới có thể chuyển sang topic khác");
+        return;
+      }
+
+      if (movedItem.kind === "assignment") {
+        if (movedItem.assignment.status !== "DRAFT") {
+          showToast("Chỉ bài tập ở trạng thái nháp (DRAFT) mới có thể chuyển topic");
+          return;
+        }
+        try {
+          const updated = await updateAssignment(courseId, movedItem.id, { moduleId: targetModId });
+          setAssignments((prev) => prev.map((a) => (a.id === movedItem.id ? { ...a, ...updated } : a)));
+          showToast("Đã chuyển bài tập sang topic mới");
+        } catch (err) {
+          showToast((err as Error)?.message || "Không chuyển được bài tập sang topic khác");
+          await refreshAssignments();
+        }
+        return;
+      }
+
+      if (movedItem.quiz.status !== "DRAFT") {
+        showToast("Chỉ đề kiểm tra ở trạng thái nháp (DRAFT) mới có thể chuyển topic");
+        return;
+      }
+      try {
+        const updated = await updateQuiz(courseId, movedItem.id, { moduleId: targetModId });
+        setQuizzes((prev) => prev.map((q) => (q.id === movedItem.id ? { ...q, ...updated } : q)));
+        showToast("Đã chuyển đề kiểm tra sang topic mới");
+      } catch (err) {
+        showToast(formatQuizApiError(err, "Không chuyển được đề kiểm tra sang topic khác"));
+        await refreshQuizzes();
+      }
+      return;
+    }
+
+    // ===== Đổi thứ tự trong cùng topic =====
+    if (movedItem.kind === "quiz") {
+      setDraggedItemInfo(null);
+      showToast("Đề kiểm tra không hỗ trợ đổi thứ tự trong cùng topic — hãy kéo sang topic khác");
+      return;
+    }
+
+    const items = [...sourceItems];
     const [moved] = items.splice(draggedItemInfo.index, 1);
     items.splice(dropIndex, 0, moved);
     const reordered = items.map((item, i) => ({ ...item, order: i + 1 }));
@@ -485,7 +603,11 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
     const updatedLessons = reordered
       .filter((i): i is Extract<ModuleItem, { kind: "lesson" }> => i.kind === "lesson")
       .map((i) => ({ ...i.lesson, orderIndex: i.order }));
-    const assignmentOrder = new Map(reordered.filter((i) => i.kind === "assignment").map((i) => [i.id, i.order]));
+    const assignmentOrder = new Map(
+      reordered
+        .filter((i): i is Extract<ModuleItem, { kind: "assignment" }> => i.kind === "assignment")
+        .map((i) => [i.id, i.order]),
+    );
     setCourse({
       ...course,
       modules: course.modules.map((m) => (m.id === targetModId ? { ...m, lessons: updatedLessons } : m)),
@@ -496,7 +618,9 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
     try {
       await reorderModuleItems(
         targetModId,
-        reordered.map((i) => ({ type: i.kind === "lesson" ? ("LESSON" as const) : ("ASSIGNMENT" as const), id: i.id })),
+        reordered
+          .filter((i): i is Exclude<ModuleItem, { kind: "quiz" }> => i.kind !== "quiz")
+          .map((i) => ({ type: i.kind === "lesson" ? ("LESSON" as const) : ("ASSIGNMENT" as const), id: i.id })),
       );
       showToast("Đã cập nhật thứ tự");
     } catch {
@@ -521,8 +645,14 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
       : course.modules
           .map((mod) => {
             if (mod.title.toLowerCase().includes(query)) return mod;
-            const matched = mod.lessons?.filter((l) => l.title.toLowerCase().includes(query));
-            return matched?.length ? { ...mod, lessons: matched } : null;
+            const matchedLessons = mod.lessons?.some((l) => l.title.toLowerCase().includes(query));
+            const matchedAssignments = assignments.some(
+              (a) => a.moduleId === mod.id && a.title.toLowerCase().includes(query),
+            );
+            const matchedQuizzes = quizzes.some(
+              (q) => q.moduleId === mod.id && q.title.toLowerCase().includes(query),
+            );
+            return matchedLessons || matchedAssignments || matchedQuizzes ? mod : null;
           })
           .filter((m): m is NonNullable<typeof m> => m !== null);
 
@@ -829,6 +959,159 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
     );
   };
 
+  /** Một dòng đề kiểm tra trong topic — có thể kéo sang topic khác khi còn nháp */
+  const renderQuiz = (m: ModuleDto, quiz: QuizDto, idx: number) => {
+    const hidden = quiz.status === "DRAFT";
+    const canDrag = role === "TEACHER" && editMode && !isSearching;
+    const editHref = `/teacher/content/courses/${courseId}/lessons/new?section=${quiz.moduleId}&type=QUIZ&quizId=${quiz.id}`;
+    const viewHref =
+      role === "TEACHER" ? `/teacher/quizzes?course=${courseId}&quiz=${quiz.id}` : "/student/quizzes";
+    const isPastDue = new Date(quiz.dueAt).getTime() < openedAt;
+    const attempts = quiz.attemptStats;
+
+    return (
+      <div
+        key={`quiz-${quiz.id}`}
+        draggable={canDrag}
+        onDragStart={(e) => handleItemDragStart(e, m.id, idx)}
+        onDragOver={handleDragOver}
+        onDrop={(e) => handleItemDrop(e, m.id, idx)}
+        className={`group flex items-start gap-3 rounded-lg px-4 py-3.5 transition hover:bg-slate-50/80 ${hidden ? "bg-slate-50/60" : ""}`}
+      >
+        {canDrag && (
+          <span title="Kéo thả để chuyển topic" className="mt-2 cursor-grab text-slate-300 hover:text-slate-600">
+            <GripVertical className="h-4 w-4" />
+          </span>
+        )}
+        <div className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-violet-50 text-violet-600 ${hidden ? "opacity-60" : ""}`}>
+          <CheckSquare className="h-5 w-5" />
+        </div>
+        <div className={`min-w-0 flex-1 ${hidden ? "opacity-70" : ""}`}>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-600">Đề kiểm tra</p>
+          <Link href={viewHref} className="text-[15px] font-semibold leading-snug text-[#0f6cbf] hover:underline">
+            {quiz.title}
+          </Link>
+          <div className="mt-0.5 flex flex-wrap items-center gap-2 text-[12px] text-slate-500">
+            <span className={isPastDue && quiz.status === "PUBLISHED" ? "text-red-600" : ""}>
+              Hạn làm: {formatDateTime(quiz.dueAt)}
+            </span>
+            <span>·</span>
+            <span>Tổng điểm: {formatScore(quiz.totalMaxScore)}</span>
+            <span>·</span>
+            <span>{quiz.questionCount} câu</span>
+            {quiz.durationMinutes ? (
+              <>
+                <span>·</span>
+                <span>{quiz.durationMinutes} phút</span>
+              </>
+            ) : null}
+            {quiz.status === "CLOSED" && (
+              <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
+                Đã đóng
+              </span>
+            )}
+            {role === "TEACHER" && attempts && (
+              <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600">
+                {attempts.submitted}/{attempts.total} đã làm
+              </span>
+            )}
+          </div>
+          {quiz.instructions && (
+            <RichContent html={quiz.instructions} className="mt-1.5 !text-[13px] text-slate-600 line-clamp-3" />
+          )}
+        </div>
+
+        <div className="flex shrink-0 items-center gap-1.5">
+          {role === "TEACHER" && (
+            <>
+              {hidden && (
+                <span className="inline-flex select-none items-center gap-1.5 rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-[11.5px] font-semibold text-slate-600">
+                  <EyeOff className="h-3.5 w-3.5" /> Bản nháp
+                </span>
+              )}
+
+              {editMode && (
+                <KebabMenu
+                  items={[
+                    {
+                      label: "Xem chi tiết",
+                      icon: Eye,
+                      onClick: () => router.push(viewHref),
+                    },
+                    ...(quiz.status === "DRAFT"
+                      ? [
+                          {
+                            label: "Chỉnh sửa đề kiểm tra",
+                            icon: Pencil,
+                            onClick: () => router.push(editHref),
+                          },
+                          {
+                            label: "Xuất bản đề kiểm tra",
+                            icon: Eye,
+                            onClick: async () => {
+                              try {
+                                await publishQuiz(courseId, quiz.id);
+                                showToast("Đã xuất bản đề kiểm tra");
+                                void refreshQuizzes();
+                              } catch (err) {
+                                showToast(formatQuizApiError(err, "Không thể xuất bản đề kiểm tra"));
+                              }
+                            },
+                          },
+                          {
+                            label: "Xóa đề kiểm tra",
+                            icon: Trash2,
+                            danger: true,
+                            onClick: async () => {
+                              const ok = await confirm({
+                                tone: "danger",
+                                title: "Xóa đề kiểm tra?",
+                                message: (
+                                  <>
+                                    Đề <strong className="text-slate-800">{quiz.title}</strong> sẽ bị xóa vĩnh viễn.
+                                  </>
+                                ),
+                                confirmText: "Xóa",
+                              });
+                              if (!ok) return;
+                              try {
+                                await deleteQuiz(courseId, quiz.id);
+                                showToast("Đã xóa đề kiểm tra");
+                                void refreshQuizzes();
+                              } catch (err) {
+                                showToast(formatQuizApiError(err, "Không thể xóa đề kiểm tra"));
+                              }
+                            },
+                          },
+                        ]
+                      : []),
+                    ...(quiz.status === "PUBLISHED"
+                      ? [
+                          {
+                            label: "Đóng đề kiểm tra",
+                            icon: EyeOff,
+                            onClick: async () => {
+                              try {
+                                await closeQuiz(courseId, quiz.id);
+                                showToast("Đã đóng đề kiểm tra");
+                                void refreshQuizzes();
+                              } catch (err) {
+                                showToast(formatQuizApiError(err, "Không thể đóng đề kiểm tra"));
+                              }
+                            },
+                          },
+                        ]
+                      : []),
+                  ]}
+                />
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <CourseShell
       course={course}
@@ -1078,10 +1361,18 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
                     {expanded && (
                       <div className="divide-y divide-slate-100 px-2 py-1">
                         {moduleItems(m).map((item, idx) =>
-                          item.kind === "lesson" ? renderLesson(m, item.lesson, idx) : renderAssignment(m, item.assignment, idx),
+                          item.kind === "lesson"
+                            ? renderLesson(m, item.lesson, idx)
+                            : item.kind === "assignment"
+                              ? renderAssignment(m, item.assignment, idx)
+                              : renderQuiz(m, item.quiz, idx),
                         )}
                         {moduleItems(m).length === 0 && (
-                          <div className="py-6 text-center text-xs text-slate-400">
+                          <div
+                            onDragOver={handleDragOver}
+                            onDrop={(e) => handleItemDrop(e, m.id, 0)}
+                            className="py-6 text-center text-xs text-slate-400"
+                          >
                             Chưa có nội dung trong topic này.
                           </div>
                         )}
