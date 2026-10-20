@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   AlertCircle,
   Archive,
+  Check,
   CheckCircle2,
   CheckSquare,
   ClipboardList,
@@ -307,12 +308,40 @@ export default function LessonEditor({
   const [newQuestionContent, setNewQuestionContent] = useState("");
   const [newQuestionType, setNewQuestionType] = useState<QuestionTypeKey>("SINGLE");
   const [newQuestionScore, setNewQuestionScore] = useState("1");
+  const [newQuestionSetId, setNewQuestionSetId] = useState("");
   const [newQuestionChoices, setNewQuestionChoices] = useState([
     { content: "", isCorrect: true },
     { content: "", isCorrect: false },
   ]);
   const [newQuestionError, setNewQuestionError] = useState("");
   const [creatingQuestion, setCreatingQuestion] = useState(false);
+
+  const changeNewQuestionType = (next: QuestionTypeKey) => {
+    setNewQuestionType(next);
+    if (next === "SINGLE") {
+      setNewQuestionChoices((prev) => {
+        const firstCorrect = prev.findIndex((choice) => choice.isCorrect);
+        const keep = firstCorrect >= 0 ? firstCorrect : 0;
+        return prev.map((choice, index) => ({
+          ...choice,
+          isCorrect: index === keep,
+        }));
+      });
+    }
+  };
+
+  const toggleNewQuestionCorrect = (index: number) => {
+    setNewQuestionChoices((prev) =>
+      prev.map((choice, choiceIndex) => {
+        if (newQuestionType === "SINGLE") {
+          return { ...choice, isCorrect: choiceIndex === index };
+        }
+        return choiceIndex === index
+          ? { ...choice, isCorrect: !choice.isCorrect }
+          : choice;
+      }),
+    );
+  };
 
   // Tệp
   const [existingFiles, setExistingFiles] = useState<ResourceDto[]>([]);
@@ -653,50 +682,62 @@ export default function LessonEditor({
 
   const createBankQuestion = async () => {
     setNewQuestionError("");
-    if (!newQuestionContent.trim()) {
-      setNewQuestionError("Vui lòng nhập nội dung câu hỏi");
+    const trimmedContent = newQuestionContent.trim();
+    if (!trimmedContent) {
+      setNewQuestionError("Nội dung câu hỏi không được để trống.");
       return;
     }
-    const choices = newQuestionChoices
-      .map((choice) => ({ content: choice.content.trim(), isCorrect: choice.isCorrect }))
-      .filter((choice) => choice.content.length > 0);
-    if (choices.length < 2) {
-      setNewQuestionError("Cần ít nhất 2 lựa chọn có nội dung");
+    if (newQuestionChoices.length < 2) {
+      setNewQuestionError("Câu hỏi phải có ít nhất 2 lựa chọn.");
+      return;
+    }
+    const choices = newQuestionChoices.map((choice) => ({
+      content: choice.content.trim(),
+      isCorrect: choice.isCorrect,
+    }));
+    if (choices.some((c) => !c.content)) {
+      setNewQuestionError("Nội dung lựa chọn không được để trống.");
       return;
     }
     const correctCount = choices.filter((choice) => choice.isCorrect).length;
     if (correctCount === 0) {
-      setNewQuestionError("Phải chọn ít nhất một đáp án đúng");
+      setNewQuestionError("Câu hỏi phải có ít nhất một lựa chọn đúng.");
       return;
     }
     if (newQuestionType === "SINGLE" && correctCount !== 1) {
-      setNewQuestionError("Câu hỏi một đáp án chỉ được có đúng một đáp án đúng");
+      setNewQuestionError("Câu hỏi một đáp án chỉ được có đúng một lựa chọn đúng.");
       return;
     }
     if (newQuestionType === "MULTIPLE" && correctCount < 2) {
-      setNewQuestionError("Câu hỏi nhiều đáp án phải có ít nhất hai đáp án đúng");
+      setNewQuestionError("Câu hỏi nhiều đáp án phải có ít nhất hai lựa chọn đúng.");
       return;
     }
     const score = Number(newQuestionScore);
     if (!Number.isFinite(score) || score < 0.01) {
-      setNewQuestionError("Điểm mặc định phải lớn hơn hoặc bằng 0.01");
+      setNewQuestionError("Điểm mặc định phải là số lớn hơn hoặc bằng 0.01.");
       return;
     }
 
     setCreatingQuestion(true);
     try {
-      const targetSetId =
-        bankSetFilter !== "all" && bankSetFilter !== "unfiled"
-          ? bankSetFilter
-          : undefined;
+      const targetSetId = newQuestionSetId ? newQuestionSetId : undefined;
       const created = await createQuestionBankQuestion({
-        content: newQuestionContent.trim(),
+        content: trimmedContent,
         questionType: newQuestionType,
         defaultScore: score,
         ...(targetSetId ? { setId: targetSetId } : {}),
         choices,
       });
       setBankQuestions((prev) => [created, ...prev]);
+      if (targetSetId) {
+        setBankSets((prev) =>
+          prev.map((s) =>
+            s.id === targetSetId
+              ? { ...s, questionCount: s.questionCount + 1 }
+              : s
+          )
+        );
+      }
       setChosenQuestions((prev) => [
         ...prev,
         {
@@ -713,6 +754,7 @@ export default function LessonEditor({
       setNewQuestionContent("");
       setNewQuestionType("SINGLE");
       setNewQuestionScore("1");
+      setNewQuestionSetId("");
       setNewQuestionChoices([
         { content: "", isCorrect: true },
         { content: "", isCorrect: false },
@@ -720,7 +762,7 @@ export default function LessonEditor({
       setNewQuestionOpen(false);
       markDirty();
     } catch (err) {
-      setNewQuestionError(formatQuizApiError(err, "Không tạo được câu hỏi"));
+      setNewQuestionError(formatQuizApiError(err, "Không tạo được câu hỏi."));
     } finally {
       setCreatingQuestion(false);
     }
@@ -1492,6 +1534,11 @@ export default function LessonEditor({
                         disabled={quizLocked}
                         onClick={() => {
                           setNewQuestionError("");
+                          setNewQuestionSetId(
+                            bankSetFilter !== "all" && bankSetFilter !== "unfiled"
+                              ? bankSetFilter
+                              : ""
+                          );
                           setNewQuestionOpen(true);
                         }}
                         className="flex items-center gap-1.5 rounded-lg border border-[#0f6cbf] bg-blue-50 px-3.5 py-2 text-[13.5px] font-semibold text-[#0f6cbf] hover:bg-blue-100 disabled:opacity-50"
@@ -1577,10 +1624,10 @@ export default function LessonEditor({
                     )}
 
                     {newQuestionOpen && (
-                      <div className="rounded-xl border border-sky-200 bg-sky-50/50 p-4">
-                        <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
+                        <div className="flex items-start justify-between gap-3 border-b border-slate-100 pb-3">
                           <div>
-                            <p className="text-[14px] font-bold text-slate-900">Tạo câu hỏi mới</p>
+                            <p className="text-[15px] font-bold text-slate-900">Tạo câu hỏi mới</p>
                             <p className="mt-0.5 text-[12.5px] text-slate-500">
                               Câu hỏi được lưu vào ngân hàng của bạn và thêm ngay vào đề.
                             </p>
@@ -1588,137 +1635,185 @@ export default function LessonEditor({
                           <button
                             type="button"
                             onClick={() => setNewQuestionOpen(false)}
-                            className="grid h-8 w-8 place-items-center rounded-lg text-slate-500 hover:bg-white hover:text-slate-800"
+                            aria-label="Đóng biểu mẫu"
+                            className="grid h-8 w-8 place-items-center rounded-lg text-slate-400 hover:bg-slate-100 hover:text-slate-700"
                           >
                             <X className="h-4 w-4" />
                           </button>
                         </div>
 
-                        <label className="mt-3 block">
-                          <span className="text-[13px] font-medium text-slate-600">Nội dung câu hỏi</span>
+                        <label className="block">
+                          <span className="mb-1.5 block text-[13px] font-semibold text-slate-700">
+                            Nội dung câu hỏi <span className="text-red-500">*</span>
+                          </span>
                           <textarea
+                            autoFocus
                             value={newQuestionContent}
                             onChange={(e) => {
                               setNewQuestionContent(e.target.value);
                               setNewQuestionError("");
                             }}
                             rows={3}
-                            placeholder="VD: Khóa chính trong bảng dùng để làm gì?"
-                            className="mt-1.5 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-[#0f6cbf] focus:ring-4 focus:ring-blue-100"
+                            maxLength={5000}
+                            placeholder="Nhập nội dung câu hỏi..."
+                            className="w-full resize-y rounded-lg border border-slate-300 bg-white px-3.5 py-2.5 text-[13.5px] leading-relaxed outline-none focus:border-[#0f6cbf] focus:ring-4 focus:ring-blue-100"
                           />
                         </label>
 
-                        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                        <div className="grid gap-3 sm:grid-cols-3">
                           <label className="block">
-                            <span className="text-[13px] font-medium text-slate-600">Loại câu hỏi</span>
+                            <span className="mb-1.5 block text-[13px] font-semibold text-slate-700">
+                              Loại câu hỏi
+                            </span>
                             <select
                               value={newQuestionType}
-                              onChange={(e) => setNewQuestionType(e.target.value as QuestionTypeKey)}
-                              className="mt-1.5 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#0f6cbf] focus:ring-4 focus:ring-blue-100"
+                              onChange={(e) =>
+                                changeNewQuestionType(e.target.value as QuestionTypeKey)
+                              }
+                              className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-[13.5px] outline-none focus:border-[#0f6cbf]"
                             >
-                              <option value="SINGLE">Một đáp án đúng</option>
-                              <option value="MULTIPLE">Nhiều đáp án đúng</option>
+                              <option value="SINGLE">Một đáp án</option>
+                              <option value="MULTIPLE">Nhiều đáp án</option>
                             </select>
                           </label>
                           <label className="block">
-                            <span className="text-[13px] font-medium text-slate-600">Điểm mặc định</span>
+                            <span className="mb-1.5 block text-[13px] font-semibold text-slate-700">
+                              Điểm mặc định
+                            </span>
                             <input
                               type="number"
                               min="0.01"
-                              step="any"
+                              step="0.01"
                               value={newQuestionScore}
                               onChange={(e) => {
                                 setNewQuestionScore(e.target.value);
                                 setNewQuestionError("");
                               }}
-                              className="mt-1.5 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm outline-none focus:border-[#0f6cbf] focus:ring-4 focus:ring-blue-100"
+                              className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-[13.5px] outline-none focus:border-[#0f6cbf] focus:ring-4 focus:ring-blue-100"
                             />
+                          </label>
+                          <label className="block">
+                            <span className="mb-1.5 block text-[13px] font-semibold text-slate-700">
+                              Bộ câu hỏi
+                            </span>
+                            <select
+                              value={newQuestionSetId}
+                              onChange={(e) => setNewQuestionSetId(e.target.value)}
+                              className="h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-[13.5px] outline-none focus:border-[#0f6cbf]"
+                            >
+                              <option value="">Chưa phân bộ</option>
+                              {bankSets.map((set) => (
+                                <option key={set.id} value={set.id}>
+                                  {set.name}
+                                </option>
+                              ))}
+                            </select>
                           </label>
                         </div>
 
-                        <div className="mt-4 space-y-2">
-                          <p className="text-[13px] font-medium text-slate-600">
-                            Đáp án <span className="font-normal text-slate-500">(tick vào đáp án đúng)</span>
-                          </p>
-                          {newQuestionChoices.map((choice, index) => (
-                            <div key={index} className="flex items-center gap-2">
-                              <input
-                                type="checkbox"
-                                checked={choice.isCorrect}
-                                onChange={(e) =>
-                                  setNewQuestionChoices((prev) =>
-                                    prev.map((item, itemIndex) =>
-                                      itemIndex === index ? { ...item, isCorrect: e.target.checked } : item,
-                                    ),
-                                  )
-                                }
-                                title="Đáp án đúng"
-                                className="h-4 w-4 shrink-0 rounded border-slate-300 text-[#0f6cbf] focus:ring-[#0f6cbf]"
-                              />
-                              <input
-                                value={choice.content}
-                                onChange={(e) =>
-                                  setNewQuestionChoices((prev) =>
-                                    prev.map((item, itemIndex) =>
-                                      itemIndex === index ? { ...item, content: e.target.value } : item,
-                                    ),
-                                  )
-                                }
-                                placeholder={`Đáp án ${index + 1}`}
-                                className="h-9 flex-1 rounded-lg border border-slate-300 bg-white px-3 text-[13.5px] outline-none focus:border-[#0f6cbf] focus:ring-4 focus:ring-blue-100"
-                              />
-                              <button
-                                type="button"
-                                disabled={newQuestionChoices.length <= 2}
-                                onClick={() =>
-                                  setNewQuestionChoices((prev) => prev.filter((_, itemIndex) => itemIndex !== index))
-                                }
-                                title="Xóa đáp án"
-                                className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </button>
+                        <div>
+                          <div className="mb-2 flex items-center justify-between gap-3">
+                            <div>
+                              <p className="text-[13px] font-semibold text-slate-700">
+                                Lựa chọn trả lời <span className="text-red-500">*</span>
+                              </p>
+                              <p className="mt-0.5 text-[12px] text-slate-500">
+                                {newQuestionType === "SINGLE"
+                                  ? "Chọn đúng một đáp án."
+                                  : "Chọn ít nhất hai đáp án đúng."}
+                              </p>
                             </div>
-                          ))}
-                          <button
-                            type="button"
-                            disabled={newQuestionChoices.length >= 10}
-                            onClick={() =>
-                              setNewQuestionChoices((prev) => [...prev, { content: "", isCorrect: false }])
-                            }
-                            className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[12.5px] font-semibold text-[#0f6cbf] hover:bg-blue-100/60 disabled:opacity-40"
-                          >
-                            <Plus className="h-3.5 w-3.5" /> Thêm đáp án
-                          </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                setNewQuestionChoices((prev) => [
+                                  ...prev,
+                                  { content: "", isCorrect: false },
+                                ])
+                              }
+                              className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12.5px] font-semibold text-slate-600 hover:bg-slate-50"
+                            >
+                              <Plus className="h-3.5 w-3.5" /> Thêm lựa chọn
+                            </button>
+                          </div>
+
+                          <div className="space-y-2">
+                            {newQuestionChoices.map((choice, index) => (
+                              <div
+                                key={index}
+                                className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2"
+                              >
+                                <input
+                                  type={newQuestionType === "SINGLE" ? "radio" : "checkbox"}
+                                  name="new-quiz-question-choice"
+                                  checked={choice.isCorrect}
+                                  onChange={() => toggleNewQuestionCorrect(index)}
+                                  title="Đánh dấu đáp án đúng"
+                                  className="h-4 w-4 shrink-0 accent-[#0f6cbf]"
+                                />
+                                <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-white text-[11.5px] font-bold text-slate-500">
+                                  {String.fromCharCode(65 + index)}
+                                </span>
+                                <input
+                                  value={choice.content}
+                                  onChange={(e) =>
+                                    setNewQuestionChoices((prev) =>
+                                      prev.map((item, choiceIndex) =>
+                                        choiceIndex === index
+                                          ? { ...item, content: e.target.value }
+                                          : item,
+                                      ),
+                                    )
+                                  }
+                                  placeholder={`Nội dung lựa chọn ${String.fromCharCode(65 + index)}`}
+                                  className="h-9 min-w-0 flex-1 rounded-lg border border-slate-200 bg-white px-3 text-[13.5px] outline-none focus:border-[#0f6cbf] focus:ring-4 focus:ring-blue-100"
+                                />
+                                {choice.isCorrect && (
+                                  <span className="hidden shrink-0 items-center gap-1 text-[11.5px] font-semibold text-green-700 sm:flex">
+                                    <Check className="h-3.5 w-3.5" /> Đúng
+                                  </span>
+                                )}
+                                <button
+                                  type="button"
+                                  disabled={newQuestionChoices.length <= 2}
+                                  onClick={() =>
+                                    setNewQuestionChoices((prev) =>
+                                      prev.filter((_, choiceIndex) => choiceIndex !== index),
+                                    )
+                                  }
+                                  title="Xóa lựa chọn"
+                                  className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-30"
+                                >
+                                  <X className="h-4 w-4" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
                         </div>
 
                         {newQuestionError && (
-                          <p className="mt-3 flex items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[12.5px] font-medium text-red-700">
-                            <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {newQuestionError}
+                          <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] font-medium text-red-700">
+                            {newQuestionError}
                           </p>
                         )}
 
-                        <div className="mt-3 flex gap-2">
-                          <button
-                            type="button"
-                            disabled={creatingQuestion}
-                            onClick={() => void createBankQuestion()}
-                            className="flex items-center gap-1.5 rounded-lg bg-[#0f6cbf] px-4 py-2 text-[13.5px] font-semibold text-white hover:bg-[#0c599e] disabled:opacity-60"
-                          >
-                            {creatingQuestion ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Save className="h-4 w-4" />
-                            )}
-                            Lưu câu hỏi
-                          </button>
+                        <div className="flex justify-end gap-2 border-t border-slate-100 pt-4">
                           <button
                             type="button"
                             disabled={creatingQuestion}
                             onClick={() => setNewQuestionOpen(false)}
-                            className="rounded-lg px-4 py-2 text-[13.5px] font-semibold text-slate-600 hover:bg-white disabled:opacity-60"
+                            className="rounded-lg px-4 py-2 text-[13.5px] font-semibold text-slate-600 hover:bg-slate-100 disabled:opacity-60"
                           >
                             Hủy
+                          </button>
+                          <button
+                            type="button"
+                            disabled={creatingQuestion}
+                            onClick={() => void createBankQuestion()}
+                            className="flex items-center gap-2 rounded-lg bg-[#0f6cbf] px-5 py-2 text-[13.5px] font-semibold text-white hover:bg-[#0c599e] disabled:opacity-60"
+                          >
+                            {creatingQuestion && <Loader2 className="h-4 w-4 animate-spin" />}
+                            Lưu câu hỏi
                           </button>
                         </div>
                       </div>
