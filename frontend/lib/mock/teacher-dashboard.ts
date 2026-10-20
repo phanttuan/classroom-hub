@@ -194,6 +194,12 @@ export const teacherSidebarNav: SidebarItem[] = [
     icon: "content",
     href: "/teacher/content/courses",
   },
+  {
+    id: "question-bank",
+    label: "Ngân hàng câu hỏi",
+    icon: "quiz",
+    href: "/teacher/question-bank",
+  },
   { id: "grades", label: "Sổ điểm", icon: "gradebook", href: "/teacher/grades" },
   { id: "notifs", label: "Thông báo", icon: "bell", href: "/teacher/notifications" },
   { id: "schedule", label: "Lịch", icon: "calendar", href: "/teacher/schedule" },

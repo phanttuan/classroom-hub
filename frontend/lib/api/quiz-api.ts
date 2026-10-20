@@ -4,10 +4,12 @@ import type {
   CreateQuestionPayload,
   CreateQuizPayload,
   QuestionBankQuestionDto,
+  QuestionSetDto,
   QuestionTypeKey,
   QuizDto,
   QuizQuestionDto,
   QuizStatus,
+  UpdateQuestionPayload,
   UpdateQuizPayload,
 } from '../types/quiz';
 
@@ -206,15 +208,27 @@ export async function removeQuizQuestion(
 export async function fetchQuestionBank(
   search?: string,
   questionType?: QuestionTypeKey,
+  filters?: { setId?: string; unfiled?: boolean },
 ): Promise<QuestionBankQuestionDto[]> {
   const query = new URLSearchParams();
   if (search?.trim()) query.set('search', search.trim());
   if (questionType) query.set('questionType', questionType);
+  if (filters?.setId) query.set('setId', filters.setId);
+  if (filters?.unfiled) query.set('unfiled', 'true');
   const qs = query.toString();
 
   const res = await apiFetch<
     ApiEnvelope<QuestionBankQuestionDto[]> | QuestionBankQuestionDto[]
   >(`/question-bank${qs ? `?${qs}` : ''}`, { skipAuthRedirect: true });
+  return unwrap(res);
+}
+
+export async function fetchQuestionBankQuestion(
+  id: string,
+): Promise<QuestionBankQuestionDto> {
+  const res = await apiFetch<
+    ApiEnvelope<QuestionBankQuestionDto> | QuestionBankQuestionDto
+  >(`/question-bank/${id}`, { skipAuthRedirect: true });
   return unwrap(res);
 }
 
@@ -228,5 +242,74 @@ export async function createQuestionBankQuestion(
     body: JSON.stringify(payload),
     skipAuthRedirect: true,
   });
+  return unwrap(res);
+}
+
+export async function updateQuestionBankQuestion(
+  id: string,
+  payload: UpdateQuestionPayload,
+): Promise<QuestionBankQuestionDto> {
+  const res = await apiFetch<
+    ApiEnvelope<QuestionBankQuestionDto> | QuestionBankQuestionDto
+  >(`/question-bank/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+    skipAuthRedirect: true,
+  });
+  return unwrap(res);
+}
+
+export async function deleteQuestionBankQuestion(
+  id: string,
+): Promise<{ id: string }> {
+  const res = await apiFetch<ApiEnvelope<{ id: string }> | { id: string }>(
+    `/question-bank/${id}`,
+    { method: 'DELETE', skipAuthRedirect: true },
+  );
+  return unwrap(res);
+}
+
+export async function fetchQuestionSets(): Promise<QuestionSetDto[]> {
+  const res = await apiFetch<ApiEnvelope<QuestionSetDto[]> | QuestionSetDto[]>(
+    '/question-bank/sets',
+    { skipAuthRedirect: true },
+  );
+  return unwrap(res);
+}
+
+export async function createQuestionSet(name: string): Promise<QuestionSetDto> {
+  const res = await apiFetch<ApiEnvelope<QuestionSetDto> | QuestionSetDto>(
+    '/question-bank/sets',
+    {
+      method: 'POST',
+      body: JSON.stringify({ name }),
+      skipAuthRedirect: true,
+    },
+  );
+  return unwrap(res);
+}
+
+export async function renameQuestionSet(
+  id: string,
+  name: string,
+): Promise<QuestionSetDto> {
+  const res = await apiFetch<ApiEnvelope<QuestionSetDto> | QuestionSetDto>(
+    `/question-bank/sets/${id}`,
+    {
+      method: 'PATCH',
+      body: JSON.stringify({ name }),
+      skipAuthRedirect: true,
+    },
+  );
+  return unwrap(res);
+}
+
+export async function deleteQuestionSet(
+  id: string,
+): Promise<{ id: string }> {
+  const res = await apiFetch<ApiEnvelope<{ id: string }> | { id: string }>(
+    `/question-bank/sets/${id}`,
+    { method: 'DELETE', skipAuthRedirect: true },
+  );
   return unwrap(res);
 }

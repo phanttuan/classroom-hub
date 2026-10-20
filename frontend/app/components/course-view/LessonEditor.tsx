@@ -55,6 +55,7 @@ import {
   createQuestionBankQuestion,
   createQuiz,
   fetchQuestionBank,
+  fetchQuestionSets,
   fetchQuizDetail,
   formatQuizApiError,
   publishQuiz,
@@ -64,6 +65,7 @@ import {
 } from "@/lib/api/quiz-api";
 import type {
   QuestionBankQuestionDto,
+  QuestionSetDto,
   QuestionTypeKey,
   QuizQuestionDto,
   QuizStatus,
@@ -299,6 +301,8 @@ export default function LessonEditor({
   const [bankLoading, setBankLoading] = useState(false);
   const [bankLoaded, setBankLoaded] = useState(false);
   const [bankSearch, setBankSearch] = useState("");
+  const [bankSets, setBankSets] = useState<QuestionSetDto[]>([]);
+  const [bankSetFilter, setBankSetFilter] = useState("all");
   const [newQuestionOpen, setNewQuestionOpen] = useState(false);
   const [newQuestionContent, setNewQuestionContent] = useState("");
   const [newQuestionType, setNewQuestionType] = useState<QuestionTypeKey>("SINGLE");
@@ -421,10 +425,11 @@ export default function LessonEditor({
     void Promise.resolve().then(() => {
       if (active) setBankLoading(true);
     });
-    fetchQuestionBank()
-      .then((questions) => {
+    Promise.all([fetchQuestionBank(), fetchQuestionSets()])
+      .then(([questions, sets]) => {
         if (!active) return;
         setBankQuestions(questions);
+        setBankSets(sets);
         setBankLoaded(true);
       })
       .catch((err) => {
@@ -463,6 +468,14 @@ export default function LessonEditor({
     return sum + (Number.isFinite(score) ? score : 0);
   }, 0);
   const filteredBankQuestions = bankQuestions.filter((question) => {
+    if (
+      bankSetFilter !== "all" &&
+      (bankSetFilter === "unfiled"
+        ? question.setId !== null
+        : question.setId !== bankSetFilter)
+    ) {
+      return false;
+    }
     const keyword = bankSearch.trim().toLowerCase();
     if (!keyword) return true;
     return question.content.toLowerCase().includes(keyword);
@@ -672,10 +685,15 @@ export default function LessonEditor({
 
     setCreatingQuestion(true);
     try {
+      const targetSetId =
+        bankSetFilter !== "all" && bankSetFilter !== "unfiled"
+          ? bankSetFilter
+          : undefined;
       const created = await createQuestionBankQuestion({
         content: newQuestionContent.trim(),
         questionType: newQuestionType,
         defaultScore: score,
+        ...(targetSetId ? { setId: targetSetId } : {}),
         choices,
       });
       setBankQuestions((prev) => [created, ...prev]);
@@ -1709,14 +1727,29 @@ export default function LessonEditor({
                     <div className="border-t border-slate-200 pt-4">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <p className="text-[14px] font-bold text-slate-900">Ngân hàng câu hỏi</p>
-                        <div className="relative w-full max-w-xs">
-                          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                          <input
-                            value={bankSearch}
-                            onChange={(e) => setBankSearch(e.target.value)}
-                            placeholder="Tìm theo nội dung câu hỏi..."
-                            className="h-9 w-full rounded-lg border border-slate-300 pl-9 pr-3 text-[13.5px] outline-none focus:border-[#0f6cbf] focus:ring-4 focus:ring-blue-100"
-                          />
+                        <div className="flex w-full max-w-md flex-col gap-2 sm:flex-row">
+                          <select
+                            value={bankSetFilter}
+                            onChange={(e) => setBankSetFilter(e.target.value)}
+                            className="h-9 rounded-lg border border-slate-300 bg-white px-3 text-[13px] text-slate-700 outline-none focus:border-[#0f6cbf]"
+                          >
+                            <option value="all">Tất cả bộ câu hỏi</option>
+                            <option value="unfiled">Chưa phân bộ</option>
+                            {bankSets.map((set) => (
+                              <option key={set.id} value={set.id}>
+                                {set.name} ({set.questionCount})
+                              </option>
+                            ))}
+                          </select>
+                          <div className="relative min-w-0 flex-1">
+                            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                            <input
+                              value={bankSearch}
+                              onChange={(e) => setBankSearch(e.target.value)}
+                              placeholder="Tìm theo nội dung câu hỏi..."
+                              className="h-9 w-full rounded-lg border border-slate-300 pl-9 pr-3 text-[13.5px] outline-none focus:border-[#0f6cbf] focus:ring-4 focus:ring-blue-100"
+                            />
+                          </div>
                         </div>
                       </div>
 
@@ -1745,6 +1778,7 @@ export default function LessonEditor({
                                     <p className="mt-0.5 text-[12px] text-slate-500">
                                       {question.questionType === "MULTIPLE" ? "Nhiều đáp án" : "Một đáp án"} ·{" "}
                                       {question.choices.length} lựa chọn · mặc định {question.defaultScore} điểm
+                                      {question.setName ? ` · ${question.setName}` : ""}
                                     </p>
                                   </div>
                                   <button

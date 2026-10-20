@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMinSize,
   IsArray,
@@ -8,6 +8,7 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  Matches,
   MaxLength,
   Min,
   ValidateNested,
@@ -38,6 +39,13 @@ export class CreateQuestionDto {
   @IsNumber({}, { message: 'Điểm mặc định phải là số' })
   @Min(0.01, { message: 'Điểm mặc định phải lớn hơn hoặc bằng 0.01' })
   defaultScore?: number;
+
+  @IsOptional()
+  @Transform(({ value }) =>
+    typeof value === 'string' ? value.trim() : value,
+  )
+  @Matches(/^[1-9]\d*$/, { message: 'Mã bộ câu hỏi (setId) không hợp lệ' })
+  setId?: string;
 
   @IsArray({ message: 'Danh sách lựa chọn phải là mảng' })
   @ArrayMinSize(2, { message: 'Câu hỏi phải có ít nhất 2 lựa chọn' })

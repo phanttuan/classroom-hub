@@ -103,15 +103,27 @@ export interface QuestionBankChoiceDto {
   orderIndex: number;
 }
 
+export interface QuestionSetDto {
+  id: string;
+  ownerId: string;
+  name: string;
+  questionCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface QuestionBankQuestionDto {
   id: string;
   ownerId: string;
+  setId: string | null;
+  setName: string | null;
   questionKey: string;
   content: string;
   questionType: QuestionTypeKey;
   defaultScore: string;
   version: number;
   status: string;
+  usageCount: number;
   createdAt: string;
   updatedAt: string;
   choices: QuestionBankChoiceDto[];
@@ -121,5 +133,15 @@ export interface CreateQuestionPayload {
   content: string;
   questionType: QuestionTypeKey;
   defaultScore?: number;
+  setId?: string;
   choices: Array<{ content: string; isCorrect: boolean }>;
+}
+
+export interface UpdateQuestionPayload {
+  content?: string;
+  questionType?: QuestionTypeKey;
+  defaultScore?: number;
+  /** null = chuyển về "Chưa phân bộ" */
+  setId?: string | null;
+  choices?: Array<{ content: string; isCorrect: boolean }>;
 }
