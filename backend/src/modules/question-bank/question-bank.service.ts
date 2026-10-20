@@ -284,7 +284,7 @@ export class QuestionBankService {
         data: {
           ownerId,
           questionKey: existing.questionKey,
-          setId: existing.setId,
+          setId: nextSetId,
           content: nextContent,
           questionType: nextType,
           defaultScore:

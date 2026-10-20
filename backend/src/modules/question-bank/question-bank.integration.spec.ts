@@ -319,6 +319,54 @@ describe.skipIf(!canReachDatabase)(
       questionId = res.body.data.id;
     });
 
+    it('sửa câu hỏi đã dùng kèm đổi bộ tạo version mới mang setId mới', async () => {
+      // Gắn câu hỏi hiện tại vào quiz để mô phỏng đã được sử dụng
+      const addRes = await request(app.getHttpServer())
+        .post(
+          `/courses/${courseId.toString()}/quizzes/${quizId.toString()}/questions`,
+        )
+        .set(auth(teacherOwner.token))
+        .send({ questionId });
+      expect(addRes.status).toBe(201);
+
+      const res = await request(app.getHttpServer())
+        .patch(`/question-bank/${questionId}`)
+        .set(auth(teacherOwner.token))
+        .send({
+          content: 'Thủ đô của Việt Nam là gì (câu hỏi cập nhật lần 3)?',
+          setId: setAId,
+          choices: [
+            { content: 'Hà Nội', isCorrect: true },
+            { content: 'TP. Hồ Chí Minh', isCorrect: false },
+          ],
+        });
+
+      expect(res.status).toBe(200);
+      expect(res.body.data).toMatchObject({
+        questionKey,
+        version: 3,
+        status: QuestionStatus.ACTIVE,
+        setId: setAId,
+      });
+
+      const v2 = await prisma.questionBank.findUnique({
+        where: { id: BigInt(questionId) },
+      });
+      expect(v2?.status).toBe(QuestionStatus.RETIRED);
+
+      const listRes = await request(app.getHttpServer())
+        .get(`/question-bank?setId=${setAId}`)
+        .set(auth(teacherOwner.token));
+      expect(listRes.status).toBe(200);
+      expect(
+        listRes.body.data.some(
+          (q: { id: string; version: number }) => q.version === 3,
+        ),
+      ).toBe(true);
+
+      questionId = res.body.data.id;
+    });
+
     it('chặn IDOR giữa các giáo viên', async () => {
       const getRes = await request(app.getHttpServer())
         .get(`/question-bank/${questionId}`)

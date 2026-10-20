@@ -370,7 +370,6 @@ describe('QuestionBankService', () => {
 
       const result = await service.update(teacherId, questionId, {
         content: 'Nội dung mới',
-        setId: null,
       });
 
       expect(prisma.questionBank.update).toHaveBeenCalledWith({
@@ -392,6 +391,108 @@ describe('QuestionBankService', () => {
         id: '900',
         version: 4,
         setId: '9',
+        usageCount: 0,
+      });
+    });
+
+    it('sửa câu đã dùng kèm đổi bộ → version mới mang setId mới', async () => {
+      const newSetId = 20n;
+      prisma.questionBank.findFirst.mockResolvedValue({
+        ...baseQuestion,
+        _count: { quizQuestions: 1 },
+      });
+      prisma.questionSet.findFirst.mockResolvedValue({ id: newSetId });
+      prisma.questionBank.aggregate.mockResolvedValue({
+        _max: { version: 3 },
+      });
+      prisma.questionBank.update.mockResolvedValue({
+        ...baseQuestion,
+        status: QuestionStatus.RETIRED,
+      });
+      prisma.questionBank.create.mockResolvedValue({
+        ...baseQuestion,
+        id: 901n,
+        setId: newSetId,
+        content: 'Nội dung mới và bộ mới',
+        version: 4,
+        _count: { quizQuestions: 0 },
+        set: { id: newSetId, name: 'Bộ mới' },
+      });
+
+      const result = await service.update(teacherId, questionId, {
+        content: 'Nội dung mới và bộ mới',
+        setId: '20',
+      });
+
+      expect(prisma.questionSet.findFirst).toHaveBeenCalledWith({
+        where: { id: newSetId, ownerId: teacherId },
+        select: { id: true },
+      });
+      expect(prisma.questionBank.update).toHaveBeenCalledWith({
+        where: { id: questionId },
+        data: { status: QuestionStatus.RETIRED },
+      });
+      expect(prisma.questionBank.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            questionKey,
+            setId: newSetId,
+            content: 'Nội dung mới và bộ mới',
+            version: 4,
+            status: QuestionStatus.ACTIVE,
+          }),
+        }),
+      );
+      expect(result).toMatchObject({
+        id: '901',
+        version: 4,
+        setId: '20',
+        usageCount: 0,
+      });
+    });
+
+    it('sửa câu đã dùng kèm chuyển về chưa phân bộ → version mới mang setId = null', async () => {
+      prisma.questionBank.findFirst.mockResolvedValue({
+        ...baseQuestion,
+        _count: { quizQuestions: 1 },
+      });
+      prisma.questionBank.aggregate.mockResolvedValue({
+        _max: { version: 3 },
+      });
+      prisma.questionBank.update.mockResolvedValue({
+        ...baseQuestion,
+        status: QuestionStatus.RETIRED,
+      });
+      prisma.questionBank.create.mockResolvedValue({
+        ...baseQuestion,
+        id: 902n,
+        setId: null,
+        set: null,
+        content: 'Nội dung mới chưa phân bộ',
+        version: 4,
+        _count: { quizQuestions: 0 },
+      });
+
+      const result = await service.update(teacherId, questionId, {
+        content: 'Nội dung mới chưa phân bộ',
+        setId: null,
+      });
+
+      expect(prisma.questionBank.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            questionKey,
+            setId: null,
+            content: 'Nội dung mới chưa phân bộ',
+            version: 4,
+            status: QuestionStatus.ACTIVE,
+          }),
+        }),
+      );
+      expect(result).toMatchObject({
+        id: '902',
+        version: 4,
+        setId: null,
         usageCount: 0,
       });
     });
