@@ -84,5 +84,11 @@
     "typescript": "^6.0.2",
     "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^4.1.2"
+  },
+  "allowScripts": {
+    "@prisma/engines": true,
+    "bcrypt": true,
+    "esbuild": true,
+    "prisma": true
   }
 }
