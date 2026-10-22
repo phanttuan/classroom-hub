@@ -208,12 +208,19 @@ export default function QuizAttemptRunner({ courseId, quizId, attemptId }: QuizA
   const doSubmit = useCallback(
     async (auto: boolean) => {
       if (!attempt || submittedRef.current) return;
-      submittedRef.current = true;
       setSubmitting(true);
       window.clearTimeout(saveTimerRef.current);
+      // Máy chủ chỉ chấm đáp án đã lưu nháp → xả các câu chưa kịp lưu (debounce) trước khi chốt lượt
+      await flushSave();
+      if (dirtyRef.current.size && !auto) {
+        // Lưu thất bại (mất mạng) và còn thời gian → không chốt, để sinh viên thử lại cho khỏi mất câu vừa chọn
+        setSubmitting(false);
+        toast.error("Chưa lưu được đáp án", "Vui lòng kiểm tra kết nối rồi bấm Nộp bài lại.");
+        return;
+      }
+      submittedRef.current = true;
       try {
-        const payload: AttemptAnswerInput[] = attempt.questions.map((q) => ({ attemptQuestionId: q.id, choiceIds: answers[q.id] ?? [] }));
-        const result = await submitQuizAttempt(courseId, quizId, attemptId, payload);
+        const result = await submitQuizAttempt(courseId, quizId, attemptId);
         toast.success(
           auto ? "Hết giờ — bài đã được nộp tự động" : "Nộp bài thành công",
           `Điểm: ${formatScore(result.totalScore)}/${formatScore(result.totalMaxScore)} · đúng ${result.correctCount}/${result.questionCount} câu`,
@@ -225,10 +232,10 @@ export default function QuizAttemptRunner({ courseId, quizId, attemptId }: QuizA
         toast.error("Không nộp được bài", formatQuizApiError(err, "Vui lòng thử lại."));
       }
     },
-    [attempt, answers, courseId, quizId, attemptId, router, resultPath],
+    [attempt, flushSave, courseId, quizId, attemptId, router, resultPath],
   );
 
-  // Hết giờ → tự nộp (đáp án đã lưu nháp vẫn được chấm phía máy chủ kể cả khi gửi muộn)
+  // Hết giờ → tự nộp (máy chủ chấm các đáp án đã lưu nháp trong giờ)
   useEffect(() => {
     if (attempt && remainMs <= 0 && !submittedRef.current) void doSubmit(true);
   }, [attempt, remainMs, doSubmit]);

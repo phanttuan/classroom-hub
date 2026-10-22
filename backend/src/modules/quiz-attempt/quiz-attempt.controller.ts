@@ -18,7 +18,7 @@ import { Roles } from '../../common/decorators/roles.decorator.js';
 import { UserRole } from '../../generated/prisma/enums.js';
 import type { RequestWithCourseContext } from '../../common/interfaces/request-with-user.interface.js';
 import { QuizAttemptService } from './quiz-attempt.service.js';
-import { SaveAnswersDto, SubmitAttemptDto } from './dto/save-answers.dto.js';
+import { SaveAnswersDto } from './dto/save-answers.dto.js';
 
 function parseId(raw: string, label: string): bigint {
   const trimmed = (raw ?? '').trim();
@@ -96,7 +96,7 @@ export class QuizAttemptController {
     return { message: 'Đã lưu đáp án', data };
   }
 
-  /** Nộp bài — chấm tự động ngay */
+  /** Nộp bài — chốt lượt và chấm tự động các đáp án đã lưu nháp (không nhận đáp án trong body) */
   @Post('attempts/:attemptId/submit')
   @Roles(UserRole.STUDENT)
   @HttpCode(HttpStatus.OK)
@@ -104,14 +104,12 @@ export class QuizAttemptController {
     @Req() req: RequestWithCourseContext,
     @Param('quizId') quizIdParam: string,
     @Param('attemptId') attemptIdParam: string,
-    @Body() dto: SubmitAttemptDto,
   ) {
     const data = await this.attempts.submit(
       req.course!.id,
       parseId(quizIdParam, 'đề kiểm tra'),
       parseId(attemptIdParam, 'lượt làm bài'),
       BigInt(req.user!.id),
-      dto,
     );
     return { message: 'Nộp bài thành công', data };
   }

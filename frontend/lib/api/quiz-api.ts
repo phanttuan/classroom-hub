@@ -365,16 +365,11 @@ export async function saveQuizAnswers(
   return unwrap(res);
 }
 
-/** Sinh viên: nộp bài (có thể kèm đáp án cuối) — chấm tự động ngay */
-export async function submitQuizAttempt(
-  courseId: string,
-  quizId: string,
-  attemptId: string,
-  answers?: AttemptAnswerInput[],
-): Promise<AttemptResultDto> {
+/** Sinh viên: nộp bài — chốt lượt, máy chủ chấm những đáp án đã lưu nháp (phải lưu xong trước khi gọi) */
+export async function submitQuizAttempt(courseId: string, quizId: string, attemptId: string): Promise<AttemptResultDto> {
   const res = await apiFetch<ApiEnvelope<AttemptResultDto>>(`${attemptsBase(courseId, quizId)}/${attemptId}/submit`, {
     method: 'POST',
-    body: JSON.stringify(answers ? { answers } : {}),
+    body: JSON.stringify({}),
     skipAuthRedirect: true,
   });
   return unwrap(res);

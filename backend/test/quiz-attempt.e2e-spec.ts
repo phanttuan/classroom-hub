@@ -201,10 +201,15 @@ describe('Quiz Attempt (E2E)', () => {
     // Lượt 1: đúng Q1 (1đ) + Q2 (2đ), sai Q3 → 3/4
     const a1 = (await request(server).post(`${base(quizId)}/attempts`).set(auth(student))).body.data;
     const [q1, q2, q3] = a1.questions;
+    // Nộp bài không nhận đáp án: đáp án kèm theo bị bỏ qua, chỉ chấm những gì đã lưu nháp
+    await request(server)
+      .patch(`${base(quizId)}/attempts/${a1.id}/answers`)
+      .set(auth(student))
+      .send({ answers: [pick(q1, 'A'), pick(q2, 'A', 'B'), pick(q3, 'A')] });
     const r1 = await request(server)
       .post(`${base(quizId)}/attempts/${a1.id}/submit`)
       .set(auth(student))
-      .send({ answers: [pick(q1, 'A'), pick(q2, 'A', 'B'), pick(q3, 'A')] });
+      .send({ answers: [pick(q1, 'B'), pick(q2, 'A'), pick(q3, 'B')] });
     expect(r1.status).toBe(200);
     expect(r1.body.data).toMatchObject({ status: 'GRADED', totalScore: '3.00', totalMaxScore: '4.00', correctCount: 2, answersRevealed: false });
     // Giáo viên không cho xem đáp án → sinh viên chỉ nhận điểm, không nhận chi tiết câu hỏi / lựa chọn
@@ -230,9 +235,10 @@ describe('Quiz Attempt (E2E)', () => {
     expect(a2.attemptNumber).toBe(2);
     const [b1, b2, b3] = a2.questions;
     await request(server)
-      .post(`${base(quizId)}/attempts/${a2.id}/submit`)
+      .patch(`${base(quizId)}/attempts/${a2.id}/answers`)
       .set(auth(student))
       .send({ answers: [pick(b1, 'B'), pick(b2, 'A', 'B'), pick(b3, 'A')] });
+    await request(server).post(`${base(quizId)}/attempts/${a2.id}/submit`).set(auth(student)).send({});
     const grade2 = await prisma.grade.findUniqueOrThrow({ where: { id: grade1.id } });
     expect(grade2.score.toFixed(2)).toBe('3.00');
 
@@ -340,7 +346,8 @@ describe('Quiz Attempt (E2E)', () => {
     const quizId = await createQuiz({ scoringEnabled: false });
     const server = app.getHttpServer();
     const a = (await request(server).post(`${base(quizId)}/attempts`).set(auth(student2))).body.data;
-    const r = await request(server).post(`${base(quizId)}/attempts/${a.id}/submit`).set(auth(student2)).send({ answers: [pick(a.questions[0], 'A')] });
+    await request(server).patch(`${base(quizId)}/attempts/${a.id}/answers`).set(auth(student2)).send({ answers: [pick(a.questions[0], 'A')] });
+    const r = await request(server).post(`${base(quizId)}/attempts/${a.id}/submit`).set(auth(student2)).send({});
     expect(r.body.data).toMatchObject({ status: 'GRADED', totalScore: '1.00' });
     expect(await prisma.gradeItem.findUnique({ where: { quizId: BigInt(quizId) } })).toBeNull();
   });

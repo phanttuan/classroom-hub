@@ -4,7 +4,6 @@ import {
   ArrayMinSize,
   IsArray,
   IsNotEmpty,
-  IsOptional,
   Matches,
   ValidateNested,
 } from 'class-validator';
@@ -29,14 +28,4 @@ export class SaveAnswersDto {
   @ValidateNested({ each: true })
   @Type(() => AttemptAnswerInputDto)
   answers!: AttemptAnswerInputDto[];
-}
-
-/** POST …/attempts/:attemptId/submit — có thể gửi kèm đáp án cuối cùng */
-export class SubmitAttemptDto {
-  @IsOptional()
-  @IsArray({ message: 'Danh sách câu trả lời phải là mảng' })
-  @ArrayMaxSize(500, { message: 'Số câu trả lời vượt quá giới hạn' })
-  @ValidateNested({ each: true })
-  @Type(() => AttemptAnswerInputDto)
-  answers?: AttemptAnswerInputDto[];
 }

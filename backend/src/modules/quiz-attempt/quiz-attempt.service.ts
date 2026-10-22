@@ -22,9 +22,12 @@ import {
   shuffle,
   toStudentSnapshot,
 } from './quiz-grading.js';
-import type { AttemptAnswerInputDto, SubmitAttemptDto } from './dto/save-answers.dto.js';
+import type { AttemptAnswerInputDto } from './dto/save-answers.dto.js';
 
-/** Thời gian nới sau hạn để bù độ trễ mạng khi nộp bài */
+/**
+ * Gia hạn kỹ thuật sau hạn chót (bù trễ mạng / lệch đồng hồ) — chỉ áp dụng cho việc lưu nháp đáp án.
+ * Nộp bài không nhận đáp án nên không cần gia hạn: chỉ chấm những gì đã lưu trong khoảng này.
+ */
 export const SUBMIT_GRACE_MS = 30_000;
 
 export type AttemptBlockReason =
@@ -247,7 +250,7 @@ export class QuizAttemptService {
     // Giáo viên đã đóng đề / khóa học lưu trữ → kết thúc lượt dở ngay với đáp án đã lưu
     const forcedEnd = quiz.status === ActivityStatus.CLOSED || quiz.course.status === CourseStatus.ARCHIVED;
     if (!forcedEnd && now <= deadline.getTime() + SUBMIT_GRACE_MS) return attempt;
-    await this.gradeAndFinalize(quiz, attempt, [], forcedEnd && now < deadline.getTime() ? new Date(now) : deadline);
+    await this.gradeAndFinalize(quiz, attempt, forcedEnd && now < deadline.getTime() ? new Date(now) : deadline);
     return this.loadAttempt(quiz.id, attempt.id);
   }
 
@@ -265,7 +268,7 @@ export class QuizAttemptService {
       if (!quiz) continue;
       const deadline = QuizAttemptService.deadlineOf(quiz, attempt.startedAt);
       const now = new Date();
-      await this.gradeAndFinalize(quiz, attempt, [], now < deadline ? now : deadline);
+      await this.gradeAndFinalize(quiz, attempt, now < deadline ? now : deadline);
     }
     return open.length;
   }
@@ -291,15 +294,10 @@ export class QuizAttemptService {
 
   /**
    * Chấm toàn bộ câu từ snapshot đã đóng băng + ghi điểm sổ trong một transaction.
+   * Chỉ dùng đáp án đã lưu nháp trong CSDL (đã qua kiểm tra hạn lúc lưu).
    * `submittedAt` = thời điểm nộp thật, hoặc hạn chót nếu hệ thống tự nộp.
    */
-  private async gradeAndFinalize(
-    quiz: QuizRow,
-    attempt: AttemptRow,
-    finalAnswers: { question: AttemptRow['attemptQuestions'][number]; choiceIds: string[] }[],
-    submittedAt: Date,
-  ) {
-    const overrides = new Map(finalAnswers.map((a) => [a.question.id, a.choiceIds]));
+  private async gradeAndFinalize(quiz: QuizRow, attempt: AttemptRow, submittedAt: Date) {
     await this.prisma.$transaction(async (tx) => {
       // Chỉ lượt đang làm mới được chốt — chặn nộp hai lần (idempotent)
       const locked = await tx.quizAttempt.updateMany({
@@ -310,24 +308,15 @@ export class QuizAttemptService {
 
       let total = new Prisma.Decimal(0);
       for (const q of attempt.attemptQuestions) {
-        const selected =
-          overrides.get(q.id) ?? q.attemptAnswer?.selectedChoices.map((c) => c.choiceId.toString()) ?? [];
+        const selected = q.attemptAnswer?.selectedChoices.map((c) => c.choiceId.toString()) ?? [];
         const { isCorrect, awardedScore } = gradeQuestion(parseSnapshot(q.questionSnapshot), selected, q.maxScore);
         total = total.plus(awardedScore);
-        const answer = await tx.attemptAnswer.upsert({
+        await tx.attemptAnswer.upsert({
           where: { attemptQuestionId: q.id },
           create: { attemptQuestionId: q.id, isCorrect, awardedScore },
           update: { isCorrect, awardedScore },
           select: { id: true },
         });
-        if (overrides.has(q.id)) {
-          await tx.attemptAnswerChoice.deleteMany({ where: { attemptAnswerId: answer.id } });
-          if (selected.length) {
-            await tx.attemptAnswerChoice.createMany({
-              data: selected.map((choiceId) => ({ attemptAnswerId: answer.id, choiceId: BigInt(choiceId) })),
-            });
-          }
-        }
       }
 
       await tx.quizAttempt.update({
@@ -482,8 +471,12 @@ export class QuizAttemptService {
     return { saved: answers.length, deadlineAt, serverTime: new Date() };
   }
 
-  /** Nộp bài: chốt đáp án cuối (nếu gửi kèm), chấm tự động, ghi điểm sổ */
-  async submit(courseId: bigint, quizId: bigint, attemptId: bigint, studentId: bigint, dto: SubmitAttemptDto) {
+  /**
+   * Nộp bài: chốt lượt và chấm tự động.
+   * Không nhận đáp án trong request — chỉ chấm những gì đã lưu nháp qua saveAnswers (nơi duy nhất kiểm tra hạn),
+   * nên không có đường nào đưa đáp án chọn sau giờ vào bài. submittedAt = min(thời điểm nộp, hạn chót).
+   */
+  async submit(courseId: bigint, quizId: bigint, attemptId: bigint, studentId: bigint) {
     const quiz = await this.loadQuiz(courseId, quizId);
     const attempt = await this.loadAttempt(quizId, attemptId);
     this.assertOwner(attempt, studentId);
@@ -493,10 +486,7 @@ export class QuizAttemptService {
     }
     const deadlineAt = QuizAttemptService.deadlineOf(quiz, attempt.startedAt);
     const now = new Date();
-    const withinGrace = now.getTime() <= deadlineAt.getTime() + SUBMIT_GRACE_MS;
-    // Quá hạn + thời gian nới: chỉ chấm những gì đã lưu nháp, bỏ qua đáp án gửi muộn
-    const finalAnswers = withinGrace && dto.answers?.length ? this.normalizeAnswers(attempt, dto.answers) : [];
-    await this.gradeAndFinalize(quiz, attempt, finalAnswers, withinGrace ? now : deadlineAt);
+    await this.gradeAndFinalize(quiz, attempt, now < deadlineAt ? now : deadlineAt);
     const graded = await this.loadAttempt(quizId, attemptId);
     return this.formatResult(quiz, graded, quiz.showAnswersAfterSubmit);
   }
