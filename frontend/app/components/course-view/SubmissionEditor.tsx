@@ -466,7 +466,7 @@ export default function SubmissionEditor({ courseId, assignmentId }: SubmissionE
                 <dl className="mt-3 space-y-2 text-[13px]">
                   <div className="flex justify-between gap-3">
                     <dt className="text-slate-500">Hạn nộp</dt>
-                    <dd className="font-semibold text-slate-800">{formatDateTime(assignment.dueAt)}</dd>
+                    <dd className="font-semibold tabular-nums text-slate-800">{formatDateTime(assignment.dueAt)}</dd>
                   </div>
                   <div className="flex justify-between gap-3">
                     <dt className="text-slate-500">Nộp trễ</dt>

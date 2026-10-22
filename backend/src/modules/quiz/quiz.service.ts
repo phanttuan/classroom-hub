@@ -4,14 +4,19 @@ import {
   ForbiddenException,
   Injectable,
   NotFoundException,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service.js';
 import {
   ActivityStatus,
+  AttemptGradingMethod,
   AttemptStatus,
   GradeCategory,
   UserRole,
 } from '../../generated/prisma/enums.js';
+import { QuizGradeSyncService } from '../quiz-attempt/quiz-grade-sync.service.js';
+import { QuizAttemptService } from '../quiz-attempt/quiz-attempt.service.js';
+import { aggregateAttemptScores } from '../quiz-attempt/quiz-grading.js';
 import { Prisma } from '../../generated/prisma/client.js';
 import { CreateQuizDto } from './dto/create-quiz.dto.js';
 import { UpdateQuizDto } from './dto/update-quiz.dto.js';
@@ -47,7 +52,12 @@ function sumScores(items: Array<{ maxScore: ScoreValue }>): Prisma.Decimal {
 
 @Injectable()
 export class QuizService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    // Tùy chọn để unit test cũ (new QuizService(prisma)) không phải truyền thêm
+    @Optional() private readonly gradeSync?: QuizGradeSyncService,
+    @Optional() private readonly attempts?: QuizAttemptService,
+  ) {}
 
   // =========================================================================
   // QUIZ CRUD
@@ -78,6 +88,9 @@ export class QuizService {
           maxAttempts: dto.maxAttempts ?? 1,
           scoringEnabled,
           showAnswersAfterSubmit: dto.showAnswersAfterSubmit ?? false,
+          attemptGrading: (dto.attemptGrading as AttemptGradingMethod | undefined) ?? AttemptGradingMethod.HIGHEST,
+          shuffleQuestions: dto.shuffleQuestions ?? false,
+          shuffleChoices: dto.shuffleChoices ?? false,
           status: ActivityStatus.DRAFT,
         },
       });
@@ -132,10 +145,21 @@ export class QuizService {
         include: {
           gradeItem: { select: { id: true } },
           quizQuestions: { select: { maxScore: true } },
+          // Lượt làm của chính sinh viên → badge trạng thái trên trang khóa học
+          attempts: {
+            where: { studentId: viewer.id },
+            select: { id: true, status: true, totalScore: true, attemptNumber: true },
+          },
         },
       });
 
-      return quizzes.map((quiz) => this.formatQuiz(quiz, quiz));
+      return quizzes.map(({ attempts, ...quiz }) =>
+        this.formatQuiz(quiz, {
+          quizQuestions: quiz.quizQuestions,
+          gradeItem: quiz.gradeItem,
+          myAttempts: this.summarizeMyAttempts(attempts ?? [], quiz.attemptGrading),
+        }),
+      );
     }
 
     const where: Prisma.QuizWhereInput = { courseId };
@@ -225,9 +249,18 @@ export class QuizService {
       throw new NotFoundException('Đề kiểm tra không tồn tại trong khóa học này');
     }
 
-    if (existing.status !== ActivityStatus.DRAFT) {
+    // Đề đã đóng: khóa hoàn toàn. Đề đã xuất bản: sửa được cấu hình (gia hạn, số lượt, cách tính điểm,
+    // trộn đề, hiện đáp án, topic...) nhưng KHÔNG đổi chấm điểm vào sổ — GradeItem.maxScore đã chốt khi publish.
+    if (existing.status === ActivityStatus.CLOSED) {
+      throw new ConflictException('Đề kiểm tra đã đóng, không thể chỉnh sửa');
+    }
+    if (
+      existing.status === ActivityStatus.PUBLISHED &&
+      dto.scoringEnabled !== undefined &&
+      dto.scoringEnabled !== existing.scoringEnabled
+    ) {
       throw new ConflictException(
-        'Chỉ có thể chỉnh sửa đề kiểm tra khi ở trạng thái nháp (DRAFT)',
+        'Không thể bật / tắt chấm điểm vào sổ sau khi đề đã xuất bản (tổng điểm đã được chốt)',
       );
     }
 
@@ -258,12 +291,20 @@ export class QuizService {
     if (dto.showAnswersAfterSubmit !== undefined) {
       data.showAnswersAfterSubmit = dto.showAnswersAfterSubmit;
     }
+    if (dto.attemptGrading !== undefined) {
+      data.attemptGrading = dto.attemptGrading as AttemptGradingMethod;
+    }
+    if (dto.shuffleQuestions !== undefined) data.shuffleQuestions = dto.shuffleQuestions;
+    if (dto.shuffleChoices !== undefined) data.shuffleChoices = dto.shuffleChoices;
 
     const scoringChanged =
       dto.scoringEnabled !== undefined &&
       dto.scoringEnabled !== existing.scoringEnabled;
+    const gradingChanged =
+      dto.attemptGrading !== undefined &&
+      dto.attemptGrading !== existing.attemptGrading;
 
-    return this.prisma.$transaction(async (tx) => {
+    const result = await this.prisma.$transaction(async (tx) => {
       const updated = await tx.quiz.update({
         where: { id: quizId },
         data,
@@ -300,6 +341,12 @@ export class QuizService {
 
       return this.formatQuiz(updated);
     });
+
+    // Đổi cách tính điểm nhiều lượt khi đã có lượt làm → tính lại điểm sổ của mọi sinh viên
+    if (gradingChanged && existing.status !== ActivityStatus.DRAFT) {
+      await this.gradeSync?.resyncQuizGrades(quizId);
+    }
+    return result;
   }
 
   /** Xuất bản DRAFT → PUBLISHED, chốt tổng điểm vào GradeItem. */
@@ -387,6 +434,9 @@ export class QuizService {
       data: { status: ActivityStatus.CLOSED },
       include: { gradeItem: { select: { id: true } } },
     });
+
+    // Đóng đề → chốt ngay mọi lượt đang làm dở (chấm với đáp án đã lưu), sinh viên không tiếp tục được nữa
+    await this.attempts?.finalizeOpenAttempts(quizId);
 
     return this.formatQuiz(updated, {
       quizQuestions: existing.quizQuestions,
@@ -613,6 +663,9 @@ export class QuizService {
       maxAttempts: number;
       scoringEnabled: boolean;
       showAnswersAfterSubmit: boolean;
+      attemptGrading?: AttemptGradingMethod;
+      shuffleQuestions?: boolean;
+      shuffleChoices?: boolean;
       status: ActivityStatus;
       publishedAt: Date | null;
       createdAt: Date;
@@ -623,6 +676,7 @@ export class QuizService {
       gradeItem?: { id: bigint } | null;
       questions?: ReturnType<QuizService['formatQuizQuestion']>[];
       attemptStats?: { submitted: number; total: number };
+      myAttempts?: MyAttemptsSummary | null;
     },
   ) {
     const questions = extra?.quizQuestions ?? [];
@@ -641,6 +695,9 @@ export class QuizService {
       maxAttempts: quiz.maxAttempts,
       scoringEnabled: quiz.scoringEnabled,
       showAnswersAfterSubmit: quiz.showAnswersAfterSubmit,
+      attemptGrading: quiz.attemptGrading ?? AttemptGradingMethod.HIGHEST,
+      shuffleQuestions: quiz.shuffleQuestions ?? false,
+      shuffleChoices: quiz.shuffleChoices ?? false,
       status: quiz.status,
       publishedAt: quiz.publishedAt,
       gradeItemId: extra?.gradeItem?.id.toString() ?? null,
@@ -649,7 +706,29 @@ export class QuizService {
       createdAt: quiz.createdAt,
       updatedAt: quiz.updatedAt,
       ...(extra?.attemptStats ? { attemptStats: extra.attemptStats } : {}),
+      ...(extra && 'myAttempts' in extra ? { myAttempts: extra.myAttempts } : {}),
       ...(extra?.questions ? { questions: extra.questions } : {}),
+    };
+  }
+
+  /** Tóm tắt lượt làm của sinh viên gắn kèm đề (chi tiết lấy ở QuizAttemptService) */
+  private summarizeMyAttempts(
+    attempts: Array<{ id: bigint; status: AttemptStatus; totalScore: ScoreValue; attemptNumber: number }>,
+    attemptGrading: AttemptGradingMethod,
+  ): MyAttemptsSummary | null {
+    if (!attempts.length) return null;
+    const sorted = [...attempts].sort((a, b) => a.attemptNumber - b.attemptNumber);
+    const inProgress = sorted.find((a) => a.status === AttemptStatus.IN_PROGRESS);
+    const graded = sorted
+      .filter((a) => a.status === AttemptStatus.GRADED)
+      .map((a) => ({ attemptNumber: a.attemptNumber, totalScore: new Prisma.Decimal(a.totalScore ?? 0) }));
+    return {
+      count: sorted.length,
+      inProgressAttemptId: inProgress ? inProgress.id.toString() : null,
+      latestScore: graded.length ? graded[graded.length - 1].totalScore.toFixed(2) : null,
+      bestScore: aggregateAttemptScores(AttemptGradingMethod.HIGHEST, graded)?.toFixed(2) ?? null,
+      // Điểm theo đúng cách tính của đề → khớp với điểm ghi sổ
+      gradeScore: aggregateAttemptScores(attemptGrading, graded)?.toFixed(2) ?? null,
     };
   }
 
@@ -672,4 +751,12 @@ export class QuizService {
       createdAt: question.createdAt,
     };
   }
+}
+
+export interface MyAttemptsSummary {
+  count: number;
+  inProgressAttemptId: string | null;
+  latestScore: string | null;
+  bestScore: string | null;
+  gradeScore: string | null;
 }

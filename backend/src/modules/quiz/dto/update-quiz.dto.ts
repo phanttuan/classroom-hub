@@ -2,6 +2,7 @@ import { Transform } from 'class-transformer';
 import {
   IsBoolean,
   IsDateString,
+  IsIn,
   IsInt,
   IsNotEmpty,
   IsOptional,
@@ -72,4 +73,19 @@ export class UpdateQuizDto {
     message: 'Tùy chọn hiện đáp án sau khi nộp phải là true/false',
   })
   showAnswersAfterSubmit?: boolean;
+
+  /** Cách tính điểm vào sổ khi làm nhiều lượt — đổi được cả sau khi xuất bản (điểm được tính lại) */
+  @IsOptional()
+  @IsIn(['HIGHEST', 'LATEST', 'AVERAGE'], {
+    message: 'Cách tính điểm phải là HIGHEST, LATEST hoặc AVERAGE',
+  })
+  attemptGrading?: 'HIGHEST' | 'LATEST' | 'AVERAGE';
+
+  @IsOptional()
+  @IsBoolean({ message: 'Tùy chọn trộn câu hỏi phải là true/false' })
+  shuffleQuestions?: boolean;
+
+  @IsOptional()
+  @IsBoolean({ message: 'Tùy chọn trộn đáp án phải là true/false' })
+  shuffleChoices?: boolean;
 }

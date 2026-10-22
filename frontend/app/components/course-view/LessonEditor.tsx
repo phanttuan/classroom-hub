@@ -70,7 +70,9 @@ import type {
   QuestionTypeKey,
   QuizQuestionDto,
   QuizStatus,
+  AttemptGradingMethod,
 } from "@/lib/types/quiz";
+import { ATTEMPT_GRADING_OPTIONS } from "@/lib/quiz-utils";
 import {
   CHOOSER_ITEMS,
   DISPLAY_OPTIONS,
@@ -295,6 +297,10 @@ export default function LessonEditor({
   const [quizMaxAttempts, setQuizMaxAttempts] = useState("1");
   const [quizScoring, setQuizScoring] = useState(true);
   const [quizShowAnswers, setQuizShowAnswers] = useState(false);
+  // Cách tính điểm khi làm nhiều lượt + trộn đề theo từng lượt
+  const [quizAttemptGrading, setQuizAttemptGrading] = useState<AttemptGradingMethod>("HIGHEST");
+  const [quizShuffleQuestions, setQuizShuffleQuestions] = useState(false);
+  const [quizShuffleChoices, setQuizShuffleChoices] = useState(false);
   const [quizTab, setQuizTab] = useState<"config" | "questions">("config");
   const [chosenQuestions, setChosenQuestions] = useState<ChosenQuizQuestion[]>([]);
   const [removedQuizQuestionIds, setRemovedQuizQuestionIds] = useState<string[]>([]);
@@ -421,6 +427,9 @@ export default function LessonEditor({
         setQuizMaxAttempts(String(quiz.maxAttempts ?? 1));
         setQuizScoring(quiz.scoringEnabled);
         setQuizShowAnswers(quiz.showAnswersAfterSubmit);
+        setQuizAttemptGrading(quiz.attemptGrading ?? "HIGHEST");
+        setQuizShuffleQuestions(quiz.shuffleQuestions ?? false);
+        setQuizShuffleChoices(quiz.shuffleChoices ?? false);
         setQuizStatus(quiz.status);
         setVisible(quiz.status === "PUBLISHED");
         setChosenQuestions(
@@ -490,7 +499,10 @@ export default function LessonEditor({
           ? LESSON_TYPE_META[type]
           : undefined;
   const backToCourse = `${coursePath}#module-section-${targetModuleId}`;
-  const quizLocked = isQuiz && quizStatus !== null && quizStatus !== "DRAFT";
+  // Đề đã đóng: khóa toàn bộ. Đề đã xuất bản: sửa được cấu hình, nhưng câu hỏi / điểm câu / chấm điểm vào sổ đã chốt.
+  const quizLocked = isQuiz && quizStatus === "CLOSED";
+  const quizQuestionsLocked = isQuiz && quizStatus !== null && quizStatus !== "DRAFT";
+  const quizEditPublished = isEdit && isQuiz && quizStatus === "PUBLISHED";
   const quizEditDraft = isEdit && isQuiz && quizStatus === "DRAFT";
   const quizScoreTotal = chosenQuestions.reduce((sum, question) => {
     const score = Number(question.maxScore);
@@ -771,7 +783,7 @@ export default function LessonEditor({
   const handleSaveQuiz = async (mode: "course" | "draft") => {
     setSubmitError("");
     if (quizLocked) {
-      setSubmitError("Đề kiểm tra đã xuất bản/đóng nên không thể chỉnh sửa.");
+      setSubmitError("Đề kiểm tra đã đóng nên không thể chỉnh sửa.");
       return;
     }
 
@@ -813,7 +825,7 @@ export default function LessonEditor({
     if (invalidScore) {
       nextErrors.scores = "Điểm của mỗi câu hỏi phải là số lớn hơn hoặc bằng 0.01";
     }
-    if (mode === "course" && chosenQuestions.length === 0) {
+    if (mode === "course" && chosenQuestions.length === 0 && !quizEditPublished) {
       nextErrors.questions = "Đề kiểm tra phải có ít nhất một câu hỏi trước khi xuất bản";
     }
 
@@ -837,12 +849,25 @@ export default function LessonEditor({
       dueAt: dueDate.toISOString(),
       durationMinutes: duration,
       maxAttempts: attempts,
-      scoringEnabled: quizScoring,
+      // Đề đã xuất bản: tổng điểm đã chốt vào sổ nên không gửi lại scoringEnabled
+      ...(quizEditPublished ? {} : { scoringEnabled: quizScoring }),
       showAnswersAfterSubmit: quizShowAnswers,
+      attemptGrading: quizAttemptGrading,
+      shuffleQuestions: quizShuffleQuestions,
+      shuffleChoices: quizShuffleChoices,
     };
 
     setSaving(mode);
     try {
+      // Đề đã xuất bản: chỉ cập nhật cấu hình (câu hỏi đã khóa, không xuất bản lại)
+      if (quizEditPublished && quizId) {
+        await updateQuiz(courseId, quizId, payload);
+        toast.success("Đã cập nhật đề kiểm tra", "Thay đổi có hiệu lực ngay với sinh viên; lượt đang làm giữ nguyên đề.");
+        setDirty(false);
+        router.push(`${coursePath}/quizzes/${quizId}`);
+        return;
+      }
+
       let savedQuizId = quizId;
       if (savedQuizId) {
         await updateQuiz(courseId, savedQuizId, payload);
@@ -1027,7 +1052,9 @@ export default function LessonEditor({
                 <Eye className="h-4 w-4" /> Xem trang hiện tại
               </HeroButton>
             ) : isEdit && quizId ? (
-              undefined
+              <HeroButton href={`${coursePath}/quizzes/${quizId}`}>
+                <Eye className="h-4 w-4" /> Xem đề kiểm tra
+              </HeroButton>
             ) : isEdit && assignmentId ? (
               <HeroButton href={`${coursePath}/assignments/${assignmentId}`}>
                 <Eye className="h-4 w-4" /> Xem bài tập
@@ -1307,9 +1334,16 @@ export default function LessonEditor({
                 {quizLocked && (
                   <div className="flex items-start gap-3 border-b border-amber-200 bg-amber-50 px-6 py-3.5 text-[13.5px] text-amber-900">
                     <AlertCircle className="mt-0.5 h-4.5 w-4.5 shrink-0 text-amber-600" />
+                    <span>Đề kiểm tra đã đóng nên chỉ xem được, không thể chỉnh sửa.</span>
+                  </div>
+                )}
+                {quizEditPublished && (
+                  <div className="flex items-start gap-3 border-b border-sky-200 bg-sky-50 px-6 py-3.5 text-[13.5px] text-sky-900">
+                    <Eye className="mt-0.5 h-4.5 w-4.5 shrink-0 text-sky-600" />
                     <span>
-                      Đề kiểm tra đã {quizStatus === "CLOSED" ? "đóng" : "xuất bản"} nên chỉ xem được. Chỉ đề ở trạng thái
-                      nháp (DRAFT) mới có thể sửa câu hỏi, đổi topic hoặc xóa.
+                      Đề <b>đã xuất bản</b> — bạn vẫn sửa được thời gian, số lượt, cách tính điểm, trộn đề, hiện đáp án.
+                      Câu hỏi, điểm từng câu và chấm điểm vào sổ đã được chốt (muốn đổi đề phải tạo đề mới). Đổi cách tính điểm
+                      sẽ tính lại điểm sổ của các sinh viên đã làm.
                     </span>
                   </div>
                 )}
@@ -1479,6 +1513,74 @@ export default function LessonEditor({
                           className="h-10 w-full max-w-sm rounded-lg border border-slate-300 px-3 text-sm outline-none focus:border-[#0f6cbf] focus:ring-4 focus:ring-blue-100 disabled:bg-slate-50 disabled:text-slate-500"
                         />
                       </Field>
+
+                      {/* Chỉ hiện khi cho làm từ 2 lượt — chọn đúng một cách tính điểm */}
+                      {Number(quizMaxAttempts) >= 2 && (
+                        <Field
+                          label="Cách tính điểm"
+                          required
+                          hint="Áp dụng khi sinh viên làm nhiều lượt. Đổi sau khi xuất bản sẽ tính lại điểm sổ của sinh viên đã làm."
+                        >
+                          <div className="grid gap-2 sm:grid-cols-3">
+                            {ATTEMPT_GRADING_OPTIONS.map((opt) => {
+                              const active = quizAttemptGrading === opt.value;
+                              return (
+                                <label
+                                  key={opt.value}
+                                  className={`flex cursor-pointer items-start gap-2.5 rounded-xl border px-3.5 py-3 transition ${
+                                    active ? "border-[#0f6cbf] bg-blue-50/60 ring-2 ring-blue-100" : "border-slate-200 hover:border-slate-300"
+                                  } ${quizLocked ? "cursor-not-allowed opacity-60" : ""}`}
+                                >
+                                  <input
+                                    type="radio"
+                                    name="attemptGrading"
+                                    value={opt.value}
+                                    checked={active}
+                                    disabled={quizLocked}
+                                    onChange={() => {
+                                      setQuizAttemptGrading(opt.value);
+                                      markDirty();
+                                    }}
+                                    className="mt-0.5 h-4 w-4 border-slate-300 text-[#0f6cbf] focus:ring-[#0f6cbf]"
+                                  />
+                                  <span>
+                                    <span className="block text-[13.5px] font-semibold text-slate-800">{opt.label}</span>
+                                    <span className="mt-0.5 block text-[12px] leading-snug text-slate-500">{opt.hint}</span>
+                                  </span>
+                                </label>
+                              );
+                            })}
+                          </div>
+                        </Field>
+                      )}
+                    </Fieldset>
+
+                    <Fieldset title="Trộn đề">
+                      <Field
+                        label="Chống chép bài"
+                        hint="Mỗi lượt làm bài nhận một thứ tự riêng; đáp án đúng vẫn được chấm theo đề gốc."
+                      >
+                        <div className="space-y-3">
+                          <Checkbox
+                            checked={quizShuffleQuestions}
+                            onChange={(v) => {
+                              setQuizShuffleQuestions(v);
+                              markDirty();
+                            }}
+                            disabled={quizLocked}
+                            label="Trộn thứ tự câu hỏi"
+                          />
+                          <Checkbox
+                            checked={quizShuffleChoices}
+                            onChange={(v) => {
+                              setQuizShuffleChoices(v);
+                              markDirty();
+                            }}
+                            disabled={quizLocked}
+                            label="Trộn thứ tự đáp án trong mỗi câu"
+                          />
+                        </div>
+                      </Field>
                     </Fieldset>
 
                     <Fieldset title="Tùy chọn chấm điểm">
@@ -1490,7 +1592,7 @@ export default function LessonEditor({
                               setQuizScoring(v);
                               markDirty();
                             }}
-                            disabled={quizLocked}
+                            disabled={quizQuestionsLocked}
                             label="Đưa điểm đề kiểm tra vào sổ điểm"
                             hint="Khi xuất bản, tổng điểm các câu hỏi được chốt thành một cột điểm trong Gradebook. Tắt với bài khảo sát hoặc luyện tập."
                           />
@@ -1531,7 +1633,7 @@ export default function LessonEditor({
                       </div>
                       <button
                         type="button"
-                        disabled={quizLocked}
+                        disabled={quizQuestionsLocked}
                         onClick={() => {
                           setNewQuestionError("");
                           setNewQuestionSetId(
@@ -1602,14 +1704,14 @@ export default function LessonEditor({
                                     min="0.01"
                                     step="any"
                                     value={question.maxScore}
-                                    disabled={quizLocked}
+                                    disabled={quizQuestionsLocked}
                                     onChange={(e) => updateChosenScore(question.questionId, e.target.value)}
                                     className="h-9 w-20 rounded-lg border border-slate-300 px-2 text-[13px] text-slate-800 outline-none focus:border-[#0f6cbf] focus:ring-4 focus:ring-blue-100 disabled:bg-slate-50"
                                   />
                                 </label>
                                 <button
                                   type="button"
-                                  disabled={quizLocked}
+                                  disabled={quizQuestionsLocked}
                                   onClick={() => removeChosenQuestion(question)}
                                   title="Bỏ câu hỏi khỏi đề"
                                   className="grid h-9 w-9 place-items-center rounded-lg border border-slate-200 text-slate-500 hover:border-red-200 hover:bg-red-50 hover:text-red-600 disabled:opacity-40"
@@ -1878,7 +1980,7 @@ export default function LessonEditor({
                                   </div>
                                   <button
                                     type="button"
-                                    disabled={quizLocked}
+                                    disabled={quizQuestionsLocked}
                                     onClick={() => toggleBankQuestion(question)}
                                     className={`shrink-0 rounded-lg px-3 py-1.5 text-[12.5px] font-semibold disabled:opacity-40 ${
                                       chosen
@@ -2354,10 +2456,12 @@ export default function LessonEditor({
                   <>
                     <p className="text-[12.5px] text-slate-500">
                       {quizLocked
-                        ? "Đề đã xuất bản hoặc đóng nên không thể chỉnh sửa."
-                        : isEdit
-                          ? "Cập nhật đề nháp. Xuất bản để sinh viên có thể làm bài và chốt điểm vào sổ điểm."
-                          : "Lưu đề vào khóa học. Sinh viên có thể làm bài khi đến thời gian mở."}
+                        ? "Đề đã đóng nên không thể chỉnh sửa."
+                        : quizEditPublished
+                          ? "Cập nhật cấu hình đề đã xuất bản; câu hỏi và tổng điểm giữ nguyên."
+                          : isEdit
+                            ? "Cập nhật đề nháp. Xuất bản để sinh viên có thể làm bài và chốt điểm vào sổ điểm."
+                            : "Lưu đề vào khóa học. Sinh viên có thể làm bài khi đến thời gian mở."}
                     </p>
                     <button
                       type="button"

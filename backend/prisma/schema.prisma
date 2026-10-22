@@ -94,6 +94,13 @@ enum QuestionStatus {
   RETIRED
 }
 
+/// Cách tính điểm vào sổ khi sinh viên được làm nhiều lượt
+enum AttemptGradingMethod {
+  HIGHEST
+  LATEST
+  AVERAGE
+}
+
 enum AttemptStatus {
   IN_PROGRESS
   SUBMITTED
@@ -474,6 +481,11 @@ model Quiz {
   maxAttempts            Int            @default(1) @map("max_attempts") @db.SmallInt
   scoringEnabled         Boolean        @default(true) @map("scoring_enabled")
   showAnswersAfterSubmit Boolean        @default(false) @map("show_answers_after_submit")
+  /// Điểm ghi sổ khi có nhiều lượt: cao nhất / lượt mới nhất / trung bình
+  attemptGrading         AttemptGradingMethod @default(HIGHEST) @map("attempt_grading")
+  /// Trộn thứ tự câu hỏi / đáp án theo từng lượt (chống chép bài)
+  shuffleQuestions       Boolean        @default(false) @map("shuffle_questions")
+  shuffleChoices         Boolean        @default(false) @map("shuffle_choices")
   status                 ActivityStatus @default(DRAFT)
   publishedAt            DateTime?      @map("published_at") @db.Timestamptz(6)
   createdAt              DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)

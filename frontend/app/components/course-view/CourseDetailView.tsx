@@ -964,10 +964,21 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
     const hidden = quiz.status === "DRAFT";
     const canDrag = role === "TEACHER" && editMode && !isSearching;
     const editHref = `/teacher/content/courses/${courseId}/lessons/new?section=${quiz.moduleId}&type=QUIZ&quizId=${quiz.id}`;
-    // Giáo viên dùng chung giao diện soạn thảo cho mọi trạng thái; đề đã khóa sẽ ở chế độ chỉ xem
-    const viewHref = role === "TEACHER" ? editHref : "/student/quizzes";
+    // Trang đề kiểm tra: sinh viên xem lượt làm / bắt đầu làm; giáo viên xem bảng kết quả
+    const viewHref = `${coursePath}/quizzes/${quiz.id}`;
     const isPastDue = new Date(quiz.dueAt).getTime() < openedAt;
     const attempts = quiz.attemptStats;
+    const mine = quiz.myAttempts;
+    const quizState =
+      role !== "STUDENT"
+        ? null
+        : mine?.inProgressAttemptId
+          ? { label: "Đang làm", tone: "warning" as const }
+          : mine && mine.count > 0
+            ? { label: "Đã làm", tone: "success" as const }
+            : isPastDue
+              ? { label: "Chưa làm (quá hạn)", tone: "danger" as const }
+              : { label: "Chưa làm", tone: "neutral" as const };
 
     return (
       <div
@@ -1022,6 +1033,12 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
+          {quizState && (
+            <span className={`inline-flex select-none items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11.5px] font-semibold ${SUBMISSION_BADGE[quizState.tone]}`}>
+              {quizState.tone === "success" ? <CheckCircle2 className="h-3.5 w-3.5" /> : quizState.tone === "warning" || quizState.tone === "danger" ? <AlertTriangle className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
+              {quizState.label}
+            </span>
+          )}
           {role === "TEACHER" && (
             <>
               {hidden && (
@@ -1034,10 +1051,19 @@ export default function CourseDetailView({ courseId, role, backHref }: CourseDet
                 <KebabMenu
                   items={[
                     {
-                      label: "Chỉnh sửa đề kiểm tra",
-                      icon: Pencil,
-                      onClick: () => router.push(editHref),
+                      label: "Xem kết quả làm bài",
+                      icon: Eye,
+                      onClick: () => router.push(viewHref),
                     },
+                    ...(quiz.status !== "CLOSED"
+                      ? [
+                          {
+                            label: "Chỉnh sửa đề kiểm tra",
+                            icon: Pencil,
+                            onClick: () => router.push(editHref),
+                          },
+                        ]
+                      : []),
                     ...(quiz.status === "DRAFT"
                       ? [
                           {

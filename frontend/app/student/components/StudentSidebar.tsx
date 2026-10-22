@@ -5,9 +5,7 @@ import Link from "next/link";
 import {
   Bell,
   BookOpen,
-  CalendarDays,
-  CheckSquare,
-  ChevronDown,
+  CalendarDays,  ChevronDown,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
@@ -19,7 +17,7 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 
-type NavIcon = "home" | "classes" | "content" | "assignment" | "quiz" | "gradebook" | "bell" | "calendar" | "profile";
+type NavIcon = "home" | "classes" | "content" | "assignment" | "gradebook" | "bell" | "calendar" | "profile";
 
 interface NavItem {
   id: string;
@@ -42,9 +40,7 @@ const ICON_MAP: Record<NavIcon, LucideIcon> = {
   home: Home,
   classes: Users,
   content: NotebookPen,
-  assignment: ClipboardList,
-  quiz: CheckSquare,
-  gradebook: BookOpen,
+  assignment: ClipboardList,  gradebook: BookOpen,
   bell: Bell,
   calendar: CalendarDays,
   profile: User,

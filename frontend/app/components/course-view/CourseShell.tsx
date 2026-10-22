@@ -1,10 +1,14 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { CheckCircle2, ChevronDown, EyeOff, ListTree, Plus, X } from "lucide-react";
-import type { CourseContentDto } from "@/lib/types/learning-content";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { CheckCircle2, CheckSquare, ChevronDown, ClipboardList, Clock, EyeOff, ListTree, Plus, X, type LucideIcon } from "lucide-react";
+import type { CourseContentDto, LessonDto, ModuleDto } from "@/lib/types/learning-content";
+import type { AssignmentDto } from "@/lib/types/assignment";
+import type { QuizDto } from "@/lib/types/quiz";
 import { fetchCourseContent } from "@/lib/api/learning-content-api";
+import { fetchCourseAssignments } from "@/lib/api/assignment-api";
+import { fetchCourseQuizzes } from "@/lib/api/quiz-api";
 import { LESSON_TYPE_META } from "@/lib/lesson-types";
 import TeacherTopbar from "@/app/teacher/components/TeacherTopbar";
 import { NotificationModal } from "@/app/teacher/components/TeacherModals";
@@ -13,6 +17,74 @@ import type { TeacherNotification, TeacherProfile } from "@/lib/types/teacher";
 import { fetchUserProfile } from "@/lib/api/user-api";
 
 export type CourseRole = "TEACHER" | "STUDENT";
+
+/** Một mục trong mục lục: bài học / bài tập / đề kiểm tra, sắp theo orderIndex chung của topic */
+type IndexItem = {
+  key: string;
+  kind: "lesson" | "assignment" | "quiz";
+  moduleId: string;
+  title: string;
+  href: string | null;
+  icon: LucideIcon;
+  iconClass: string;
+  order: number;
+  hidden: boolean;
+  /** Sinh viên: đã hoàn thành / đã nộp / đã làm */
+  done: boolean;
+  /** Sinh viên: đang làm dở (đề kiểm tra) */
+  inProgress?: boolean;
+};
+
+/** Gộp bài học + bài tập + đề kiểm tra của một topic theo đúng thứ tự trên trang khóa học */
+function buildIndexItems(m: ModuleDto, assignments: AssignmentDto[], quizzes: QuizDto[], coursePath: string): IndexItem[] {
+  const lessons: IndexItem[] = (m.lessons ?? []).map((l: LessonDto) => {
+    const meta = LESSON_TYPE_META[l.type] ?? LESSON_TYPE_META.PAGE;
+    return {
+      key: `lesson-${l.id}`,
+      kind: "lesson",
+      moduleId: m.id,
+      title: l.title,
+      href: l.type === "LABEL" ? null : `${coursePath}/lessons/${l.id}`,
+      icon: meta.icon,
+      iconClass: "text-slate-400",
+      order: l.orderIndex,
+      hidden: l.status !== "PUBLISHED",
+      done: Boolean(l.isCompleted),
+    };
+  });
+  const asg: IndexItem[] = assignments
+    .filter((a) => a.moduleId === m.id)
+    .map((a) => ({
+      key: `assignment-${a.id}`,
+      kind: "assignment",
+      moduleId: m.id,
+      title: a.title,
+      href: `${coursePath}/assignments/${a.id}`,
+      icon: ClipboardList,
+      iconClass: "text-pink-500",
+      order: a.orderIndex,
+      hidden: a.status === "DRAFT",
+      done: Boolean(a.mySubmission),
+    }));
+  const qz: IndexItem[] = quizzes
+    .filter((q) => q.moduleId === m.id)
+    .map((q) => ({
+      key: `quiz-${q.id}`,
+      kind: "quiz",
+      moduleId: m.id,
+      title: q.title,
+      href: `${coursePath}/quizzes/${q.id}`,
+      icon: CheckSquare,
+      iconClass: "text-violet-500",
+      // Đề kiểm tra chưa có orderIndex → xếp sau, theo thứ tự tạo (giống trang khóa học)
+      order: 1_000_000 + (Date.parse(q.createdAt) || 0),
+      hidden: q.status === "DRAFT",
+      done: Boolean(q.myAttempts && q.myAttempts.count > 0 && !q.myAttempts.inProgressAttemptId),
+      inProgress: Boolean(q.myAttempts?.inProgressAttemptId),
+    }));
+  const rank = { lesson: 0, assignment: 1, quiz: 2 } as const;
+  return [...lessons, ...asg, ...qz].sort((a, b) => a.order - b.order || rank[a.kind] - rank[b.kind]);
+}
 
 /** Đường dẫn gốc của trang khóa học theo vai trò */
 export function coursePathOf(role: CourseRole, courseId: string) {
@@ -103,6 +175,8 @@ interface CourseShellProps {
   onModuleClick?: (moduleId: string) => void;
   /** Hiện nút "Thêm topic mới" trong mục lục (chỉ trang khóa học) */
   onAddTopic?: () => void;
+  /** Hỏi trước khi rời trang qua mục lục (vd. đang làm bài kiểm tra); trả về false để ở lại */
+  beforeNavigate?: () => Promise<boolean>;
   children: React.ReactNode;
 }
 
@@ -122,6 +196,7 @@ export default function CourseShell({
   activeLessonId,
   onModuleClick,
   onAddTopic,
+  beforeNavigate,
   children,
 }: CourseShellProps) {
   const router = useRouter();
@@ -131,20 +206,51 @@ export default function CourseShell({
   const [localSearch, setLocalSearch] = useState("");
   // Topic đã thu gọn trong mục lục (mặc định mở hết)
   const [collapsedModules, setCollapsedModules] = useState<Record<string, boolean>>({});
+  const pathname = usePathname();
+
+  // Bài tập + đề kiểm tra để mục lục liệt kê đủ hoạt động của topic (như trang khóa học)
+  const [assignments, setAssignments] = useState<AssignmentDto[]>([]);
+  const [quizzes, setQuizzes] = useState<QuizDto[]>([]);
+  const courseIdForIndex = course?.id;
+  useEffect(() => {
+    if (!courseIdForIndex) return;
+    let active = true;
+    fetchCourseAssignments(courseIdForIndex)
+      .then((data) => active && setAssignments(data))
+      .catch(() => {});
+    fetchCourseQuizzes(courseIdForIndex)
+      .then((data) => active && setQuizzes(data))
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [courseIdForIndex]);
 
   const coursePath = course ? coursePathOf(role, course.id) : "";
 
-  const goToModule = (moduleId: string) => {
+  const goToModule = async (moduleId: string) => {
+    if (beforeNavigate && !(await beforeNavigate())) return;
     if (onModuleClick) onModuleClick(moduleId);
     else router.push(`${coursePath}#module-section-${moduleId}`);
     if (window.innerWidth < 1024) setDrawerOpen(false);
   };
 
-  const goToLesson = (moduleId: string, lessonId: string, isLabel: boolean) => {
+  const goToItem = async (item: IndexItem) => {
+    if (!item.href) return goToModule(item.moduleId);
+    if (beforeNavigate && !(await beforeNavigate())) return;
     setDrawerOpen(false);
-    if (isLabel) goToModule(moduleId);
-    else router.push(`${coursePath}/lessons/${lessonId}`);
+    router.push(item.href);
   };
+
+  const indexByModule = useMemo(() => {
+    const map = new Map<string, IndexItem[]>();
+    for (const m of course?.modules ?? []) map.set(m.id, buildIndexItems(m, assignments, quizzes, coursePath));
+    return map;
+  }, [course, assignments, quizzes, coursePath]);
+
+  /** Mục đang mở: theo prop activeLessonId (trang bài học) hoặc theo đường dẫn hiện tại (bài tập / đề kiểm tra) */
+  const isItemActive = (item: IndexItem) =>
+    item.kind === "lesson" ? item.key === `lesson-${activeLessonId}` : Boolean(item.href && pathname?.startsWith(item.href));
 
   return (
     <div className="min-h-screen bg-[#f0f2f5] text-slate-800 antialiased font-sans">
@@ -208,7 +314,8 @@ export default function CourseShell({
             {course?.modules?.map((m) => {
               const isSelected = activeModuleId === m.id;
               const isCollapsed = collapsedModules[m.id] ?? false;
-              const hasLessons = Boolean(m.lessons && m.lessons.length > 0);
+              const items = indexByModule.get(m.id) ?? [];
+              const hasLessons = items.length > 0;
               return (
                 <li key={m.id}>
                   {/* Mũi tên thu gọn / mở rộng là nút riêng — bấm vào tên topic vẫn điều hướng */}
@@ -240,25 +347,27 @@ export default function CourseShell({
 
                   {hasLessons && !isCollapsed && (
                     <ul className="ml-5 mt-1 space-y-0.5 border-l-2 border-slate-200 pl-2">
-                      {m.lessons.map((l) => {
-                        const meta = LESSON_TYPE_META[l.type] ?? LESSON_TYPE_META.PAGE;
-                        const Icon = meta.icon;
-                        const isActive = activeLessonId === l.id;
-                        const hidden = l.status !== "PUBLISHED";
+                      {items.map((item) => {
+                        const Icon = item.icon;
+                        const isActive = isItemActive(item);
                         return (
-                          <li key={l.id}>
+                          <li key={item.key}>
                             <button
-                              onClick={() => goToLesson(m.id, l.id, l.type === "LABEL")}
+                              onClick={() => goToItem(item)}
+                              title={item.kind === "assignment" ? "Bài tập" : item.kind === "quiz" ? "Đề kiểm tra" : undefined}
                               className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12.5px] transition ${
                                 isActive
                                   ? "bg-blue-50 font-semibold text-[#0f6cbf]"
                                   : "text-slate-600 hover:bg-blue-50 hover:text-[#0f6cbf]"
-                              } ${hidden ? "opacity-60" : ""}`}
+                              } ${item.hidden ? "opacity-60" : ""}`}
                             >
-                              <Icon className="h-3.5 w-3.5 shrink-0 text-slate-400" />
-                              <span className="flex-1 truncate">{l.title}</span>
-                              {hidden && <EyeOff className="h-3.5 w-3.5 shrink-0 text-slate-400" />}
-                              {role === "STUDENT" && l.isCompleted && (
+                              <Icon className={`h-3.5 w-3.5 shrink-0 ${item.iconClass}`} />
+                              <span className="flex-1 truncate">{item.title}</span>
+                              {item.hidden && <EyeOff className="h-3.5 w-3.5 shrink-0 text-slate-400" />}
+                              {role === "STUDENT" && item.inProgress && (
+                                <Clock className="h-3.5 w-3.5 shrink-0 text-amber-500" />
+                              )}
+                              {role === "STUDENT" && item.done && (
                                 <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
                               )}
                             </button>

@@ -118,11 +118,15 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
               <div className={`grid h-14 w-14 place-items-center rounded-full ${tone.iconBox}`}>
                 <Icon className="h-6 w-6" />
               </div>
-              <h2 id="confirm-title" className="mt-5 text-[18px] font-bold leading-snug text-slate-900">
+              <h2 id="confirm-title" className="mt-5 text-balance text-[18px] font-bold leading-snug text-slate-900">
                 {options.title}
               </h2>
               {options.message && (
-                <div id="confirm-message" className="mt-2 text-[14px] leading-relaxed text-slate-500">
+                /* Đoạn dài căn đều 2 bên, dòng cuối (hoặc thông báo 1 dòng) vẫn căn giữa; text-pretty tránh rớt 1 chữ lẻ */
+                <div
+                  id="confirm-message"
+                  className="mt-2 text-pretty text-justify [text-align-last:center] text-[14px] leading-relaxed text-slate-500"
+                >
                   {options.message}
                 </div>
               )}

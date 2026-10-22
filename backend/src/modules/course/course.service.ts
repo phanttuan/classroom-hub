@@ -6,6 +6,7 @@ import {
   InternalServerErrorException,
   ForbiddenException,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service.js';
 import { CourseStatus, EnrollmentStatus } from '../../generated/prisma/enums.js';
@@ -15,6 +16,7 @@ import { UpdateCourseDto } from './dto/update-course.dto.js';
 import { UpdateCourseStatusDto } from './dto/update-course-status.dto.js';
 import { generateCourseCode } from './utils/course-code.util.js';
 import { DEFAULT_MODULE_TITLE } from '../learning-content/learning-content.constants.js';
+import { QuizAttemptService } from '../quiz-attempt/quiz-attempt.service.js';
 
 export interface CourseListFilter {
   status?: string;
@@ -27,7 +29,11 @@ export interface CourseListFilter {
 export class CourseService {
   private readonly logger = new Logger(CourseService.name);
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    // Tùy chọn để unit test cũ (new CourseService(prisma)) không phải truyền thêm
+    @Optional() private readonly quizAttempts?: QuizAttemptService,
+  ) {}
 
   /**
    * Tạo môn học mới (chỉ dành cho Giảng viên / Giáo viên)
@@ -559,6 +565,9 @@ export class CourseService {
         removedAt: new Date(),
       },
     });
+
+    // Lượt làm bài trắc nghiệm đang dở của sinh viên bị gỡ → chốt ngay, không để treo vô thời hạn
+    await this.quizAttempts?.finalizeStudentAttempts(courseId, studentId);
 
     return {
       message: 'Đã gỡ học sinh khỏi khóa học',
