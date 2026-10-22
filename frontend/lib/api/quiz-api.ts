@@ -1,6 +1,12 @@
 import { apiFetch } from './http-client';
 import type {
   AddQuizQuestionPayload,
+  AttemptAnswerInput,
+  AttemptGetResponse,
+  AttemptInProgressDto,
+  AttemptResultDto,
+  MyQuizAttemptsResponse,
+  TeacherAttemptListResponse,
   CreateQuestionPayload,
   CreateQuizPayload,
   QuestionBankQuestionDto,
@@ -311,5 +317,81 @@ export async function deleteQuestionSet(
     `/question-bank/sets/${id}`,
     { method: 'DELETE', skipAuthRedirect: true },
   );
+  return unwrap(res);
+}
+
+/* =========================================================================
+ * LƯỢT LÀM BÀI (CH-106 / CH-107)
+ * ========================================================================= */
+
+const attemptsBase = (courseId: string, quizId: string) => `/courses/${courseId}/quizzes/${quizId}/attempts`;
+
+/** Sinh viên: các lượt của tôi + cửa sổ làm bài + điểm ghi sổ */
+export async function fetchMyQuizAttempts(courseId: string, quizId: string): Promise<MyQuizAttemptsResponse> {
+  const res = await apiFetch<ApiEnvelope<MyQuizAttemptsResponse>>(`${attemptsBase(courseId, quizId)}/me`, {
+    skipAuthRedirect: true,
+  });
+  return unwrap(res);
+}
+
+/** Sinh viên: bắt đầu lượt mới (hoặc nhận lại lượt đang dở) */
+export async function startQuizAttempt(courseId: string, quizId: string): Promise<AttemptInProgressDto> {
+  const res = await apiFetch<ApiEnvelope<AttemptInProgressDto>>(attemptsBase(courseId, quizId), {
+    method: 'POST',
+    skipAuthRedirect: true,
+  });
+  return unwrap(res);
+}
+
+/** Sinh viên: lượt đang làm (tiếp tục) hoặc kết quả nếu đã nộp */
+export async function fetchQuizAttempt(courseId: string, quizId: string, attemptId: string): Promise<AttemptGetResponse> {
+  const res = await apiFetch<ApiEnvelope<AttemptGetResponse>>(`${attemptsBase(courseId, quizId)}/${attemptId}`, {
+    skipAuthRedirect: true,
+  });
+  return unwrap(res);
+}
+
+/** Sinh viên: lưu nháp đáp án */
+export async function saveQuizAnswers(
+  courseId: string,
+  quizId: string,
+  attemptId: string,
+  answers: AttemptAnswerInput[],
+): Promise<{ saved: number; deadlineAt: string; serverTime: string }> {
+  const res = await apiFetch<ApiEnvelope<{ saved: number; deadlineAt: string; serverTime: string }>>(
+    `${attemptsBase(courseId, quizId)}/${attemptId}/answers`,
+    { method: 'PATCH', body: JSON.stringify({ answers }), skipAuthRedirect: true },
+  );
+  return unwrap(res);
+}
+
+/** Sinh viên: nộp bài (có thể kèm đáp án cuối) — chấm tự động ngay */
+export async function submitQuizAttempt(
+  courseId: string,
+  quizId: string,
+  attemptId: string,
+  answers?: AttemptAnswerInput[],
+): Promise<AttemptResultDto> {
+  const res = await apiFetch<ApiEnvelope<AttemptResultDto>>(`${attemptsBase(courseId, quizId)}/${attemptId}/submit`, {
+    method: 'POST',
+    body: JSON.stringify(answers ? { answers } : {}),
+    skipAuthRedirect: true,
+  });
+  return unwrap(res);
+}
+
+/** Kết quả một lượt — sinh viên (chủ lượt) hoặc giáo viên */
+export async function fetchQuizAttemptResult(courseId: string, quizId: string, attemptId: string): Promise<AttemptResultDto> {
+  const res = await apiFetch<ApiEnvelope<AttemptResultDto>>(`${attemptsBase(courseId, quizId)}/${attemptId}/result`, {
+    skipAuthRedirect: true,
+  });
+  return unwrap(res);
+}
+
+/** Giáo viên: bảng lượt làm bài theo sinh viên */
+export async function fetchQuizAttempts(courseId: string, quizId: string): Promise<TeacherAttemptListResponse> {
+  const res = await apiFetch<ApiEnvelope<TeacherAttemptListResponse>>(attemptsBase(courseId, quizId), {
+    skipAuthRedirect: true,
+  });
   return unwrap(res);
 }

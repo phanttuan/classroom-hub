@@ -123,7 +123,7 @@ function InfoRow({ icon: Icon, label, value }: { icon: typeof FileText; label: s
     <div className="flex items-start gap-3 px-5 py-2.5">
       <Icon className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
       <span className="w-28 shrink-0 text-[13px] text-slate-500">{label}</span>
-      <span className="min-w-0 flex-1 break-words text-[13.5px] font-medium text-slate-800">{value}</span>
+      <span className="min-w-0 flex-1 break-words text-[13.5px] font-medium tabular-nums text-slate-800">{value}</span>
     </div>
   );
 }
@@ -704,7 +704,7 @@ export default function AssignmentView({ courseId, assignmentId, role, backHref 
                         <td className="px-3 py-3 text-center">
                           <StateBadge submission={s} isPastDue={teacherData.window.isPastDue} fixed />
                         </td>
-                        <td className="whitespace-nowrap px-3 py-3 text-center text-slate-700">
+                        <td className="whitespace-nowrap px-3 py-3 text-center tabular-nums text-slate-700">
                           {s ? (
                             <>
                               {formatDateTime(s.submittedAt)}

@@ -71,6 +71,9 @@ describe('QuizService', () => {
     maxAttempts: 1,
     scoringEnabled: true,
     showAnswersAfterSubmit: false,
+    attemptGrading: 'HIGHEST' as const,
+    shuffleQuestions: false,
+    shuffleChoices: false,
     status: ActivityStatus.DRAFT,
     publishedAt: null,
     createdAt: new Date('2026-10-20T00:00:00.000Z'),
@@ -304,10 +307,10 @@ describe('QuizService', () => {
   });
 
   describe('update', () => {
-    it('should throw ConflictException (409) when quiz is PUBLISHED/CLOSED', async () => {
+    it('should throw ConflictException (409) when quiz is CLOSED', async () => {
       prisma.quiz.findFirst.mockResolvedValue({
         ...baseQuiz,
-        status: ActivityStatus.PUBLISHED,
+        status: ActivityStatus.CLOSED,
         gradeItem: { id: gradeItemId },
       });
 
@@ -315,6 +318,39 @@ describe('QuizService', () => {
         service.update(teacherId, courseId, quizId, { title: 'Sửa' }),
       ).rejects.toThrow(ConflictException);
       expect(prisma.quiz.update).not.toHaveBeenCalled();
+    });
+
+    it('should allow editing a PUBLISHED quiz config (extend dueAt, attempts, grading policy) but not scoringEnabled', async () => {
+      prisma.quiz.findFirst.mockResolvedValue({
+        ...baseQuiz,
+        status: ActivityStatus.PUBLISHED,
+        gradeItem: { id: gradeItemId },
+      });
+      prisma.quiz.update.mockResolvedValue({
+        ...baseQuiz,
+        status: ActivityStatus.PUBLISHED,
+        maxAttempts: 3,
+        attemptGrading: 'AVERAGE',
+        gradeItem: { id: gradeItemId },
+        quizQuestions: [],
+      });
+
+      const result = await service.update(teacherId, courseId, quizId, {
+        dueAt: '2026-11-10T23:59:59.000Z',
+        maxAttempts: 3,
+        attemptGrading: 'AVERAGE',
+      });
+      expect(prisma.quiz.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({ maxAttempts: 3, attemptGrading: 'AVERAGE' }),
+        }),
+      );
+      expect(result.attemptGrading).toBe('AVERAGE');
+
+      // Tổng điểm đã chốt khi publish → không bật / tắt chấm điểm vào sổ nữa
+      await expect(
+        service.update(teacherId, courseId, quizId, { scoringEnabled: false }),
+      ).rejects.toThrow(ConflictException);
     });
 
     it('should throw BadRequestException when moving quiz to a module of another course', async () => {

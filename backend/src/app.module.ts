@@ -17,6 +17,7 @@ import { AssignmentModule } from './modules/assignment/assignment.module.js';
 import { SubmissionModule } from './modules/submission/submission.module.js';
 import { QuizModule } from './modules/quiz/quiz.module.js';
 import { QuestionBankModule } from './modules/question-bank/question-bank.module.js';
+import { QuizAttemptModule } from './modules/quiz-attempt/quiz-attempt.module.js';
 import { TransformInterceptor } from './common/interceptors/transform.interceptor.js';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
 
@@ -45,6 +46,7 @@ import { AllExceptionsFilter } from './common/filters/all-exceptions.filter.js';
     SubmissionModule,
     QuizModule,
     QuestionBankModule,
+    QuizAttemptModule,
   ],
   controllers: [AppController],
   providers: [

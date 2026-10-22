@@ -15,7 +15,6 @@ import type {
   StudentInboxItem,
   StudentNotif,
   StudentProfile,
-  StudentQuiz,
   StudentRecentScore,
   WeekEvent,
 } from "@/lib/types/student";
@@ -242,29 +241,6 @@ export const assignmentComments: AssignmentComment[] = [
 ];
 
 /* ---------- Kiểm tra ---------- */
-export const jsSampleQuestions = [
-  { id: "q1", question: "Từ khóa nào dùng để khai báo biến không thể gán lại?", options: ["var", "let", "const", "static"], answer: 2 },
-  { id: "q2", question: "JSON.parse dùng để làm gì?", options: ["Chuyển object thành chuỗi", "Chuyển chuỗi JSON thành object", "Nén file JS", "Mã hóa mật khẩu"], answer: 1 },
-  { id: "q3", question: "Phương thức nào thêm phần tử vào cuối mảng?", options: ["shift()", "unshift()", "push()", "pop()"], answer: 2 },
-  { id: "q4", question: "localStorage lưu được kiểu dữ liệu nào trực tiếp?", options: ["Object", "Chuỗi", "Hàm", "Symbol"], answer: 1 },
-  { id: "q5", question: "Kết quả của typeof [] là gì?", options: ["array", "object", "list", "undefined"], answer: 1 },
-];
-
-export const studentQuizzes: StudentQuiz[] = [
-  { id: "sq1", title: "Kiểm tra 2: HTML & CSS", classCode: "WEB301", courseName: "Lập trình Web nâng cao", datetime: "26/09/2026 08:00 - 09:00", questions: 30, minutes: 60, points: 100, status: "done", score: 8.5, tags: ["HTML", "CSS", "Responsive"] },
-  { id: "sq2", title: "Kiểm tra 1: JavaScript cơ bản", classCode: "WEB301", courseName: "Lập trình Web nâng cao", datetime: "20/09/2026 08:00 - 09:00", questions: 30, minutes: 60, points: 100, status: "doing", tags: ["Biến và kiểu dữ liệu", "Hàm", "DOM", "Xử lý sự kiện"], sample: jsSampleQuestions },
-  { id: "sq3", title: "Kiểm tra 1: Python cơ bản", classCode: "PY101", courseName: "Lập trình Python cơ bản", datetime: "30/09/2026 08:00 - 09:00", questions: 25, minutes: 45, points: 100, status: "todo", tags: ["Syntax", "Hàm", "OOP"] },
-  { id: "sq4", title: "Kiểm tra giữa kỳ: Cơ sở dữ liệu", classCode: "DB201", courseName: "Cơ sở dữ liệu", datetime: "15/10/2026 13:00 - 14:30", questions: 40, minutes: 90, points: 100, status: "overdue", tags: ["ERD", "SQL", "Chuẩn hóa"] },
-  { id: "sq5", title: "Kiểm tra 3: JavaScript nâng cao", classCode: "WEB301", courseName: "Lập trình Web nâng cao", datetime: "05/10/2026 08:00 - 09:00", questions: 30, minutes: 60, points: 100, status: "done", score: 8.0, tags: ["Async", "Fetch API"] },
-  { id: "sq6", title: "Kiểm tra 2: SQL nâng cao", classCode: "DB201", courseName: "Cơ sở dữ liệu", datetime: "10/10/2026 08:00 - 09:00", questions: 30, minutes: 60, points: 100, status: "done", score: 7.5, tags: ["JOIN", "Subquery"] },
-  { id: "sq7", title: "Kiểm tra 1: HTML & CSS", classCode: "WEB301", courseName: "Lập trình Web nâng cao", datetime: "12/09/2026 08:00 - 09:00", questions: 30, minutes: 60, points: 100, status: "done", score: 7.5, tags: ["HTML", "CSS"] },
-  { id: "sq8", title: "Kiểm tra 2: Python OOP", classCode: "PY101", courseName: "Lập trình Python cơ bản", datetime: "14/09/2026 08:00 - 09:00", questions: 25, minutes: 45, points: 100, status: "done", score: 9.0, tags: ["Class", "Kế thừa"] },
-  { id: "sq9", title: "Kiểm tra 3: React cơ bản", classCode: "WEB301", courseName: "Lập trình Web nâng cao", datetime: "18/09/2026 08:00 - 09:00", questions: 20, minutes: 40, points: 100, status: "done", score: 8.0, tags: ["Component", "Props"] },
-  { id: "sq10", title: "Kiểm tra 1: ERD", classCode: "DB201", courseName: "Cơ sở dữ liệu", datetime: "08/09/2026 08:00 - 09:00", questions: 20, minutes: 40, points: 100, status: "done", score: 7.0, tags: ["ERD"] },
-  { id: "sq11", title: "Kiểm tra cuối kỳ: Web nâng cao", classCode: "WEB301", courseName: "Lập trình Web nâng cao", datetime: "20/12/2026 08:00 - 10:00", questions: 50, minutes: 120, points: 100, status: "todo", tags: ["Tổng hợp"] },
-  { id: "sq12", title: "Kiểm tra 2: Normalization", classCode: "DB201", courseName: "Cơ sở dữ liệu", datetime: "05/09/2026 08:00 - 09:00", questions: 20, minutes: 40, points: 100, status: "overdue", tags: ["1NF", "2NF", "3NF"] },
-];
-
 /* ---------- Sổ điểm ---------- */
 export const gradeRows: GradeRow[] = [
   {

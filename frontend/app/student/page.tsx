@@ -217,7 +217,7 @@ export default function StudentDashboardPage() {
                         <span className="block truncate text-[11.5px] text-slate-400">{e.meta}</span>
                       </span>
                       {e.action === "quiz" ? (
-                        <button onClick={() => router.push("/student/quizzes")} className="shrink-0 rounded-lg bg-blue-600 px-3.5 py-1.5 text-[12px] font-semibold text-white hover:bg-blue-700">Vào làm bài</button>
+                        <button onClick={() => router.push("/student/content")} className="shrink-0 rounded-lg bg-blue-600 px-3.5 py-1.5 text-[12px] font-semibold text-white hover:bg-blue-700">Vào làm bài</button>
                       ) : e.action === "join" ? (
                         <button onClick={() => showToast("Đã mở link Google Meet (demo)")} className="shrink-0 rounded-lg border border-blue-200 px-3.5 py-1.5 text-[12px] font-semibold text-blue-600 hover:bg-blue-50">Tham gia</button>
                       ) : null}
@@ -258,7 +258,7 @@ export default function StudentDashboardPage() {
             <ul className="space-y-3.5">
               {studentDeadlines.map((d) => (
                 <li key={d.id}>
-                  <button onClick={() => router.push(d.kind === "assignment" ? "/student/assignments" : "/student/quizzes")} className="flex w-full gap-2.5 text-left">
+                  <button onClick={() => router.push(d.kind === "assignment" ? "/student/assignments" : "/student/content")} className="flex w-full gap-2.5 text-left">
                     <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-lg ${TONE_BOX[d.tone]}`}>
                       <FileText className="h-5 w-5" />
                     </span>

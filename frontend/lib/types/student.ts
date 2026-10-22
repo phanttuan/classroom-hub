@@ -127,30 +127,6 @@ export interface AssignmentComment {
   text: string;
 }
 
-export type StudentQuizStatus = "todo" | "doing" | "done" | "overdue";
-
-export interface QuizQuestion {
-  id: string;
-  question: string;
-  options: string[];
-  answer: number;
-}
-
-export interface StudentQuiz {
-  id: string;
-  title: string;
-  classCode: string;
-  courseName: string;
-  datetime: string;
-  questions: number;
-  minutes: number;
-  points: number;
-  status: StudentQuizStatus;
-  score?: number;
-  tags: string[];
-  sample?: QuizQuestion[];
-}
-
 export interface GradeRow {
   code: string;
   name: string;
